@@ -11,17 +11,22 @@ async function getAuthClient() {
   if (_authClient) return _authClient;
 
   let credentials;
-  if (process.env.GOOGLE_CREDENTIALS_JSON) {
+  if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+    // Preferred: two separate env vars — avoids JSON mangling issues
+    credentials = {
+      type: 'service_account',
+      client_email: process.env.GOOGLE_CLIENT_EMAIL,
+      private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+    };
+  } else if (process.env.GOOGLE_CREDENTIALS_JSON) {
     credentials = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    if (credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
   } else if (process.env.GOOGLE_CREDENTIALS_PATH) {
     credentials = JSON.parse(readFileSync(process.env.GOOGLE_CREDENTIALS_PATH, 'utf8'));
   } else {
-    throw new Error('No Google credentials found. Set GOOGLE_CREDENTIALS_JSON or GOOGLE_CREDENTIALS_PATH in .env');
-  }
-
-  // Fix mangled newlines in private_key when pasted via environment variables
-  if (credentials.private_key) {
-    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    throw new Error('No Google credentials found. Set GOOGLE_CLIENT_EMAIL + GOOGLE_PRIVATE_KEY in Railway variables.');
   }
 
   const auth = new google.auth.GoogleAuth({
