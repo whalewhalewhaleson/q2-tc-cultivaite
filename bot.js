@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Bot } from 'grammy';
+import { Bot, session } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
 import * as sheets from './sheets.js';
@@ -143,6 +143,8 @@ async function reflectConversation(conversation, ctx) {
 
 const bot = new Bot(process.env.BOT_TOKEN);
 
+// Session is required by the conversations plugin
+bot.use(session({ initial: () => ({}) }));
 // Conversations middleware must come before command handlers
 bot.use(conversations());
 bot.use(createConversation(reflectConversation));
