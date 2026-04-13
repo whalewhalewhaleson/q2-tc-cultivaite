@@ -1,0 +1,17 @@
+{
+  "name": "tc-cultivaite-bot",
+  "version": "1.0.0",
+  "description": "TC CultivAIte Telegram bot — Q2 2026 quarterly theme",
+  "type": "module",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js"
+  },
+  "dependencies": {
+    "@grammyjs/conversations": "^1.2.0",
+    "dotenv": "^16.4.5",
+    "googleapis": "^144.0.0",
+    "grammy": "^1.31.0",
+    "node-cron": "^3.0.3"
+  }
+}
