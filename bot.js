@@ -9,6 +9,18 @@ import * as sheets from './sheets.js';
 // ---------------------------------------------------------------------------
 
 const STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+
+// Ping the Apps Script Web App to trigger an instant stats recalculation
+async function triggerAppsScript() {
+  const url = process.env.APPS_SCRIPT_URL;
+  if (!url) return; // silently skip if not configured
+  try {
+    await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
+  } catch (err) {
+    // Non-fatal — stats will still update on the hourly trigger
+    console.warn('[AppsScript] Trigger failed (non-fatal):', err.message);
+  }
+}
 const STAGE_NAMES = {
   '🌱': 'Seedling',
   '🌿': 'Sprouting',
@@ -110,12 +122,15 @@ async function reflectConversation(conversation, ctx) {
   const q2Ctx = await conversation.waitFor('message:text');
   const q2 = q2Ctx.message.text;
 
-  // --- Step 7: Log submission ---
-  await conversation.external(() =>
-    sheets.logSubmission(user.realName, user.department, q1, q2)
-  );
+  // --- Step 7: Log submission + trigger instant stats recalculation ---
+  await conversation.external(async () => {
+    await sheets.logSubmission(user.realName, user.department, q1, q2);
+    await triggerAppsScript(); // fire-and-forget — doesn't block the user
+  });
 
   // --- Step 8: Re-read stats (best-effort level-up detection) ---
+  // Small wait to give Apps Script time to finish calculating
+  await conversation.external(() => new Promise(r => setTimeout(r, 3000)));
   const statsAfter = await conversation.external(() => sheets.getStatsForUser(user.realName));
 
   const newStage = statsAfter?.plantStage ?? stage;

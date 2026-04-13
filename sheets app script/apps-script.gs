@@ -396,6 +396,17 @@ function onFormSubmit(e) {
 
 
 // ============================================================
+// WEB APP ENTRY POINT — called by the bot after each submission
+// Deploy → New deployment → Web app → Execute as Me → Anyone
+// ============================================================
+
+function doGet(e) {
+  updateAllStats();
+  return ContentService.createTextOutput('ok');
+}
+
+
+// ============================================================
 // TRIGGER SETUP — run setupTriggers() ONCE from the editor
 // ============================================================
 
