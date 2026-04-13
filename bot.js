@@ -87,21 +87,20 @@ async function reflectConversation(conversation, ctx) {
   // --- Step 3: Check if already submitted this week ---
   const statsBefore = await conversation.external(() => sheets.getStatsForUser(user.realName));
 
-  if (statsBefore?.submittedThisWeek === true) {
-    await ctx.reply(
-      `You've already watered your plant this week! 🌿\n` +
-      `Come back after Monday 6 PM for a fresh week.\n\n` +
-      `Want to see your garden? Try /department`
-    );
-    return;
-  }
+  const alreadySubmitted = statsBefore?.submittedThisWeek === true;
 
   // --- Step 4: Opening message ---
   const weekNum = getWeekNumber();
   const stage = statsBefore?.plantStage ?? '🌱';
   const pct = statsBefore?.progressPct ?? 0;
 
-  let openingMsg = `Hey ${user.realName}! 👋 Week ${weekNum} — let's water your plant!\n\n`;
+  let openingMsg;
+  if (alreadySubmitted) {
+    openingMsg = `Hey ${user.realName}! 👋 You've already scored this week — but reflection is always welcome. 🌿\n` +
+      `*(This one won't move your progress, but it's still logged.)*\n\n`;
+  } else {
+    openingMsg = `Hey ${user.realName}! 👋 Week ${weekNum} — let's water your plant!\n\n`;
+  }
 
   if (statsBefore) {
     openingMsg += buildPlantMessage(stage, pct);
@@ -138,7 +137,14 @@ async function reflectConversation(conversation, ctx) {
   const levelledUp = statsAfter && newStage !== stage;
 
   // --- Step 9: Confirmation message ---
-  if (levelledUp) {
+  if (alreadySubmitted) {
+    // Bonus reflection — logged but doesn't score
+    await ctx.reply(
+      `📝 Logged!\n\n` +
+      `Your progress is already locked in for this week — this one's just for you. 🌿\n\n` +
+      `See you next week!`
+    );
+  } else if (levelledUp) {
     const { nextEmoji, moreBlocks } = getNextStage(newStage, newPct);
     let msg = `💧 Watered!\n\n${newStage} Your plant just grew!\n▓▓▓▓▓▓▓▓▓▓ → ${newStage}\n`;
     if (nextEmoji) msg += `\n${moreBlocks} more to reach ${nextEmoji}!\n`;
