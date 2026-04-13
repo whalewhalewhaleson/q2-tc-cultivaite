@@ -317,11 +317,11 @@ bot.catch((err) => {
 });
 
 // ---------------------------------------------------------------------------
-// Sunday nudge cron — 10:00 AM SGT = 02:00 UTC, every Sunday
+// Monday nudge cron — 10:00 AM SGT = 02:00 UTC, every Monday
 // ---------------------------------------------------------------------------
 
-cron.schedule('0 2 * * 0', async () => {
-  console.log('[Cron] Running Sunday nudge...');
+cron.schedule('0 2 * * 1', async () => {
+  console.log('[Cron] Running Monday nudge...');
   try {
     const users = await sheets.getAllUsersWithChatId();
     for (const { realName, chatId } of users) {
@@ -331,7 +331,7 @@ cron.schedule('0 2 * * 0', async () => {
           await bot.api.sendMessage(
             chatId,
             `🍁 Hey ${realName}, your plant is fading...\n` +
-            `You haven't reflected this week yet. Submit before Monday 6 PM to keep your streak!\n` +
+            `You haven't reflected this week yet. Last chance — submit before 6 PM today to keep your streak!\n` +
             `/reflect — it only takes 2 minutes.`
           );
           // Small delay to stay within Telegram rate limits
