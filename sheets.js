@@ -19,6 +19,11 @@ async function getAuthClient() {
     throw new Error('No Google credentials found. Set GOOGLE_CREDENTIALS_JSON or GOOGLE_CREDENTIALS_PATH in .env');
   }
 
+  // Fix mangled newlines in private_key when pasted via environment variables
+  if (credentials.private_key) {
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials,
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
