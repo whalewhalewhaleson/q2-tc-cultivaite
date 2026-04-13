@@ -214,6 +214,64 @@ bot.command('department', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /mystats
+// ---------------------------------------------------------------------------
+
+bot.command('mystats', async (ctx) => {
+  try {
+    const username = ctx.from?.username?.toLowerCase();
+    if (!username) {
+      await ctx.reply(`Please set a Telegram username in your Telegram Settings first! 🌱`);
+      return;
+    }
+
+    const user = await sheets.getUserByUsername(username);
+    if (!user || !user.realName) {
+      await ctx.reply(
+        `Hey! 👋 Looks like you're not in our system yet.\n` +
+        `Text @whalewhalewhalee to get added! 🌱`
+      );
+      return;
+    }
+
+    const stats = await sheets.getStatsForUser(user.realName);
+
+    if (!stats) {
+      await ctx.reply(
+        `🌱 ${user.realName} — Week ${getWeekNumber()}\n\n` +
+        `Your plant is just getting started!\n` +
+        `Submit your first reflection with /reflect 🌱`
+      );
+      return;
+    }
+
+    const bar = buildProgressBar(stats.progressPct);
+    const { nextEmoji, moreBlocks } = getNextStage(stats.plantStage, stats.progressPct);
+    const stageName = STAGE_NAMES[stats.plantStage] ?? 'Growing';
+    const submittedText = stats.submittedThisWeek ? '✅ Submitted this week' : '❌ Not submitted yet this week';
+
+    let msg = `🌿 ${user.realName} — Week ${getWeekNumber()}\n\n`;
+    msg += `${stats.plantStage} Stage: ${stageName}\n`;
+    msg += `${bar}\n`;
+    if (nextEmoji) msg += `${moreBlocks} more to reach ${nextEmoji}\n`;
+    msg += `\n🔥 Streak: ${stats.streak} week${stats.streak !== 1 ? 's' : ''}`;
+    if (stats.streak >= 4) msg += ` (2.5× multiplier!)`;
+    else if (stats.streak === 3) msg += ` (2.0× multiplier)`;
+    else if (stats.streak === 2) msg += ` (1.5× multiplier)`;
+    msg += `\n${submittedText}`;
+
+    if (!stats.submittedThisWeek) {
+      msg += `\n\nReady to water your plant? /reflect 💧`;
+    }
+
+    await ctx.reply(msg);
+  } catch (err) {
+    console.error('/mystats error:', err);
+    await ctx.reply(`Something went wrong. Please try again!`);
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /help
 // ---------------------------------------------------------------------------
 
@@ -221,6 +279,7 @@ bot.command('help', async (ctx) => {
   await ctx.reply(
     `🌱 TC CultivAIte — Commands\n\n` +
     `/reflect — Submit your weekly reflection and water your plant\n` +
+    `/mystats — View your plant stage, streak, and this week's status\n` +
     `/department — View your department garden and TC Forest\n` +
     `/cancel — Cancel a reflection in progress\n` +
     `/help — Show this message`
