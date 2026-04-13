@@ -7,6 +7,9 @@
   "scripts": {
     "start": "node bot.js"
   },
+  "engines": {
+    "node": "18.x"
+  },
   "dependencies": {
     "@grammyjs/conversations": "^1.2.0",
     "dotenv": "^16.4.5",
