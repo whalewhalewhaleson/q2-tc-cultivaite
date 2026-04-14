@@ -117,6 +117,20 @@ async function lookupUser(chatId, username) {
 }
 
 // ---------------------------------------------------------------------------
+// Admin helpers
+// ---------------------------------------------------------------------------
+
+// Returns true if the sender's Telegram user ID is in ADMIN_CHAT_IDS env var
+// Set ADMIN_CHAT_IDS=806982232 (comma-separated for multiple admins)
+function isAdmin(ctx) {
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '')
+    .split(',')
+    .map(id => id.trim())
+    .filter(Boolean);
+  return adminIds.includes(String(ctx.from?.id ?? ''));
+}
+
+// ---------------------------------------------------------------------------
 // Command interceptor — use inside conversations instead of waitFor directly
 // Returns the message context, or null if a command was typed (exits flow)
 // ---------------------------------------------------------------------------
@@ -412,6 +426,59 @@ bot.command('leaderboard', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /skipweek — admin only
+// Usage: /skipweek [Name] [WeekNumber]
+// Example: /skipweek Wilson 3
+// ---------------------------------------------------------------------------
+
+bot.command('skipweek', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const args = (ctx.message?.text ?? '').split(/\s+/).slice(1);
+    // Last arg is week number, everything before is the name
+    const weekArg = args[args.length - 1];
+    const nameArg = args.slice(0, -1).join(' ').trim();
+    const weekNum = parseInt(weekArg, 10);
+
+    if (!nameArg || isNaN(weekNum) || weekNum < 1 || weekNum > 13) {
+      await ctx.reply(
+        `${bold('Usage:')} /skipweek \\[Name\\] \\[Week\\]\n\n` +
+        `Example: /skipweek Wilson 3\n\n` +
+        `${italic('Week must be a number between 1 and 13.')}`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+
+    const user = await sheets.getUserByRealName(nameArg);
+    if (!user?.realName) {
+      await ctx.reply(
+        `${bold(e(nameArg))} not found in the Users tab\\.\n\nCheck the spelling matches column B exactly\\.`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+
+    await sheets.logSkip(user.realName, user.department, weekNum);
+    await triggerAppsScript();
+
+    await ctx.reply(
+      `✅ ${bold('Week skipped!')}\n\n` +
+      `${bold(e(user.realName))} \\(${e(user.department)}\\) has been marked as excused for ${bold(`Week ${weekNum}`)}\\.\n\n` +
+      `Their streak will be preserved once Apps Script recalculates\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } catch (err) {
+    console.error('/skipweek error:', err);
+    await ctx.reply('Something went wrong. Please try again!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /mystats
 // ---------------------------------------------------------------------------
 
@@ -530,6 +597,7 @@ bot.command('help', async (ctx) => {
     `/myreflections — 📋 Browse your past reflections\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
+    `/skipweek — 🗓 \\(Admin\\) Excuse a user for a week\n` +
     `/help — Show this message\n\n` +
     `${italic('Reflect weekly. Grow together.')}`,
     { parse_mode: 'MarkdownV2' }

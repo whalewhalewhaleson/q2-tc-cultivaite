@@ -122,6 +122,35 @@ export async function getUserByUsername(username) {
 }
 
 /**
+ * Look up a user by their real name (case-insensitive, column B).
+ * Returns { realName, department, chatId } or null if not found.
+ */
+export async function getUserByRealName(realName) {
+  if (!realName) return null;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:D',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+
+  for (const row of rows) {
+    const rowName = String(row[1] ?? '').toLowerCase().trim();
+    if (rowName === needle) {
+      return {
+        realName: String(row[1] ?? '').trim(),
+        department: String(row[2] ?? '').trim(),
+        chatId: row[3] ? String(row[3]).trim() : null,
+      };
+    }
+  }
+  return null;
+}
+
+/**
  * Write the user's Telegram chat ID into column D of the Users tab.
  * Only writes if the cell is currently empty (avoids unnecessary API calls).
  */
@@ -319,6 +348,32 @@ export async function updateSubmission(rowIndex, q1, q2) {
     range: `Submissions!E${rowIndex}:F${rowIndex}`,
     valueInputOption: 'RAW',
     requestBody: { values: [[q1, q2]] },
+  });
+}
+
+/**
+ * Write an excused-absence row for a user into the Submissions tab.
+ * Uses Wednesday 12:00 PM SGT of the target week so the Apps Script
+ * week-boundary logic (Mon 6 PM SGT cutoff) reliably places it in the right week.
+ * Q2_START is week 1 Monday: 2026-04-20.
+ */
+export async function logSkip(realName, department, weekNumber) {
+  // Wednesday of week N = Q2 Monday + (N-1)*7 + 2 days
+  const Q2_MONDAY_UTC = Date.UTC(2026, 3, 20); // 2026-04-20 00:00 UTC
+  const wednesdayUTC = Q2_MONDAY_UTC + ((weekNumber - 1) * 7 + 2) * 86400000;
+  const d = new Date(wednesdayUTC);
+  const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+  const time = '12:00 PM';
+
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Submissions!A:F',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [[realName, department, date, time, '[Excused absence]', '[Excused absence]']],
+    },
   });
 }
 
