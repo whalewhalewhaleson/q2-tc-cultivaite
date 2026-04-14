@@ -76,7 +76,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek) {
     const noun = reflectionsNeeded === 1 ? 'reflection' : 'reflections';
     card += `Next ▸ ${italic(`${reflectionsNeeded} ${noun} to ${nextEmoji}`)}\n`;
   } else {
-    card += `${italic('Full bloom reached\\! 🍎')}\n`;
+    card += `${italic('Full bloom reached! 🍎')}\n`;
   }
   card += `\n🔥 Streak ▸ ${streakLabel}\n`;
   card += submittedLine;
@@ -175,11 +175,11 @@ async function reflectConversation(conversation, ctx) {
 
   if (alreadySubmitted) {
     openingMsg += buildPlantCard(stage, pct, streak, true);
-    openingMsg += `\n\n${italic("You've already scored this week — but reflection is always welcome\\. This one won't move your progress, but it's still logged\\.")}`;
+    openingMsg += `\n\n${italic("You've already scored this week — but reflection is always welcome. This one won't move your progress, but it's still logged.")}`;
   } else if (statsBefore) {
     openingMsg += buildPlantCard(stage, pct, streak, false);
   } else {
-    openingMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started\\!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
+    openingMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
   }
 
   openingMsg += `\n\n${bold("Q1: What's one thing you've grown in personally this week?")}`;
@@ -218,12 +218,12 @@ async function reflectConversation(conversation, ctx) {
   // --- Step 8: Confirmation ---
   if (alreadySubmitted) {
     await ctx.reply(
-      `📝 ${bold('Logged\\!')}\n\nYour progress is already locked in for this week — this one's just for you\\. 🌿\n\nSee you next week\\!`,
+      `📝 ${bold('Logged!')}\n\nYour progress is already locked in for this week — this one's just for you\\. 🌿\n\nSee you next week\\!`,
       { parse_mode: 'MarkdownV2' }
     );
   } else if (levelledUp) {
     const { nextEmoji } = getNextStageInfo(newStage, newPct);
-    let msg = `💧 ${bold('Watered\\!')}\n\n${newStage} ${bold('Your plant just grew\\!')}\n${mono('●●●●●●●●●●')} → ${newStage}\n`;
+    let msg = `💧 ${bold('Watered!')}\n\n${newStage} ${bold('Your plant just grew!')}\n${mono('●●●●●●●●●●')} → ${newStage}\n`;
     if (nextEmoji) {
       const { reflectionsNeeded } = getNextStageInfo(newStage, newPct);
       const noun = reflectionsNeeded === 1 ? 'reflection' : 'reflections';
@@ -232,7 +232,7 @@ async function reflectConversation(conversation, ctx) {
     msg += `\nLooking good out there\\. ${newStage}`;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else {
-    let msg = `💧 ${bold('Watered\\!')}\n\n`;
+    let msg = `💧 ${bold('Watered!')}\n\n`;
     msg += buildPlantCard(newStage, newPct, newStreak, true);
     msg += `\n\nSee you next week\\. 🌿`;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
@@ -296,7 +296,7 @@ async function editReflectionConversation(conversation, ctx) {
   }
 
   await conversation.external(() => sheets.updateSubmission(latest.rowIndex, newQ1, newQ2));
-  await ctx.reply(`✅ ${bold('Updated\\!')} Your reflection has been saved\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`✅ ${bold('Updated!')} Your reflection has been saved\\.`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -348,7 +348,7 @@ bot.command('department', async (ctx) => {
 
     if (!deptStats) {
       await ctx.reply(
-        `${bold(user.department)}\n${italic('Your garden is taking root — check back soon\\!')}\n\n🌲 ${bold('TC Forest')} ▸ growing\\.\\.\\.`,
+        `${bold(user.department)}\n${italic('Your garden is taking root — check back soon!')}\n\n🌲 ${bold('TC Forest')} ▸ growing\\.\\.\\.`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -360,9 +360,9 @@ bot.command('department', async (ctx) => {
     const totalGardens = allDepts.length;
 
     const msg =
-      `${deptStats.gardenStage} ${bold(e(user.department))}\n` +
+      `${deptStats.gardenStage} ${bold(user.department)}\n` +
       `Garden ▸ ${bar} ${deptStats.totalSubmissions}/${deptStats.targetSubmissions}\n` +
-      `Stage ▸ ${italic(`${e(stageName)} \\(${Math.round(deptStats.progressPct)}%\\)`)}\n\n` +
+      `Stage ▸ ${italic(`${stageName} (${Math.round(deptStats.progressPct)}%)`)}\n\n` +
       `🌲 ${bold('TC Forest')} ▸ ${inBloom} of ${totalGardens} gardens in bloom`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
@@ -399,7 +399,7 @@ bot.command('mystats', async (ctx) => {
       msg +=
         `🌱 ${bold('Your Plant')}\n` +
         `Growth ▸ ${mono('○○○○○○○○○○')} 0%\n` +
-        `${italic('Just getting started\\!')}\n\n` +
+        `${italic('Just getting started!')}\n\n` +
         `🔥 Streak ▸ 0\n` +
         `❌ Not submitted yet this week\n\n` +
         `Ready to start? /reflect 💧`;
@@ -448,12 +448,12 @@ bot.command('myreflections', async (ctx) => {
     let msg = `📋 ${bold('Your Reflections')}\n`;
 
     for (const sub of submissions.reverse()) {
-      msg += `\n${bold(e(sub.date))}\n`;
-      msg += `Q1: ${italic(e(sub.q1))}\n`;
-      msg += `Q2: ${italic(e(sub.q2))}\n`;
+      msg += `\n${bold(sub.date)}\n`;
+      msg += `Q1: ${italic(sub.q1)}\n`;
+      msg += `Q2: ${italic(sub.q2)}\n`;
     }
 
-    msg += `\n${italic('Showing last 5\\.')}`;
+    msg += `\n${italic('Showing last 5.')}`;
     msg += `\nTo edit your latest: /editreflection`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
@@ -509,7 +509,7 @@ bot.command('cancel', async (ctx) => {
 
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    `🌱 ${bold('Welcome to TC CultivAIte\\!')}\n\n` +
+    `🌱 ${bold('Welcome to TC CultivAIte!')}\n\n` +
     `Every week you reflect, your plant grows\\. Every plant grows our forest\\.\n\n` +
     `Type /reflect to get started, or /help for all commands\\.`,
     { parse_mode: 'MarkdownV2' }
@@ -539,7 +539,7 @@ cron.schedule('0 2 * * 1', async () => {
         if (stats && stats.submittedThisWeek === false) {
           await bot.api.sendMessage(
             chatId,
-            `🍁 Hey ${realName}, your plant is fading\\.\\.\\.\n` +
+            `🍁 Hey ${e(realName)}, your plant is fading\\.\\.\\.\n` +
             `You haven't reflected this week yet\\. Last chance — submit before 6 PM today to keep your streak\\!\n` +
             `/reflect — it only takes 2 minutes\\.`,
             { parse_mode: 'MarkdownV2' }
