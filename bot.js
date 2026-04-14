@@ -88,8 +88,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
   const { nextEmoji, ptsNeeded } = getNextStageInfo(stage, totalPoints ?? 0);
   if (nextEmoji) {
     const idx = HEALTHY_STAGES.indexOf(stage);
-    const stageRange = STAGE_THRESHOLDS_PTS[idx + 1] - STAGE_THRESHOLDS_PTS[idx];
-    card += `${bar} ${e(String(ptsNeeded))}/${e(String(stageRange))} pts to ${nextEmoji}\n`;
+    card += `${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
   } else {
     card += `${bar} ${italic('Full bloom reached! 🍎')}\n`;
   }
@@ -223,7 +222,7 @@ async function reflectConversation(conversation, ctx) {
   } else if (statsBefore) {
     cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
   } else {
-    cardMsg += `🌱 ${bold('Your Plant')} ▸ 0 pts\n${mono('○○○○○○○○○○')} 21/21 pts to 🌿\n\n💧 Fertilizer ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')} ▸ 0 pts\n${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n💧 Fertilizer ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
   }
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
@@ -580,7 +579,7 @@ bot.command('mystats', async (ctx) => {
     if (!stats) {
       msg +=
         `🌱 ${bold('Your Plant')} ▸ 0 pts\n` +
-        `${mono('○○○○○○○○○○')} 21/21 pts to 🌿\n\n` +
+        `${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n` +
         `💧 Fertilizer ▸ None \\(0 weeks\\)\n` +
         `❌ Not submitted yet this week\n\n` +
         `Ready to plant your first seed? /reflect 💧`;
