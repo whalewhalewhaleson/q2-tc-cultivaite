@@ -81,25 +81,24 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
     ? `${'💧'.repeat(fertCount)}${streak > 5 ? ` ×${streak}` : ''} \\(${streak} week${streak !== 1 ? 's' : ''}\\)`
     : `None \\(0 weeks\\)`;
 
-  let card = `${displayStage} ${bold('Your Plant')}\n`;
+  // Line 1: stage emoji + pts
+  let card = `${displayStage} ${bold('Your Plant')} ▸ ${e(String(totalPoints ?? 0))} pts\n`;
 
+  // Line 2: bar + progress context
+  const { nextEmoji, ptsNeeded } = getNextStageInfo(stage, totalPoints ?? 0);
+  if (nextEmoji) {
+    const idx = HEALTHY_STAGES.indexOf(stage);
+    const stageRange = STAGE_THRESHOLDS_PTS[idx + 1] - STAGE_THRESHOLDS_PTS[idx];
+    card += `${bar} ${e(String(ptsNeeded))}/${e(String(stageRange))} pts to ${nextEmoji}\n`;
+  } else {
+    card += `${bar} ${italic('Full bloom reached! 🍎')}\n`;
+  }
+
+  // Dying/dead flavour text
   if (consecutiveMisses >= 2) {
     card += `${italic('Your plant has withered. Reflect to revive it!')}\n`;
   } else if (consecutiveMisses === 1) {
     card += `${italic('Your plant is struggling \u2014 reflect this week to save it!')}\n`;
-  }
-
-  card += `⭐ ${bold('Points')} ▸ ${e(String(totalPoints ?? 0))} pts\n`;
-  card += `Growth ▸ ${bar} ${pct}%\n`;
-
-  if (consecutiveMisses < 1) {
-    const { nextEmoji, ptsNeeded } = getNextStageInfo(stage, totalPoints ?? 0);
-    if (nextEmoji) {
-      const noun = ptsNeeded === 1 ? 'pt' : 'pts';
-      card += `Next ▸ ${italic(`${ptsNeeded} ${noun} to ${nextEmoji}`)}\n`;
-    } else {
-      card += `${italic('Full bloom reached! 🍎')}\n`;
-    }
   }
 
   card += `\n💧 Fertilizer ▸ ${fertStr}\n`;
@@ -224,7 +223,7 @@ async function reflectConversation(conversation, ctx) {
   } else if (statsBefore) {
     cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
   } else {
-    cardMsg += `🌱 ${bold('Your Plant')}\n⭐ ${bold('Points')} ▸ 0 pts\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Your journey starts here!')}\n\n💧 Fertilizer ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')} ▸ 0 pts\n${mono('○○○○○○○○○○')} 21/21 pts to 🌿\n\n💧 Fertilizer ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
   }
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
@@ -580,10 +579,8 @@ bot.command('mystats', async (ctx) => {
 
     if (!stats) {
       msg +=
-        `🌱 ${bold('Your Plant')}\n` +
-        `⭐ ${bold('Points')} ▸ 0 pts\n` +
-        `Growth ▸ ${mono('○○○○○○○○○○')} 0%\n` +
-        `${italic('Your journey starts here!')}\n\n` +
+        `🌱 ${bold('Your Plant')} ▸ 0 pts\n` +
+        `${mono('○○○○○○○○○○')} 21/21 pts to 🌿\n\n` +
         `💧 Fertilizer ▸ None \\(0 weeks\\)\n` +
         `❌ Not submitted yet this week\n\n` +
         `Ready to plant your first seed? /reflect 💧`;
