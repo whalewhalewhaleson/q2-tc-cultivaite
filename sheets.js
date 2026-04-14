@@ -216,14 +216,16 @@ export async function getAllUsersWithChatId() {
 
 /**
  * Get a user's plant stats from the Stats tab.
- * Returns { plantStage, progressPct, streak, submittedThisWeek } or null.
+ * Returns { plantStage, progressPct, streak, submittedThisWeek, totalPoints, consecutiveMisses, rank } or null.
+ * Columns: Name(A) | Plant Stage(B) | Progress %(C) | Streak(D) | Submitted This Week(E) |
+ *          Total Points(F) | Consecutive Misses(G) | Rank(H)
  */
 export async function getStatsForUser(realName) {
   if (!realName) return null;
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'Stats!A:E',
+    range: 'Stats!A:H',
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
 
@@ -234,10 +236,13 @@ export async function getStatsForUser(realName) {
     const rowName = String(row[0] ?? '').toLowerCase().trim();
     if (rowName === needle) {
       return {
-        plantStage: String(row[1] ?? '🌱').trim(),
-        progressPct: Number(row[2] ?? 0),
-        streak: Number(row[3] ?? 0),
+        plantStage:        String(row[1] ?? '🌱').trim(),
+        progressPct:       Number(row[2] ?? 0),
+        streak:            Number(row[3] ?? 0),
         submittedThisWeek: Boolean(row[4]), // UNFORMATTED_VALUE returns actual booleans
+        totalPoints:       Number(row[5] ?? 0),
+        consecutiveMisses: Number(row[6] ?? 0),
+        rank:              Number(row[7] ?? 0),
       };
     }
   }
@@ -250,14 +255,16 @@ export async function getStatsForUser(realName) {
 
 /**
  * Get department garden stats for a given department.
- * Returns { gardenStage, progressPct, totalSubmissions, targetSubmissions } or null.
+ * Returns { gardenStage, progressPct, totalSubmissions, targetSubmissions, avgPoints, deptStreak } or null.
+ * Columns: Department(A) | Garden Stage(B) | Progress %(C) | Total Submissions(D) |
+ *          Target Submissions(E) | Avg Points(F) | Dept Streak(G)
  */
 export async function getDeptStats(department) {
   if (!department) return null;
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'DeptStats!A:E',
+    range: 'DeptStats!A:G',
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
 
@@ -268,10 +275,12 @@ export async function getDeptStats(department) {
     const rowDept = String(row[0] ?? '').toLowerCase().trim();
     if (rowDept === needle) {
       return {
-        gardenStage: String(row[1] ?? '🌱').trim(),
-        progressPct: Number(row[2] ?? 0),
-        totalSubmissions: Number(row[3] ?? 0),
+        gardenStage:       String(row[1] ?? '🌱').trim(),
+        progressPct:       Number(row[2] ?? 0),
+        totalSubmissions:  Number(row[3] ?? 0),
         targetSubmissions: Number(row[4] ?? 0),
+        avgPoints:         Number(row[5] ?? 0),
+        deptStreak:        Number(row[6] ?? 0),
       };
     }
   }
@@ -279,13 +288,13 @@ export async function getDeptStats(department) {
 }
 
 /**
- * Returns all rows from DeptStats — used to count gardens in bloom for TC Forest.
+ * Returns all rows from DeptStats — used by /leaderboard.
  */
 export async function getAllDeptStats() {
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'DeptStats!A:E',
+    range: 'DeptStats!A:G',
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
 
@@ -293,11 +302,13 @@ export async function getAllDeptStats() {
   return rows
     .filter(row => row[0]) // skip empty rows
     .map(row => ({
-      department: String(row[0] ?? '').trim(),
-      gardenStage: String(row[1] ?? '🌱').trim(),
-      progressPct: Number(row[2] ?? 0),
-      totalSubmissions: Number(row[3] ?? 0),
+      department:        String(row[0] ?? '').trim(),
+      gardenStage:       String(row[1] ?? '🌱').trim(),
+      progressPct:       Number(row[2] ?? 0),
+      totalSubmissions:  Number(row[3] ?? 0),
       targetSubmissions: Number(row[4] ?? 0),
+      avgPoints:         Number(row[5] ?? 0),
+      deptStreak:        Number(row[6] ?? 0),
     }));
 }
 
@@ -373,6 +384,38 @@ export async function logSkip(realName, department, weekNumber) {
     insertDataOption: 'INSERT_ROWS',
     requestBody: {
       values: [[realName, department, date, time, '[Excused absence]', '[Excused absence]']],
+    },
+  });
+}
+
+/**
+ * Append a Good News nomination to the GoodNews tab.
+ * Status defaults to 'Pending'. Admin changes to 'Approved' after review.
+ * Columns: Timestamp(A) | NominatorName(B) | NominatorDept(C) | NomineeName(D) |
+ *          NomineeDept(E) | Message(F) | WeekNumber(G) | Status(H) | PtsSharer(I) | PtsNominee(J)
+ */
+export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nomineeDept, message, weekNum) {
+  const { date, time } = getSGTDatetime();
+  const timestamp = `${date} ${time}`;
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'GoodNews!A:J',
+    valueInputOption: 'RAW',
+    insertDataOption: 'INSERT_ROWS',
+    requestBody: {
+      values: [[
+        timestamp,    // A: Timestamp
+        nominatorName, // B: NominatorName
+        nominatorDept, // C: NominatorDept
+        nomineeName,   // D: NomineeName
+        nomineeDept,   // E: NomineeDept
+        message,       // F: Message
+        weekNum,       // G: WeekNumber
+        'Pending',     // H: Status
+        5,             // I: PtsSharer (default)
+        3,             // J: PtsNominee (default)
+      ]],
     },
   });
 }

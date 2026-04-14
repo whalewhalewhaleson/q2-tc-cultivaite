@@ -6,8 +6,9 @@
  *
  * What this does:
  *   - Reads Submissions tab
- *   - Calculates per-user streaks, plant stage, progress → writes Stats tab
- *   - Calculates per-department garden progress → writes DeptStats tab
+ *   - Calculates per-user pts, streaks, plant stage → writes Stats tab
+ *   - Calculates per-department average pts, garden stage → writes DeptStats tab
+ *   - Reads approved Good News nominations → adds bonus pts
  *   - Catches Google Form backup submissions → maps them to Submissions tab
  */
 
@@ -18,21 +19,38 @@
 const CONFIG = {
   Q2_START_DATE: '2026-04-20',   // Monday — first day of Q2 (YYYY-MM-DD)
   TOTAL_WEEKS: 13,
-  RESET_HOUR_SGT: 18,            // 6 PM SGT = streak reset hour
+  RESET_HOUR_SGT: 18,            // 6 PM SGT = week boundary hour
 
   SHEETS: {
     SUBMISSIONS: 'Submissions',
-    USERS: 'Users',
-    STATS: 'Stats',
-    DEPT_STATS: 'DeptStats',
+    USERS:       'Users',
+    STATS:       'Stats',
+    DEPT_STATS:  'DeptStats',
+    GOOD_NEWS:   'GoodNews',
   },
 
-  // Streak multipliers: index 0 = week 1, index 1 = week 2, index 2 = week 3, index 3+ = week 4+
-  MULTIPLIERS: [1.0, 1.5, 2.0, 2.5],
-
   STAGES: ['🌱', '🌿', '🌳', '🌼', '🍎'],
-  STAGE_THRESHOLDS: [0, 20, 40, 60, 80, 100], // overall % boundaries per stage
+  // Points lower-bounds per stage: Seedling, Sprout, Sapling, Flowering, Fruiting
+  STAGE_THRESHOLDS: [0, 21, 51, 86, 116],
+
+  PTS_BASE: 10,              // base pts per reflection submitted
+  // Streak bonus = streakSoFar - 1  (week 1 = +0, week 2 = +1, week 5 = +4)
+
+  DEPT_STREAK_WEEKS: 4,      // consecutive 100%-submission weeks to trigger multiplier
+  DEPT_STREAK_MULTIPLIER: 2, // 2× pts for everyone on the trigger week
 };
+
+
+// ============================================================
+// CUSTOM MENU — adds "TC CultivAIte > Update Stats" to the sheet toolbar
+// ============================================================
+
+function onOpen() {
+  SpreadsheetApp.getUi()
+    .createMenu('TC CultivAIte')
+    .addItem('Update All Stats', 'updateAllStats')
+    .addToUi();
+}
 
 
 // ============================================================
@@ -42,29 +60,40 @@ const CONFIG = {
 function updateAllStats() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const submissionsSheet = ss.getSheetByName(CONFIG.SHEETS.SUBMISSIONS);
-  const usersSheet = ss.getSheetByName(CONFIG.SHEETS.USERS);
-  const statsSheet = ss.getSheetByName(CONFIG.SHEETS.STATS);
-  const deptStatsSheet = ss.getSheetByName(CONFIG.SHEETS.DEPT_STATS);
+  const usersSheet       = ss.getSheetByName(CONFIG.SHEETS.USERS);
+  const statsSheet       = ss.getSheetByName(CONFIG.SHEETS.STATS);
+  const deptStatsSheet   = ss.getSheetByName(CONFIG.SHEETS.DEPT_STATS);
+  const goodNewsSheet    = ss.getSheetByName(CONFIG.SHEETS.GOOD_NEWS); // null if not created yet
 
   if (!submissionsSheet || !usersSheet || !statsSheet || !deptStatsSheet) {
     console.error('One or more sheets not found. Check sheet tab names match CONFIG.SHEETS exactly.');
     return;
   }
 
-  const submissions = loadSubmissions(submissionsSheet);
-  const users = loadUsers(usersSheet);
+  const submissions    = loadSubmissions(submissionsSheet);
+  const users          = loadUsers(usersSheet);
   const currentWeekKey = getCurrentWeekKey();
+  const currentWeekNum = Math.max(1, Math.min(CONFIG.TOTAL_WEEKS, getWeekNumber(currentWeekKey)));
+
+  // Load approved Good News entries (graceful if tab doesn't exist yet)
+  const goodNewsEntries = goodNewsSheet ? loadGoodNews(goodNewsSheet) : [];
+
+  // Pre-calculate which weeks trigger the 2× dept multiplier per department
+  const deptMultiplierWeeksMap = calculateDeptMultiplierWeeks(submissions, users, currentWeekNum);
 
   // --- Per-user stats ---
   const userStats = {};
   for (const user of users) {
-    userStats[user.realName] = calculateUserStats(user.realName, submissions, currentWeekKey);
+    const deptMultiplierWeeks = deptMultiplierWeeksMap[user.department] || new Set();
+    userStats[user.realName] = calculateUserStats(
+      user.realName, submissions, currentWeekKey, goodNewsEntries, deptMultiplierWeeks
+    );
   }
   writeStatsTab(statsSheet, users, userStats);
 
   // --- Per-department stats ---
   const deptTargets = loadDeptTargets(deptStatsSheet);
-  const deptStats = calculateDeptStats(submissions, users, currentWeekKey, deptTargets);
+  const deptStats = calculateDeptStats(submissions, users, currentWeekKey, userStats);
   writeDeptStatsTab(deptStatsSheet, deptStats, deptTargets);
 
   console.log('✅ updateAllStats() complete — ' + new Date().toISOString());
@@ -117,6 +146,33 @@ function loadDeptTargets(sheet) {
   return targets;
 }
 
+/**
+ * Reads the GoodNews tab and returns only Approved entries.
+ * Columns: Timestamp(A) | NominatorName(B) | NominatorDept(C) | NomineeName(D) |
+ *          NomineeDept(E) | Message(F) | WeekNumber(G) | Status(H) | PtsSharer(I) | PtsNominee(J)
+ */
+function loadGoodNews(sheet) {
+  const data = sheet.getDataRange().getValues();
+  const approved = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (!row[0]) continue;
+    const status = String(row[7]).trim().toLowerCase();
+    if (status !== 'approved') continue;
+    approved.push({
+      nominatorName: String(row[1]).trim(),
+      nominatorDept: String(row[2]).trim(),
+      nomineeName:   String(row[3]).trim(),
+      nomineeDept:   String(row[4]).trim(),
+      message:       String(row[5]).trim(),
+      weekNumber:    Number(row[6]),
+      ptsSharer:     Number(row[8]) || 5,
+      ptsNominee:    Number(row[9]) || 3,
+    });
+  }
+  return approved;
+}
+
 
 // ============================================================
 // WEEK KEY HELPERS
@@ -126,10 +182,8 @@ function loadDeptTargets(sheet) {
 // ============================================================
 
 function getWeekKey(dateStr, timeStr) {
-  // Parse date
   const [year, month, day] = dateStr.split('-').map(Number);
 
-  // Parse time (HH:MM AM/PM)
   const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
   if (!match) return null;
   let hours = parseInt(match[1]);
@@ -137,11 +191,9 @@ function getWeekKey(dateStr, timeStr) {
   if (period === 'PM' && hours !== 12) hours += 12;
   if (period === 'AM' && hours === 12) hours = 0;
 
-  // JavaScript Date — treated as local (doesn't matter; we only care about day-of-week math)
   const dt = new Date(year, month - 1, day, hours, 0, 0);
   const dow = dt.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
 
-  // How many days to subtract to reach the Monday that opened this week
   let daysBack;
   if (dow === 1 && hours < CONFIG.RESET_HOUR_SGT) {
     daysBack = 7; // Monday before 6 PM → belongs to PREVIOUS week
@@ -161,7 +213,6 @@ function getWeekKey(dateStr, timeStr) {
 }
 
 function getCurrentWeekKey() {
-  // Build a fake "submission" entry for right now, in SGT
   const now = new Date();
   const sgtNow = new Date(now.getTime() + 8 * 60 * 60 * 1000);
 
@@ -195,13 +246,66 @@ function getWeekNumber(weekKey) {
 
 
 // ============================================================
+// DEPT MULTIPLIER PRE-CALCULATION
+// Returns a plain object: { deptName: Set<weekNumber>, ... }
+// The Set contains 1-indexed week numbers where the 2× bonus fires.
+// Logic: per dept, consecutive 100% participation weeks; when count
+// hits DEPT_STREAK_WEEKS, record that week and reset the counter.
+// ============================================================
+
+function calculateDeptMultiplierWeeks(allSubmissions, users, currentWeekNum) {
+  // Build dept → member names map
+  const deptUsersMap = {};
+  for (const user of users) {
+    if (!deptUsersMap[user.department]) deptUsersMap[user.department] = [];
+    deptUsersMap[user.department].push(user.realName.toLowerCase());
+  }
+
+  const result = {};
+
+  for (const [dept, memberNames] of Object.entries(deptUsersMap)) {
+    result[dept] = new Set();
+    let consecutiveFull = 0;
+
+    for (let w = 1; w <= currentWeekNum; w++) {
+      const wKey = getWeekMonday(w);
+      const allSubmitted = memberNames.every(name =>
+        allSubmissions.some(s => {
+          if (s.name.toLowerCase() !== name) return false;
+          return getWeekKey(s.date, s.time) === wKey;
+        })
+      );
+
+      if (allSubmitted) {
+        consecutiveFull++;
+        if (consecutiveFull === CONFIG.DEPT_STREAK_WEEKS) {
+          result[dept].add(w); // this is the trigger week — apply 2× here
+          consecutiveFull = 0; // reset so it can fire again at week 8
+        }
+      } else {
+        consecutiveFull = 0;
+      }
+    }
+  }
+
+  return result;
+}
+
+
+// ============================================================
 // USER STATS CALCULATION
 // ============================================================
 
-function calculateUserStats(realName, allSubmissions, currentWeekKey) {
-  const userSubs = allSubmissions.filter(
-    s => s.name.toLowerCase() === realName.toLowerCase()
-  );
+/**
+ * @param {string}   realName
+ * @param {object[]} allSubmissions
+ * @param {string}   currentWeekKey
+ * @param {object[]} goodNewsEntries   - approved Good News rows from loadGoodNews()
+ * @param {Set}      deptMultiplierWeeks - week numbers (1-indexed) where 2× fires for this user's dept
+ */
+function calculateUserStats(realName, allSubmissions, currentWeekKey, goodNewsEntries, deptMultiplierWeeks) {
+  const nameLower = realName.toLowerCase();
+  const userSubs = allSubmissions.filter(s => s.name.toLowerCase() === nameLower);
 
   // First submission per week only
   const weekMap = {};
@@ -210,40 +314,59 @@ function calculateUserStats(realName, allSubmissions, currentWeekKey) {
     if (wk && !weekMap[wk]) weekMap[wk] = sub;
   }
 
-  // Build week-by-week history for weeks 1 → current
   const currentWeekNum = Math.max(1, Math.min(CONFIG.TOTAL_WEEKS, getWeekNumber(currentWeekKey)));
-  const weekHistory = [];
+
+  // Walk week-by-week, accumulating pts
+  let totalPoints = 0;
+  let streakSoFar = 0;       // running streak at time of each submission
+  let consecutiveMisses = 0; // tracks dying/dead state
+
   for (let w = 1; w <= currentWeekNum; w++) {
     const wKey = getWeekMonday(w);
-    weekHistory.push({ wKey, submitted: !!weekMap[wKey] });
+    const submitted = !!weekMap[wKey];
+
+    if (submitted) {
+      streakSoFar++;
+      consecutiveMisses = 0;
+      // Bonus = streakSoFar - 1: week 1 = +0, week 2 = +1, week 5 = +4
+      const streakBonus = streakSoFar - 1;
+      let weekPts = CONFIG.PTS_BASE + streakBonus;
+      if (deptMultiplierWeeks.has(w)) {
+        weekPts *= CONFIG.DEPT_STREAK_MULTIPLIER;
+      }
+      totalPoints += weekPts;
+    } else {
+      streakSoFar = 0;
+      consecutiveMisses++;
+    }
   }
 
-  // Current streak — consecutive submitted weeks going backwards from now
-  let streak = 0;
-  for (let i = weekHistory.length - 1; i >= 0; i--) {
-    if (weekHistory[i].submitted) streak++;
+  // Current streak — recalculate going backwards from current week
+  let currentStreak = 0;
+  for (let w = currentWeekNum; w >= 1; w--) {
+    if (weekMap[getWeekMonday(w)]) currentStreak++;
     else break;
   }
 
-  // Total scored weeks (used for plant stage)
-  const totalScoredWeeks = weekHistory.filter(w => w.submitted).length;
+  // Add approved Good News pts
+  for (const entry of goodNewsEntries) {
+    if (entry.nominatorName.toLowerCase() === nameLower) totalPoints += entry.ptsSharer;
+    if (entry.nomineeName.toLowerCase() === nameLower)   totalPoints += entry.ptsNominee;
+  }
 
-  // Personal plant: overall % = scored weeks / total weeks × 100
-  const overallPct = (totalScoredWeeks / CONFIG.TOTAL_WEEKS) * 100;
-  const { stage, progressPct } = stageFromOverallPct(overallPct);
-
+  const { stage, progressPct } = stageFromPts(totalPoints);
   const submittedThisWeek = !!weekMap[currentWeekKey];
 
-  return { stage, progressPct, streak, submittedThisWeek };
+  return { stage, progressPct, streak: currentStreak, submittedThisWeek, totalPoints, consecutiveMisses };
 }
 
 
 // ============================================================
 // DEPARTMENT STATS CALCULATION
+// Dept score = average of all members' individual pts.
 // ============================================================
 
-function calculateDeptStats(allSubmissions, users, currentWeekKey, deptTargets) {
-  // Build department → users map
+function calculateDeptStats(allSubmissions, users, currentWeekKey, userStatsMap) {
   const deptUsersMap = {};
   for (const user of users) {
     if (!deptUsersMap[user.department]) deptUsersMap[user.department] = [];
@@ -254,43 +377,47 @@ function calculateDeptStats(allSubmissions, users, currentWeekKey, deptTargets) 
   const deptStats = {};
 
   for (const [dept, deptUsers] of Object.entries(deptUsersMap)) {
-    const target = deptTargets[dept] || 0;
-    let totalWeighted = 0;
+    const memberCount = deptUsers.length;
+    let totalPts = 0;
+    let totalSubmissions = 0;
 
     for (const userName of deptUsers) {
-      const userSubs = allSubmissions.filter(
-        s => s.name.toLowerCase() === userName.toLowerCase()
-      );
-
-      // First submission per week only
-      const weekMap = {};
-      for (const sub of userSubs) {
-        const wk = getWeekKey(sub.date, sub.time);
-        if (wk && !weekMap[wk]) weekMap[wk] = sub;
-      }
-
-      // Walk week by week, tracking streak and applying multiplier
-      let userStreak = 0;
-      for (let w = 1; w <= currentWeekNum; w++) {
-        const wKey = getWeekMonday(w);
-        if (weekMap[wKey]) {
-          userStreak++;
-          const mIdx = Math.min(userStreak - 1, CONFIG.MULTIPLIERS.length - 1);
-          totalWeighted += CONFIG.MULTIPLIERS[mIdx];
-        } else {
-          userStreak = 0;
+      const uStats = userStatsMap[userName];
+      if (uStats) {
+        totalPts += uStats.totalPoints;
+        // Count raw weeks submitted (for reference)
+        const nameLower = userName.toLowerCase();
+        const weeksSeen = new Set();
+        for (const sub of allSubmissions) {
+          if (sub.name.toLowerCase() !== nameLower) continue;
+          const wk = getWeekKey(sub.date, sub.time);
+          if (wk) weeksSeen.add(wk);
         }
+        totalSubmissions += weeksSeen.size;
       }
     }
 
-    const overallPct = target > 0 ? Math.min(100, (totalWeighted / target) * 100) : 0;
-    const { stage, progressPct } = stageFromOverallPct(overallPct);
+    const avgPoints = memberCount > 0 ? Math.round((totalPts / memberCount) * 10) / 10 : 0;
+    const { stage, progressPct } = stageFromPts(avgPoints);
+
+    // Dept streak — consecutive 100% submission weeks backwards from current week
+    let deptStreak = 0;
+    const memberNamesLower = deptUsers.map(n => n.toLowerCase());
+    for (let w = currentWeekNum; w >= 1; w--) {
+      const wKey = getWeekMonday(w);
+      const allSubmitted = memberNamesLower.every(name =>
+        allSubmissions.some(s => s.name.toLowerCase() === name && getWeekKey(s.date, s.time) === wKey)
+      );
+      if (allSubmitted) deptStreak++;
+      else break;
+    }
 
     deptStats[dept] = {
       gardenStage: stage,
       progressPct,
-      totalSubmissions: Math.round(totalWeighted * 10) / 10,
-      targetSubmissions: target,
+      totalSubmissions,
+      avgPoints,
+      deptStreak,
     };
   }
 
@@ -299,19 +426,20 @@ function calculateDeptStats(allSubmissions, users, currentWeekKey, deptTargets) 
 
 
 // ============================================================
-// STAGE HELPER
+// STAGE HELPER — pts-based
 // ============================================================
 
-function stageFromOverallPct(overallPct) {
-  const thresholds = CONFIG.STAGE_THRESHOLDS;
-  let stageIdx = 0;
-  for (let i = 0; i < CONFIG.STAGES.length; i++) {
-    if (overallPct >= thresholds[i]) stageIdx = i;
+function stageFromPts(pts) {
+  const thresholds = CONFIG.STAGE_THRESHOLDS; // [0, 21, 51, 86, 116]
+  const stages = CONFIG.STAGES;
+  let idx = 0;
+  for (let i = 0; i < stages.length; i++) {
+    if (pts >= thresholds[i]) idx = i;
   }
-  const stageMin = thresholds[stageIdx];
-  const stageMax = thresholds[stageIdx + 1] !== undefined ? thresholds[stageIdx + 1] : 100;
-  const progressPct = Math.min(100, Math.round(((overallPct - stageMin) / (stageMax - stageMin)) * 100));
-  return { stage: CONFIG.STAGES[stageIdx], progressPct };
+  const stageMin = thresholds[idx];
+  const stageMax = thresholds[idx + 1] !== undefined ? thresholds[idx + 1] : stageMin + 40;
+  const progressPct = Math.min(100, Math.round(((pts - stageMin) / (stageMax - stageMin)) * 100));
+  return { stage: stages[idx], progressPct };
 }
 
 
@@ -319,23 +447,64 @@ function stageFromOverallPct(overallPct) {
 // WRITING TO SHEETS
 // ============================================================
 
+/**
+ * Stats tab columns (A–H):
+ * Name | Plant Stage | Progress % | Streak | Submitted This Week | Total Points | Consecutive Misses | Rank
+ */
 function writeStatsTab(sheet, users, userStats) {
-  const header = ['Name', 'Plant Stage', 'Progress %', 'Streak', 'Submitted This Week'];
+  const header = [
+    'Name', 'Plant Stage', 'Progress %', 'Streak',
+    'Submitted This Week', 'Total Points', 'Consecutive Misses', 'Rank',
+  ];
+
+  // Assign ranks: sort by totalPoints descending
+  const usersWithStats = users
+    .map(u => ({ name: u.realName, stats: userStats[u.realName] }))
+    .filter(x => !!x.stats);
+  usersWithStats.sort((a, b) => b.stats.totalPoints - a.stats.totalPoints);
+  const rankMap = {};
+  usersWithStats.forEach((item, idx) => { rankMap[item.name] = idx + 1; });
+
   const rows = [header];
   for (const user of users) {
     const s = userStats[user.realName];
     if (!s) continue;
-    rows.push([user.realName, s.stage, s.progressPct, s.streak, s.submittedThisWeek]);
+    rows.push([
+      user.realName,
+      s.stage,
+      s.progressPct,
+      s.streak,
+      s.submittedThisWeek,
+      s.totalPoints,
+      s.consecutiveMisses,
+      rankMap[user.realName] ?? '',
+    ]);
   }
+
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, header.length).setValues(rows);
 }
 
+/**
+ * DeptStats tab columns (A–G):
+ * Department | Garden Stage | Progress % | Total Submissions | Target Submissions | Avg Points | Dept Streak
+ */
 function writeDeptStatsTab(sheet, deptStats, deptTargets) {
-  const header = ['Department', 'Garden Stage', 'Progress %', 'Total Submissions', 'Target Submissions'];
+  const header = [
+    'Department', 'Garden Stage', 'Progress %',
+    'Total Submissions', 'Target Submissions', 'Avg Points', 'Dept Streak',
+  ];
   const rows = [header];
   for (const [dept, s] of Object.entries(deptStats)) {
-    rows.push([dept, s.gardenStage, s.progressPct, s.totalSubmissions, s.targetSubmissions]);
+    rows.push([
+      dept,
+      s.gardenStage,
+      s.progressPct,
+      s.totalSubmissions,
+      deptTargets[dept] ?? 0,
+      s.avgPoints,
+      s.deptStreak,
+    ]);
   }
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, header.length).setValues(rows);
@@ -353,24 +522,19 @@ function writeDeptStatsTab(sheet, deptStats, deptTargets) {
 // 2. In the Form: Responses tab → Link to spreadsheet → select THIS sheet
 //    (it will create a "Form Responses 1" tab — that's fine, leave it)
 // 3. In Apps Script editor: Add trigger → onFormSubmit → From spreadsheet → On form submit
-//
-// The function below catches each form submission, maps it to the
-// Submissions tab format, and then recalculates all stats.
 // ============================================================
 
 function onFormSubmit(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const usersSheet = ss.getSheetByName(CONFIG.SHEETS.USERS);
+  const usersSheet       = ss.getSheetByName(CONFIG.SHEETS.USERS);
   const submissionsSheet = ss.getSheetByName(CONFIG.SHEETS.SUBMISSIONS);
 
-  // Form response values: [Timestamp, Name, Q1, Q2]
   const responses = e.values;
   const timestamp = new Date(responses[0]);
   const formName  = String(responses[1]).trim();
   const q1        = String(responses[2]).trim();
   const q2        = String(responses[3]).trim();
 
-  // Look up department from Users tab by real name
   const usersData = usersSheet.getDataRange().getValues();
   let department = 'Unknown';
   for (let i = 1; i < usersData.length; i++) {
@@ -380,15 +544,11 @@ function onFormSubmit(e) {
     }
   }
 
-  // Convert timestamp to SGT
   const sgtTimestamp = new Date(timestamp.getTime() + 8 * 60 * 60 * 1000);
   const date = Utilities.formatDate(sgtTimestamp, 'UTC', 'yyyy-MM-dd');
-  const time = Utilities.formatDate(sgtTimestamp, 'UTC', 'h:mm a').toUpperCase(); // e.g. "2:30 PM"
+  const time = Utilities.formatDate(sgtTimestamp, 'UTC', 'h:mm a').toUpperCase();
 
-  // Write to Submissions tab
   submissionsSheet.appendRow([formName, department, date, time, q1, q2]);
-
-  // Recalculate stats immediately
   updateAllStats();
 
   console.log('Form submission logged for: ' + formName);
@@ -411,10 +571,8 @@ function doGet(e) {
 // ============================================================
 
 function setupTriggers() {
-  // Remove any existing triggers first to avoid duplicates
   deleteAllTriggers();
 
-  // Run updateAllStats() every hour automatically
   ScriptApp.newTrigger('updateAllStats')
     .timeBased()
     .everyHours(1)

@@ -26,14 +26,19 @@ function mono(text) { return `\`${text}\``; }
 // Growth helpers
 // ---------------------------------------------------------------------------
 
-const STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+const STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍂', '🥀'];
 const STAGE_NAMES = {
   '🌱': 'Seedling',
-  '🌿': 'Sprouting',
-  '🌳': 'Tree',
+  '🌿': 'Sprout',
+  '🌳': 'Sapling',
   '🌼': 'Flowering',
-  '🍎': 'Harvest',
+  '🍎': 'Fruiting',
+  '🍂': 'Dying',
+  '🥀': 'Dead',
 };
+const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+// Points lower-bound per stage (mirrors apps-script.gs CONFIG.STAGE_THRESHOLDS)
+const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 
 function getWeekNumber() {
   const start = new Date('2026-04-20T00:00:00+08:00');
@@ -47,39 +52,63 @@ function buildProgressBar(pct) {
   return mono('●'.repeat(filled) + '○'.repeat(10 - filled));
 }
 
-// How many more scored weeks until the next stage
-function getNextStageInfo(plantStage, progressPct) {
-  const idx = STAGES.indexOf(plantStage);
-  if (idx === -1 || idx === STAGES.length - 1) return { nextEmoji: null, reflectionsNeeded: 0 };
+// Resolve the display emoji — dying/dead override the earned stage for display only
+function resolveDisplayStage(plantStage, consecutiveMisses) {
+  if (consecutiveMisses >= 2) return '🥀';
+  if (consecutiveMisses === 1) return '🍂';
+  return plantStage;
+}
 
-  // Reconstruct approximate overall % from stage + within-stage progress
-  const overallPct = idx * 20 + (progressPct / 100) * 20;
-  const scoredWeeks = Math.round((overallPct / 100) * 13);
-  const weeksForNextStage = Math.ceil(((idx + 1) * 20 / 100) * 13);
-  const reflectionsNeeded = Math.max(1, weeksForNextStage - scoredWeeks);
-
-  return { nextEmoji: STAGES[idx + 1], reflectionsNeeded };
+// How many more pts until the next stage
+function getNextStageInfo(plantStage, totalPoints) {
+  const idx = HEALTHY_STAGES.indexOf(plantStage);
+  if (idx === -1 || idx === HEALTHY_STAGES.length - 1) return { nextEmoji: null, ptsNeeded: 0 };
+  const ptsNeeded = Math.max(0, STAGE_THRESHOLDS_PTS[idx + 1] - totalPoints);
+  return { nextEmoji: HEALTHY_STAGES[idx + 1], ptsNeeded };
 }
 
 // Full plant card block (used in /reflect, /mystats)
-function buildPlantCard(stage, pct, streak, submittedThisWeek) {
+function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, consecutiveMisses, rank, totalUsers) {
+  const displayStage = resolveDisplayStage(stage, consecutiveMisses);
   const bar = buildProgressBar(pct);
-  const { nextEmoji, reflectionsNeeded } = getNextStageInfo(stage, pct);
   const submittedLine = submittedThisWeek
     ? `✅ Submitted this week`
     : `❌ Not submitted yet this week`;
-  const streakLabel = streak === 1 ? '1 week' : `${streak} weeks`;
 
-  let card = `${stage} ${bold('Your Plant')}\n`;
-  card += `Growth ▸ ${bar} ${pct}%\n`;
-  if (nextEmoji) {
-    const noun = reflectionsNeeded === 1 ? 'reflection' : 'reflections';
-    card += `Next ▸ ${italic(`${reflectionsNeeded} ${noun} to ${nextEmoji}`)}\n`;
-  } else {
-    card += `${italic('Full bloom reached! 🍎')}\n`;
+  // Fertilizer: one 💧 per streak week (max 5 shown, then show count)
+  const fertCount = Math.min(streak, 5);
+  const fertStr = streak > 0
+    ? `${'💧'.repeat(fertCount)}${streak > 5 ? ` ×${streak}` : ''} \\(${streak} week${streak !== 1 ? 's' : ''}\\)`
+    : `None \\(0 weeks\\)`;
+
+  let card = `${displayStage} ${bold('Your Plant')}\n`;
+
+  if (consecutiveMisses >= 2) {
+    card += `${italic('Your plant has withered. Reflect to revive it!')}\n`;
+  } else if (consecutiveMisses === 1) {
+    card += `${italic('Your plant is struggling \u2014 reflect this week to save it!')}\n`;
   }
-  card += `\n🔥 Streak ▸ ${streakLabel}\n`;
+
+  card += `⭐ ${bold('Points')} ▸ ${e(String(totalPoints ?? 0))} pts\n`;
+  card += `Growth ▸ ${bar} ${pct}%\n`;
+
+  if (consecutiveMisses < 1) {
+    const { nextEmoji, ptsNeeded } = getNextStageInfo(stage, totalPoints ?? 0);
+    if (nextEmoji) {
+      const noun = ptsNeeded === 1 ? 'pt' : 'pts';
+      card += `Next ▸ ${italic(`${ptsNeeded} ${noun} to ${nextEmoji}`)}\n`;
+    } else {
+      card += `${italic('Full bloom reached! 🍎')}\n`;
+    }
+  }
+
+  card += `\n💧 Streak ▸ ${fertStr}\n`;
   card += submittedLine;
+
+  if (rank && totalUsers) {
+    card += `\n\n🏅 ${italic(`You're #${rank} of ${totalUsers}`)}`;
+  }
+
   return card;
 }
 
@@ -181,19 +210,21 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 3: Plant card (message 1) ---
   const weekNum = getWeekNumber();
-  const stage = statsBefore?.plantStage ?? '🌱';
-  const pct = statsBefore?.progressPct ?? 0;
-  const streak = statsBefore?.streak ?? 0;
+  const stage              = statsBefore?.plantStage        ?? '🌱';
+  const pct                = statsBefore?.progressPct       ?? 0;
+  const streak             = statsBefore?.streak            ?? 0;
+  const totalPoints        = statsBefore?.totalPoints       ?? 0;
+  const consecutiveMisses  = statsBefore?.consecutiveMisses ?? 0;
 
   let cardMsg = `${bold(`Week ${weekNum}`)}\n\nHey ${e(user.realName)} 👋\n\n`;
 
   if (alreadySubmitted) {
-    cardMsg += buildPlantCard(stage, pct, streak, true);
-    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your progress, but it's still stored. Keep going!")}`;
+    cardMsg += buildPlantCard(stage, pct, streak, true, totalPoints, consecutiveMisses, null, null);
+    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your pts, but it's still stored\\. Keep going\\!")}`;
   } else if (statsBefore) {
-    cardMsg += buildPlantCard(stage, pct, streak, false);
+    cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
   } else {
-    cardMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Your journey starts here!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')}\n⭐ ${bold('Points')} ▸ 0 pts\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Your journey starts here\\!')}\n\n💧 Streak ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
   }
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
@@ -219,41 +250,79 @@ async function reflectConversation(conversation, ctx) {
   if (!q2Ctx) return;
   const q2 = q2Ctx.message.text;
 
-  // --- Step 6: Log + trigger Apps Script ---
+  // --- Step 6b: Optional Q3 — Good News ---
+  await ctx.reply(
+    `${bold('Q3 \\(Optional\\): Got any good news to share about someone this week?')}\n\n` +
+    `${italic('Name them and what they did \u2014 both your dept and theirs earn bonus pts! Or type')} ${bold('skip')} ${italic('to finish.')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+
+  const q3Ctx = await waitForText(conversation, ctx);
+  if (!q3Ctx) return;
+  const q3Raw = q3Ctx.message.text.trim();
+  const hasGoodNews = q3Raw.toLowerCase() !== 'skip' && q3Raw.length > 0;
+
+  let nomineeName = null;
+  let nomineeDept = null;
+  if (hasGoodNews) {
+    await ctx.reply(
+      `Who are you nominating? ${italic('Type their full name as it appears in the system\\.')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    const nomineeCtx = await waitForText(conversation, ctx);
+    if (!nomineeCtx) return;
+    nomineeName = nomineeCtx.message.text.trim();
+    const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
+    nomineeDept = nomineeUser?.department ?? 'Unknown';
+  }
+
+  // --- Step 7: Log submission + good news + trigger Apps Script ---
   await conversation.external(async () => {
     await sheets.logSubmission(user.realName, user.department, q1, q2);
+    if (hasGoodNews && nomineeName) {
+      await sheets.logGoodNews(user.realName, user.department, nomineeName, nomineeDept, q3Raw, getWeekNumber());
+    }
     await triggerAppsScript();
   });
 
-  // --- Step 7: Wait for stats recalc, then re-read ---
+  // --- Step 8: Wait for stats recalc, then re-read ---
   await conversation.external(() => new Promise(r => setTimeout(r, 3000)));
   const statsAfter = await conversation.external(() => sheets.getStatsForUser(user.realName));
 
-  const newStage = statsAfter?.plantStage ?? stage;
-  const newPct = statsAfter?.progressPct ?? pct;
-  const newStreak = statsAfter?.streak ?? streak;
-  const levelledUp = statsAfter && newStage !== stage;
+  const newStage          = statsAfter?.plantStage        ?? stage;
+  const newPct            = statsAfter?.progressPct       ?? pct;
+  const newStreak         = statsAfter?.streak            ?? streak;
+  const newPoints         = statsAfter?.totalPoints       ?? totalPoints;
+  const newMisses         = statsAfter?.consecutiveMisses ?? 0;
+  const levelledUp = statsAfter &&
+    HEALTHY_STAGES.indexOf(newStage) > HEALTHY_STAGES.indexOf(stage);
 
-  // --- Step 8: Confirmation ---
+  // --- Step 9: Confirmation ---
   if (alreadySubmitted) {
-    await ctx.reply(
-      `📝 ${bold('Reflection stored!')}\n\nYour streak is already locked in for this week — this one's just for you\\. Keep that momentum going\\! 🌿\n\nSee you next week\\.`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  } else if (levelledUp) {
-    const { nextEmoji } = getNextStageInfo(newStage, newPct);
-    let msg = `💧 ${bold('Plant watered!')}\n\n${newStage} ${bold('Your plant just levelled up!')}\n${mono('●●●●●●●●●●')} → ${newStage}\n`;
-    if (nextEmoji) {
-      const { reflectionsNeeded } = getNextStageInfo(newStage, newPct);
-      const noun = reflectionsNeeded === 1 ? 'reflection' : 'reflections';
-      msg += `\n${italic(`${reflectionsNeeded} more ${noun} to reach ${nextEmoji}`)}\n`;
+    let msg = `📝 ${bold('Reflection stored!')}\n\nYour pts are already locked in for this week — this one's just for you\\. Keep that momentum going\\! 🌿\n\nSee you next week\\.`;
+    if (hasGoodNews && nomineeName) {
+      msg += `\n\n🌟 ${italic(`Your good news about ${e(nomineeName)} has been noted — the team will review it!`)}`;
     }
-    msg += `\nYou're growing\\. Keep it up\\! ${newStage}`;
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } else if (levelledUp) {
+    const { nextEmoji, ptsNeeded } = getNextStageInfo(newStage, newPoints);
+    let msg = `💧 ${bold('Plant watered!')}\n\n${newStage} ${bold('Your plant just levelled up!')}\n`;
+    if (nextEmoji) {
+      const noun = ptsNeeded === 1 ? 'pt' : 'pts';
+      msg += `\n${italic(`${ptsNeeded} more ${noun} to reach ${nextEmoji}`)}\n`;
+    }
+    msg += `\n⭐ ${bold(`${newPoints} pts`)} total\\. You're growing — keep it up\\! ${newStage}`;
+    if (hasGoodNews && nomineeName) {
+      msg += `\n\n🌟 ${italic(`Good news about ${e(nomineeName)} noted — the team will review it!`)}`;
+    }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else {
     let msg = `💧 ${bold('Plant watered!')}\n\n`;
-    msg += buildPlantCard(newStage, newPct, newStreak, true);
+    msg += buildPlantCard(newStage, newPct, newStreak, true, newPoints, newMisses, null, null);
     msg += `\n\nGreat work this week\\. See you next Monday\\! 🌿`;
+    if (hasGoodNews && nomineeName) {
+      msg += `\n\n🌟 ${italic(`Good news about ${e(nomineeName)} noted — the team will review it!`)}`;
+    }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   }
 }
@@ -372,11 +441,15 @@ bot.command('department', async (ctx) => {
 
     const bar = buildProgressBar(deptStats.progressPct);
     const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
+    const avgPts = deptStats.avgPoints ?? 0;
+    const deptStreak = deptStats.deptStreak ?? 0;
 
     const msg =
       `${deptStats.gardenStage} ${bold(user.department)}\n` +
-      `Garden ▸ ${bar} ${deptStats.totalSubmissions}/${deptStats.targetSubmissions}\n` +
-      `Stage ▸ ${italic(`${stageName} (${Math.round(deptStats.progressPct)}%)`)}`;
+      `Garden ▸ ${bar} ${Math.round(deptStats.progressPct)}%\n` +
+      `Stage ▸ ${italic(stageName)}\n` +
+      `⭐ ${bold('Avg Points')} ▸ ${e(String(avgPts))}\n` +
+      `📅 Dept Streak ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -401,19 +474,19 @@ bot.command('leaderboard', async (ctx) => {
       return;
     }
 
-    // Sort by overall progress descending
-    const sorted = [...allDepts].sort((a, b) => b.progressPct - a.progressPct);
+    // Sort by average pts descending
+    const sorted = [...allDepts].sort((a, b) => (b.avgPoints ?? 0) - (a.avgPoints ?? 0));
 
     const medals = ['🥇', '🥈', '🥉'];
     let msg = `🏆 ${bold('TC Forest Leaderboard')}\n\n`;
 
     sorted.forEach((dept, i) => {
       const rank = medals[i] ?? `${i + 1}\\.`;
-      const bar = buildProgressBar(dept.progressPct);
       const stageName = STAGE_NAMES[dept.gardenStage] ?? 'Growing';
+      const avgPts = dept.avgPoints ?? 0;
       msg +=
         `${rank} ${dept.gardenStage} ${bold(dept.department)}\n` +
-        `${bar} ${Math.round(dept.progressPct)}% — ${italic(stageName)}\n\n`;
+        `⭐ ${e(String(avgPts))} avg pts — ${italic(stageName)}\n\n`;
     });
 
     msg += italic('Keep reflecting to climb the ranks! 🌿');
@@ -496,21 +569,30 @@ bot.command('mystats', async (ctx) => {
       return;
     }
 
-    const stats = await sheets.getStatsForUser(user.realName);
+    const [stats, allUsers] = await Promise.all([
+      sheets.getStatsForUser(user.realName),
+      sheets.getAllUsersWithChatId(),
+    ]);
     const weekNum = getWeekNumber();
+    const totalUsers = allUsers.length;
 
     let msg = `${bold(`Week ${weekNum}`)}\n\nHey ${e(user.realName)} 👋\n\n`;
 
     if (!stats) {
       msg +=
         `🌱 ${bold('Your Plant')}\n` +
+        `⭐ ${bold('Points')} ▸ 0 pts\n` +
         `Growth ▸ ${mono('○○○○○○○○○○')} 0%\n` +
         `${italic('Your journey starts here!')}\n\n` +
-        `🔥 Streak ▸ 0\n` +
+        `💧 Streak ▸ None \\(0 weeks\\)\n` +
         `❌ Not submitted yet this week\n\n` +
         `Ready to plant your first seed? /reflect 💧`;
     } else {
-      msg += buildPlantCard(stats.plantStage, stats.progressPct, stats.streak, stats.submittedThisWeek);
+      msg += buildPlantCard(
+        stats.plantStage, stats.progressPct, stats.streak, stats.submittedThisWeek,
+        stats.totalPoints ?? 0, stats.consecutiveMisses ?? 0,
+        stats.rank || null, totalUsers || null
+      );
       if (!stats.submittedThisWeek) {
         msg += `\n\nYour plant is waiting\\. /reflect to water it 💧`;
       }
@@ -583,6 +665,48 @@ bot.command('editreflection', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /tutorial
+// ---------------------------------------------------------------------------
+
+bot.command('tutorial', async (ctx) => {
+  await ctx.reply(
+    `📖 ${bold('How TC CultivAIte Works')}\n\n` +
+
+    `${bold('⭐ Earning Points')}\n` +
+    `• Reflect each week ▸ ${bold('10 pts')}\n` +
+    `• Streak bonus ▸ ${bold('+1 pt')} for each consecutive week\n` +
+    `  ${italic('(week 3 of a streak = 12 pts)')}\n` +
+    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin\\-reviewed)')}\n` +
+    `• Get named in good news ▸ ${bold('+3 pts')} ${italic('(admin\\-reviewed)')}\n` +
+    `• Max 1 good news nomination per person per week\n\n` +
+
+    `${bold('🪴 Plant Stages')}\n` +
+    `🌱 Seedling ▸ 0–20 pts\n` +
+    `🌿 Sprout ▸ 21–50 pts\n` +
+    `🌳 Sapling ▸ 51–85 pts\n` +
+    `🌼 Flowering ▸ 86–115 pts\n` +
+    `🍎 Fruiting ▸ 116\\+ pts\n\n` +
+
+    `${bold('🍂 If You Miss a Week')}\n` +
+    `• Miss 1 week ▸ plant goes 🍂 Dying\n` +
+    `• Miss 2\\+ weeks ▸ plant goes 🥀 Dead\n` +
+    `• ${italic('Your pts never decrease — reflect to revive your plant\\!')}\n\n` +
+
+    `${bold('💧 Streaks \\= Fertilizer')}\n` +
+    `• Each consecutive week you reflect adds a 💧 fertilizer\n` +
+    `• More fertilizer = bigger streak bonus per week\n\n` +
+
+    `${bold('🏆 Department Garden')}\n` +
+    `• Dept score = average of all members\\' pts\n` +
+    `• Everyone submits for 4 weeks in a row → ${bold('2× pts')} for everyone that week\\!\n` +
+    `• Can trigger twice this quarter \\(week 4 and week 8\\)\n\n` +
+
+    `${italic('Reflect weekly. Grow together. 🌱')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+});
+
+// ---------------------------------------------------------------------------
 // /help
 // ---------------------------------------------------------------------------
 
@@ -591,9 +715,10 @@ bot.command('help', async (ctx) => {
     `🌱 ${bold('TC CultivAIte')}\n` +
     `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
-    `/mystats — 🌿 Check your plant, streak & progress\n` +
+    `/mystats — 🌿 Check your plant, pts & streak\n` +
     `/department — 🌳 See your department garden\n` +
-    `/leaderboard — 🏆 See all departments ranked\n` +
+    `/leaderboard — 🏆 See all departments ranked by pts\n` +
+    `/tutorial — 📖 How points and stages work\n` +
     `/myreflections — 📋 Browse your past reflections\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
