@@ -676,8 +676,8 @@ bot.command('tutorial', async (ctx) => {
     `• Reflect each week ▸ ${bold('10 pts')}\n` +
     `• Streak bonus ▸ ${bold('+1 pt')} for each consecutive week\n` +
     `  ${italic('(week 3 of a streak = 12 pts)')}\n` +
-    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin\\-reviewed)')}\n` +
-    `• Get named in good news ▸ ${bold('+3 pts')} ${italic('(admin\\-reviewed)')}\n` +
+    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin-reviewed)')}\n` +
+    `• Get named in good news ▸ ${bold('+3 pts')} ${italic('(admin-reviewed)')}\n` +
     `• Max 1 good news nomination per person per week\n\n` +
 
     `${bold('🪴 Plant Stages')}\n` +
@@ -690,14 +690,14 @@ bot.command('tutorial', async (ctx) => {
     `${bold('🍂 If You Miss a Week')}\n` +
     `• Miss 1 week ▸ plant goes 🍂 Dying\n` +
     `• Miss 2\\+ weeks ▸ plant goes 🥀 Dead\n` +
-    `• ${italic('Your pts never decrease — reflect to revive your plant\\!')}\n\n` +
+    `• ${italic('Your pts never decrease — reflect to revive your plant!')}\n\n` +
 
-    `${bold('💧 Streaks \\= Fertilizer')}\n` +
+    `${bold('💧 Streaks = Fertilizer')}\n` +
     `• Each consecutive week you reflect adds a 💧 fertilizer\n` +
-    `• More fertilizer = bigger streak bonus per week\n\n` +
+    `• More fertilizer \\= bigger streak bonus per week\n\n` +
 
     `${bold('🏆 Department Garden')}\n` +
-    `• Dept score = average of all members\\' pts\n` +
+    `• Dept score \\= average of all members' pts\n` +
     `• Everyone submits for 4 weeks in a row → ${bold('2× pts')} for everyone that week\\!\n` +
     `• Can trigger twice this quarter \\(week 4 and week 8\\)\n\n` +
 
