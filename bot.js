@@ -346,14 +346,11 @@ bot.command('department', async (ctx) => {
       return;
     }
 
-    const [deptStats, allDepts] = await Promise.all([
-      sheets.getDeptStats(user.department),
-      sheets.getAllDeptStats(),
-    ]);
+    const deptStats = await sheets.getDeptStats(user.department);
 
     if (!deptStats) {
       await ctx.reply(
-        `${bold(user.department)}\n${italic('Your garden is just taking root — check back after your first reflections come in!')}\n\n🌲 ${bold('TC Forest')} ▸ growing\\.\\.\\.`,
+        `${bold(user.department)}\n${italic('Your garden is just taking root — check back after your first reflections come in!')}`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -361,14 +358,11 @@ bot.command('department', async (ctx) => {
 
     const bar = buildProgressBar(deptStats.progressPct);
     const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
-    const inBloom = allDepts.filter(d => d.gardenStage !== '🌱').length;
-    const totalGardens = allDepts.length;
 
     const msg =
       `${deptStats.gardenStage} ${bold(user.department)}\n` +
       `Garden ▸ ${bar} ${deptStats.totalSubmissions}/${deptStats.targetSubmissions}\n` +
-      `Stage ▸ ${italic(`${stageName} (${Math.round(deptStats.progressPct)}%)`)}\n\n` +
-      `🌲 ${bold('TC Forest')} ▸ ${inBloom} of ${totalGardens} gardens in bloom`;
+      `Stage ▸ ${italic(`${stageName} (${Math.round(deptStats.progressPct)}%)`)}`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -491,7 +485,7 @@ bot.command('help', async (ctx) => {
     `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
     `/mystats — 🌿 Check your plant, streak & progress\n` +
-    `/department — 🌳 See your department garden & TC Forest\n` +
+    `/department — 🌳 See your department garden\n` +
     `/myreflections — 📋 Browse your past reflections\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
