@@ -227,6 +227,28 @@ async function reflectConversation(conversation, ctx) {
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
 
+  // --- Step 3b: Goal reminder / first-time prompt ---
+  const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
+
+  if (!existingGoal) {
+    await ctx.reply(
+      `🎯 ${bold('One quick thing before we begin!')}\n\n` +
+      `What's your personal goal for this quarter? It'll show up as a reminder every time you reflect\\.\n\n` +
+      `${italic('Type it out — you can always change it with /setgoal.')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    const goalCtx = await waitForText(conversation, ctx);
+    if (!goalCtx) return;
+    const newGoal = goalCtx.message.text.trim();
+    await conversation.external(() => sheets.setGoal(user.realName, newGoal));
+    await ctx.reply(`✅ Goal saved\\! Let's reflect\\. 🌿`, { parse_mode: 'MarkdownV2' });
+  } else {
+    await ctx.reply(
+      `🎯 ${bold('Your Q2 Goal')}\n${italic(existingGoal)}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  }
+
   // --- Step 4: Q1 prompt (message 2) ---
   await ctx.reply(
     `${bold("Q1: What's one thing you've grown in personally this week?")}\n\n${italic('Take your time — there are no wrong answers here.')}`,
@@ -326,6 +348,50 @@ async function reflectConversation(conversation, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// /setgoal conversation
+// ---------------------------------------------------------------------------
+
+async function setGoalConversation(conversation, ctx) {
+  const chatId = ctx.from?.id;
+  const username = ctx.from?.username?.toLowerCase();
+  const user = await conversation.external(() => lookupUser(chatId, username));
+
+  if (!user?.realName) {
+    await ctx.reply(
+      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  const existing = await conversation.external(() => sheets.getGoal(user.realName));
+
+  if (existing) {
+    await ctx.reply(
+      `🎯 ${bold('Your current Q2 goal:')}\n${italic(existing)}\n\n` +
+      `What would you like to change it to?`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } else {
+    await ctx.reply(
+      `🎯 ${bold("What's your goal for Q2?")}\n\n` +
+      `${italic('This will show up as a reminder at the start of every reflection.')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  }
+
+  const goalCtx = await waitForText(conversation, ctx);
+  if (!goalCtx) return;
+  const newGoal = goalCtx.message.text.trim();
+
+  await conversation.external(() => sheets.setGoal(user.realName, newGoal));
+  await ctx.reply(
+    `✅ ${bold('Goal saved!')} 🌱\n\n🎯 ${italic(newGoal)}\n\n${italic("You'll see this at the start of every /reflect.")}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // /editreflection conversation
 // ---------------------------------------------------------------------------
 
@@ -394,6 +460,7 @@ const bot = new Bot(process.env.BOT_TOKEN);
 bot.use(session({ initial: () => ({}) }));
 bot.use(conversations());
 bot.use(createConversation(reflectConversation));
+bot.use(createConversation(setGoalConversation));
 bot.use(createConversation(editReflectionConversation));
 
 // ---------------------------------------------------------------------------
@@ -703,6 +770,19 @@ bot.command('tutorial', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /setgoal
+// ---------------------------------------------------------------------------
+
+bot.command('setgoal', async (ctx) => {
+  try {
+    await ctx.conversation.enter('setGoalConversation');
+  } catch (err) {
+    console.error('/setgoal error:', err);
+    await ctx.reply('Something went wrong. Please try again!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /help
 // ---------------------------------------------------------------------------
 
@@ -712,6 +792,7 @@ bot.command('help', async (ctx) => {
     `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
     `/mystats — 🌿 Check your plant, pts & streak\n` +
+    `/setgoal — 🎯 Set or update your Q2 goal\n` +
     `/department — 🌳 See your department garden\n` +
     `/leaderboard — 🏆 See all departments ranked by pts\n` +
     `/tutorial — 📖 How points and stages work\n` +
@@ -744,7 +825,7 @@ bot.command('start', async (ctx) => {
     `This is your personal reflection companion for Q2\\.\n\n` +
     `Every week you reflect, your plant grows\\. Your department's garden blooms\\. Together, we build the TC Forest\\.\n\n` +
     `It only takes a few minutes — and every reflection counts\\.\n\n` +
-    `Ready? Type /reflect to begin, or /help to see all commands\\.`,
+    `Start by setting your Q2 goal with /setgoal, then type /reflect to begin\\. Or /help to see all commands\\.`,
     { parse_mode: 'MarkdownV2' }
   );
 });
