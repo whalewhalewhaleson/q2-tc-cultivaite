@@ -127,7 +127,7 @@ async function waitForText(conversation, ctx) {
 
   if (text.startsWith('/')) {
     await ctx.reply(
-      `❌ Reflection cancelled\\!\n\nSend ${bold(text)} again to run it\\.`,
+      `Reflection paused\\. 🌱\n\nNo worries — come back anytime with /reflect when you're ready\\.`,
       { parse_mode: 'MarkdownV2' }
     );
     return null;
@@ -154,8 +154,8 @@ async function reflectConversation(conversation, ctx) {
 
   if (!user || !user.realName) {
     await ctx.reply(
-      `Hey\\! 👋 Looks like you're not in our system yet\\.\n` +
-      `Text @whalewhalewhalee to get added, then come back here to start reflecting\\! 🌱`,
+      `Hey\\! 👋 Looks like you're not in our system yet\\.\n\n` +
+      `Text @whalewhalewhalee to get added, then come back here — your reflection journey is waiting\\! 🌱`,
       { parse_mode: 'MarkdownV2' }
     );
     return;
@@ -175,18 +175,18 @@ async function reflectConversation(conversation, ctx) {
 
   if (alreadySubmitted) {
     cardMsg += buildPlantCard(stage, pct, streak, true);
-    cardMsg += `\n\n${italic("You've already scored this week — but reflection is always welcome. This one won't move your progress, but it's still logged.")}`;
+    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your progress, but it's still stored. Keep going!")}`;
   } else if (statsBefore) {
     cardMsg += buildPlantCard(stage, pct, streak, false);
   } else {
-    cardMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Your journey starts here!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
   }
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
 
   // --- Step 4: Q1 prompt (message 2) ---
   await ctx.reply(
-    `${bold("Q1: What's one thing you've grown in personally this week?")}`,
+    `${bold("Q1: What's one thing you've grown in personally this week?")}\n\n${italic('Take your time — there are no wrong answers here.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -196,7 +196,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 5: Q2 prompt (message 3) ---
   await ctx.reply(
-    `${bold('Q2: How have you improved professionally this week?')}`,
+    `${bold('Q2: How have you improved professionally this week?')}\n\n${italic('Even small steps count.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -223,23 +223,23 @@ async function reflectConversation(conversation, ctx) {
   // --- Step 8: Confirmation ---
   if (alreadySubmitted) {
     await ctx.reply(
-      `📝 ${bold('Logged!')}\n\nYour progress is already locked in for this week — this one's just for you\\. 🌿\n\nSee you next week\\!`,
+      `📝 ${bold('Reflection stored!')}\n\nYour streak is already locked in for this week — this one's just for you\\. Keep that momentum going\\! 🌿\n\nSee you next week\\.`,
       { parse_mode: 'MarkdownV2' }
     );
   } else if (levelledUp) {
     const { nextEmoji } = getNextStageInfo(newStage, newPct);
-    let msg = `💧 ${bold('Watered!')}\n\n${newStage} ${bold('Your plant just grew!')}\n${mono('●●●●●●●●●●')} → ${newStage}\n`;
+    let msg = `💧 ${bold('Plant watered!')}\n\n${newStage} ${bold('Your plant just levelled up!')}\n${mono('●●●●●●●●●●')} → ${newStage}\n`;
     if (nextEmoji) {
       const { reflectionsNeeded } = getNextStageInfo(newStage, newPct);
       const noun = reflectionsNeeded === 1 ? 'reflection' : 'reflections';
-      msg += `\n${italic(`${reflectionsNeeded} ${noun} to ${nextEmoji}`)}\n`;
+      msg += `\n${italic(`${reflectionsNeeded} more ${noun} to reach ${nextEmoji}`)}\n`;
     }
-    msg += `\nLooking good out there\\. ${newStage}`;
+    msg += `\nYou're growing\\. Keep it up\\! ${newStage}`;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else {
-    let msg = `💧 ${bold('Watered!')}\n\n`;
+    let msg = `💧 ${bold('Plant watered!')}\n\n`;
     msg += buildPlantCard(newStage, newPct, newStreak, true);
-    msg += `\n\nSee you next week\\. 🌿`;
+    msg += `\n\nGreat work this week\\. See you next Monday\\! 🌿`;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   }
 }
@@ -254,13 +254,13 @@ async function editReflectionConversation(conversation, ctx) {
 
   const user = await conversation.external(() => lookupUser(chatId, username));
   if (!user?.realName) {
-    await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
     return;
   }
 
   const submissions = await conversation.external(() => sheets.getSubmissionsForUser(user.realName, 1));
   if (!submissions.length) {
-    await ctx.reply(`No reflections found yet\\. Submit your first with /reflect 🌱`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`No reflections stored yet\\. Your first one is just a /reflect away\\! 🌱`, { parse_mode: 'MarkdownV2' });
     return;
   }
 
@@ -270,7 +270,7 @@ async function editReflectionConversation(conversation, ctx) {
     `📅 ${e(latest.date)}\n\n` +
     `${bold('Q1:')} ${e(latest.q1)}\n\n` +
     `${bold('Q2:')} ${e(latest.q2)}\n\n` +
-    `What would you like to edit?\nReply ${bold('1')} for Q1, ${bold('2')} for Q2, or ${bold('3')} for both`,
+    `Which part would you like to update?\nReply ${bold('1')} for Q1, ${bold('2')} for Q2, or ${bold('3')} for both`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -279,7 +279,7 @@ async function editReflectionConversation(conversation, ctx) {
   const choice = choiceCtx.message.text.trim();
 
   if (!['1', '2', '3'].includes(choice)) {
-    await ctx.reply(`Please reply with 1, 2, or 3\\. Use /editreflection to try again\\.`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`Just reply with 1, 2, or 3\\. Try /editreflection again whenever you're ready\\.`, { parse_mode: 'MarkdownV2' });
     return;
   }
 
@@ -287,21 +287,21 @@ async function editReflectionConversation(conversation, ctx) {
   let newQ2 = latest.q2;
 
   if (choice === '1' || choice === '3') {
-    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}\n\n${italic('Take your time — there are no wrong answers here.')}`, { parse_mode: 'MarkdownV2' });
     const q1Ctx = await waitForText(conversation, ctx);
     if (!q1Ctx) return;
     newQ1 = q1Ctx.message.text;
   }
 
   if (choice === '2' || choice === '3') {
-    await ctx.reply(`${bold('Q2: How have you improved professionally this week?')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold('Q2: How have you improved professionally this week?')}\n\n${italic('Even small steps count.')}`, { parse_mode: 'MarkdownV2' });
     const q2Ctx = await waitForText(conversation, ctx);
     if (!q2Ctx) return;
     newQ2 = q2Ctx.message.text;
   }
 
   await conversation.external(() => sheets.updateSubmission(latest.rowIndex, newQ1, newQ2));
-  await ctx.reply(`✅ ${bold('Updated!')} Your reflection has been saved\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`✅ ${bold('Reflection updated!')} Your words are saved\\. 🌱`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -353,7 +353,7 @@ bot.command('department', async (ctx) => {
 
     if (!deptStats) {
       await ctx.reply(
-        `${bold(user.department)}\n${italic('Your garden is taking root — check back soon!')}\n\n🌲 ${bold('TC Forest')} ▸ growing\\.\\.\\.`,
+        `${bold(user.department)}\n${italic('Your garden is just taking root — check back after your first reflections come in!')}\n\n🌲 ${bold('TC Forest')} ▸ growing\\.\\.\\.`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -404,14 +404,14 @@ bot.command('mystats', async (ctx) => {
       msg +=
         `🌱 ${bold('Your Plant')}\n` +
         `Growth ▸ ${mono('○○○○○○○○○○')} 0%\n` +
-        `${italic('Just getting started!')}\n\n` +
+        `${italic('Your journey starts here!')}\n\n` +
         `🔥 Streak ▸ 0\n` +
         `❌ Not submitted yet this week\n\n` +
-        `Ready to start? /reflect 💧`;
+        `Ready to plant your first seed? /reflect 💧`;
     } else {
       msg += buildPlantCard(stats.plantStage, stats.progressPct, stats.streak, stats.submittedThisWeek);
       if (!stats.submittedThisWeek) {
-        msg += `\n\nReady to water your plant? /reflect 💧`;
+        msg += `\n\nYour plant is waiting\\. /reflect to water it 💧`;
       }
     }
 
@@ -434,7 +434,7 @@ bot.command('myreflections', async (ctx) => {
 
     if (!user?.realName) {
       await ctx.reply(
-        `You're not in our system yet\\. Text @whalewhalewhalee to get added\\! 🌱`,
+        `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -444,7 +444,7 @@ bot.command('myreflections', async (ctx) => {
 
     if (!submissions.length) {
       await ctx.reply(
-        `No reflections yet\\!\n\nStart with /reflect 🌱`,
+        `Nothing here yet\\! Your reflections will be stored here once you start\\.\n\nBegin your journey with /reflect 🌱`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -458,8 +458,8 @@ bot.command('myreflections', async (ctx) => {
       msg += `Q2: ${italic(sub.q2)}\n`;
     }
 
-    msg += `\n${italic('Showing last 5.')}`;
-    msg += `\nTo edit your latest: /editreflection`;
+    msg += `\n${italic('Showing your last 5 entries.')}`;
+    msg += `\nWant to make a change? /editreflection`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -487,14 +487,16 @@ bot.command('editreflection', async (ctx) => {
 
 bot.command('help', async (ctx) => {
   await ctx.reply(
-    `🌱 ${bold('TC CultivAIte — Commands')}\n\n` +
+    `🌱 ${bold('TC CultivAIte')}\n` +
+    `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
-    `/mystats — 🌿 Your plant stage, streak & this week's status\n` +
-    `/department — 🌳 Your department garden & TC Forest\n` +
-    `/myreflections — 📋 View your past reflections\n` +
-    `/editreflection — ✏️ Edit your most recent reflection\n` +
+    `/mystats — 🌿 Check your plant, streak & progress\n` +
+    `/department — 🌳 See your department garden & TC Forest\n` +
+    `/myreflections — 📋 Browse your past reflections\n` +
+    `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
-    `/help — Show this message`,
+    `/help — Show this message\n\n` +
+    `${italic('Reflect weekly. Grow together.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 });
@@ -505,7 +507,7 @@ bot.command('help', async (ctx) => {
 
 bot.command('cancel', async (ctx) => {
   await ctx.conversation.exit();
-  await ctx.reply(`Cancelled\\. 🌱 Come back whenever you're ready\\!\n/reflect to start again\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`No worries\\! 🌱 Come back whenever you're ready\\.\nYour plant will be here waiting — /reflect to continue\\.`, { parse_mode: 'MarkdownV2' });
 });
 
 // ---------------------------------------------------------------------------
@@ -515,8 +517,10 @@ bot.command('cancel', async (ctx) => {
 bot.command('start', async (ctx) => {
   await ctx.reply(
     `🌱 ${bold('Welcome to TC CultivAIte!')}\n\n` +
-    `Every week you reflect, your plant grows\\. Every plant grows our forest\\.\n\n` +
-    `Type /reflect to get started, or /help for all commands\\.`,
+    `This is your personal reflection companion for Q2\\.\n\n` +
+    `Every week you reflect, your plant grows\\. Your department's garden blooms\\. Together, we build the TC Forest\\.\n\n` +
+    `It only takes a few minutes — and every reflection counts\\.\n\n` +
+    `Ready? Type /reflect to begin, or /help to see all commands\\.`,
     { parse_mode: 'MarkdownV2' }
   );
 });
@@ -544,9 +548,10 @@ cron.schedule('0 2 * * 1', async () => {
         if (stats && stats.submittedThisWeek === false) {
           await bot.api.sendMessage(
             chatId,
-            `🍁 Hey ${e(realName)}, your plant is fading\\.\\.\\.\n` +
-            `You haven't reflected this week yet\\. Last chance — submit before 6 PM today to keep your streak\\!\n` +
-            `/reflect — it only takes 2 minutes\\.`,
+            `🌱 Hey ${e(realName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
+            `You haven't reflected this week yet — and your plant is waiting to be watered\\! 💧\n\n` +
+            `Submit before ${bold('6 PM today')} to keep your streak alive\\.\n` +
+            `/reflect — it only takes a couple of minutes\\.`,
             { parse_mode: 'MarkdownV2' }
           );
           await new Promise(r => setTimeout(r, 200));
