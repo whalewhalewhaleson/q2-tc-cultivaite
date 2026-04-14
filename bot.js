@@ -182,7 +182,7 @@ async function reflectConversation(conversation, ctx) {
     openingMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started\\!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
   }
 
-  openingMsg += `\n\n${bold('Q1: What\\'s one thing you\\'ve grown in personally this week?')}`;
+  openingMsg += `\n\n${bold("Q1: What's one thing you've grown in personally this week?")}`;
   await ctx.reply(openingMsg, { parse_mode: 'MarkdownV2' });
 
   // --- Step 4: Wait for Q1 (intercepts commands) ---
@@ -282,7 +282,7 @@ async function editReflectionConversation(conversation, ctx) {
   let newQ2 = latest.q2;
 
   if (choice === '1' || choice === '3') {
-    await ctx.reply(`${bold('Q1: What\\'s one thing you\\'ve grown in personally this week?')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}`, { parse_mode: 'MarkdownV2' });
     const q1Ctx = await waitForText(conversation, ctx);
     if (!q1Ctx) return;
     newQ1 = q1Ctx.message.text;
