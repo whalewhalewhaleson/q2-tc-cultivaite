@@ -220,7 +220,7 @@ async function reflectConversation(conversation, ctx) {
 
   if (alreadySubmitted) {
     cardMsg += buildPlantCard(stage, pct, streak, true, totalPoints, consecutiveMisses, null, null);
-    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your pts, but it's still stored\\. Keep going\\!")}`;
+    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your pts, but it's still stored. Keep going!")}`;
   } else if (statsBefore) {
     cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
   } else {
@@ -252,7 +252,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 6b: Optional Q3 — Good News ---
   await ctx.reply(
-    `${bold('Q3 \\(Optional\\): Got any good news to share about someone this week?')}\n\n` +
+    `${bold('Q3 (Optional): Got any good news to share about someone this week?')}\n\n` +
     `${italic('Name them and what they did \u2014 both your dept and theirs earn bonus pts! Or type')} ${bold('skip')} ${italic('to finish.')}`,
     { parse_mode: 'MarkdownV2' }
   );
@@ -266,7 +266,7 @@ async function reflectConversation(conversation, ctx) {
   let nomineeDept = null;
   if (hasGoodNews) {
     await ctx.reply(
-      `Who are you nominating? ${italic('Type their full name as it appears in the system\\.')}`,
+      `Who are you nominating? ${italic('Type their full name as it appears in the system.')}`,
       { parse_mode: 'MarkdownV2' }
     );
     const nomineeCtx = await waitForText(conversation, ctx);
@@ -301,7 +301,7 @@ async function reflectConversation(conversation, ctx) {
   if (alreadySubmitted) {
     let msg = `📝 ${bold('Reflection stored!')}\n\nYour pts are already locked in for this week — this one's just for you\\. Keep that momentum going\\! 🌿\n\nSee you next week\\.`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Your good news about ${e(nomineeName)} has been noted — the team will review it!`)}`;
+      msg += `\n\n🌟 ${italic(`Your good news about ${nomineeName} has been noted — the team will review it!`)}`;
     }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else if (levelledUp) {
@@ -313,7 +313,7 @@ async function reflectConversation(conversation, ctx) {
     }
     msg += `\n⭐ ${bold(`${newPoints} pts`)} total\\. You're growing — keep it up\\! ${newStage}`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Good news about ${e(nomineeName)} noted — the team will review it!`)}`;
+      msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else {
@@ -321,7 +321,7 @@ async function reflectConversation(conversation, ctx) {
     msg += buildPlantCard(newStage, newPct, newStreak, true, newPoints, newMisses, null, null);
     msg += `\n\nGreat work this week\\. See you next Monday\\! 🌿`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Good news about ${e(nomineeName)} noted — the team will review it!`)}`;
+      msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   }
