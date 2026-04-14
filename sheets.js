@@ -63,6 +63,36 @@ function getSGTDatetime() {
 // ---------------------------------------------------------------------------
 
 /**
+ * Look up a user by their Telegram user ID (numeric, stored in column D).
+ * More reliable than username — IDs never change even if handle does.
+ * Returns { realName, department, chatId } or null if not found.
+ */
+export async function getUserByChatId(chatId) {
+  if (!chatId) return null;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:D',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = String(chatId).trim();
+
+  for (const row of rows) {
+    const rowChatId = row[3] ? String(row[3]).trim() : null;
+    if (rowChatId === needle) {
+      return {
+        realName: String(row[1] ?? '').trim(),
+        department: String(row[2] ?? '').trim(),
+        chatId: rowChatId,
+      };
+    }
+  }
+  return null;
+}
+
+/**
  * Look up a user by their Telegram username (case-insensitive).
  * Returns { realName, department, chatId } or null if not found.
  */
@@ -245,6 +275,52 @@ export async function getAllDeptStats() {
 // ---------------------------------------------------------------------------
 // Submissions tab (bot writes)
 // ---------------------------------------------------------------------------
+
+/**
+ * Returns the last N submissions for a user, most recent last.
+ * Each row includes rowIndex (1-based) for potential editing.
+ */
+export async function getSubmissionsForUser(realName, limit = 5) {
+  if (!realName) return [];
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Submissions!A:F',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+  const userRows = [];
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][0] ?? '').toLowerCase().trim() === needle) {
+      userRows.push({
+        rowIndex: i + 1, // 1-based Sheets row number
+        date: String(rows[i][2] ?? '').trim(),
+        time: String(rows[i][3] ?? '').trim(),
+        q1: String(rows[i][4] ?? '').trim(),
+        q2: String(rows[i][5] ?? '').trim(),
+      });
+    }
+  }
+
+  return userRows.slice(-limit);
+}
+
+/**
+ * Update Q1 and/or Q2 of an existing submission row.
+ * rowIndex is 1-based (as returned by getSubmissionsForUser).
+ */
+export async function updateSubmission(rowIndex, q1, q2) {
+  const sheets = await getSheetsClient();
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: process.env.SHEET_ID,
+    range: `Submissions!E${rowIndex}:F${rowIndex}`,
+    valueInputOption: 'RAW',
+    requestBody: { values: [[q1, q2]] },
+  });
+}
 
 /**
  * Append one submission row to the Submissions tab.
