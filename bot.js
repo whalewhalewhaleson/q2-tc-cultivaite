@@ -165,37 +165,42 @@ async function reflectConversation(conversation, ctx) {
   const statsBefore = await conversation.external(() => sheets.getStatsForUser(user.realName));
   const alreadySubmitted = statsBefore?.submittedThisWeek === true;
 
-  // --- Step 3: Opening message ---
+  // --- Step 3: Plant card (message 1) ---
   const weekNum = getWeekNumber();
   const stage = statsBefore?.plantStage ?? '🌱';
   const pct = statsBefore?.progressPct ?? 0;
   const streak = statsBefore?.streak ?? 0;
 
-  let openingMsg = `${bold(`Week ${weekNum}`)}\n\nHey ${e(user.realName)} 👋\n\n`;
+  let cardMsg = `${bold(`Week ${weekNum}`)}\n\nHey ${e(user.realName)} 👋\n\n`;
 
   if (alreadySubmitted) {
-    openingMsg += buildPlantCard(stage, pct, streak, true);
-    openingMsg += `\n\n${italic("You've already scored this week — but reflection is always welcome. This one won't move your progress, but it's still logged.")}`;
+    cardMsg += buildPlantCard(stage, pct, streak, true);
+    cardMsg += `\n\n${italic("You've already scored this week — but reflection is always welcome. This one won't move your progress, but it's still logged.")}`;
   } else if (statsBefore) {
-    openingMsg += buildPlantCard(stage, pct, streak, false);
+    cardMsg += buildPlantCard(stage, pct, streak, false);
   } else {
-    openingMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')}\nGrowth ▸ ${mono('○○○○○○○○○○')} 0%\n${italic('Just getting started!')}\n\n🔥 Streak ▸ 0\n❌ Not submitted yet`;
   }
 
-  openingMsg += `\n\n${bold("Q1: What's one thing you've grown in personally this week?")}`;
-  await ctx.reply(openingMsg, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
 
-  // --- Step 4: Wait for Q1 (intercepts commands) ---
+  // --- Step 4: Q1 prompt (message 2) ---
+  await ctx.reply(
+    `${bold("Q1: What's one thing you've grown in personally this week?")}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+
   const q1Ctx = await waitForText(conversation, ctx);
   if (!q1Ctx) return;
   const q1 = q1Ctx.message.text;
 
+  // --- Step 5: Q2 prompt (message 3) ---
   await ctx.reply(
-    `Nice\\. 🙌\n\n${bold('Q2: How have you improved professionally this week?')}`,
+    `${bold('Q2: How have you improved professionally this week?')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
-  // --- Step 5: Wait for Q2 (intercepts commands) ---
+  // --- Step 6: Wait for Q2 (intercepts commands) ---
   const q2Ctx = await waitForText(conversation, ctx);
   if (!q2Ctx) return;
   const q2 = q2Ctx.message.text;
