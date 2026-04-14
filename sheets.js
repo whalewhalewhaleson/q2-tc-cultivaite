@@ -185,6 +185,58 @@ export async function setChatId(username, chatId) {
 }
 
 /**
+ * Get the Q2 goal for a user (column E of Users tab).
+ * Returns the goal string or null if not set.
+ */
+export async function getGoal(realName) {
+  if (!realName) return null;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:E',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+
+  for (const row of rows) {
+    if (String(row[1] ?? '').toLowerCase().trim() === needle) {
+      return row[4] ? String(row[4]).trim() : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Save or update the Q2 goal for a user (column E of Users tab).
+ */
+export async function setGoal(realName, goal) {
+  if (!realName) return;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:E',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][1] ?? '').toLowerCase().trim() === needle) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.SHEET_ID,
+        range: `Users!E${i + 1}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[goal]] },
+      });
+      return;
+    }
+  }
+}
+
+/**
  * Returns all users with a Chat ID set — used by the Sunday cron job.
  * Returns array of { realName, chatId }.
  */
