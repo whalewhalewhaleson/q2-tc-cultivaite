@@ -372,6 +372,46 @@ bot.command('department', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /leaderboard
+// ---------------------------------------------------------------------------
+
+bot.command('leaderboard', async (ctx) => {
+  try {
+    const allDepts = await sheets.getAllDeptStats();
+
+    if (!allDepts.length) {
+      await ctx.reply(
+        `${bold('TC Forest Leaderboard')}\n\n${italic('No department data yet — check back once reflections start coming in! 🌱')}`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+
+    // Sort by overall progress descending
+    const sorted = [...allDepts].sort((a, b) => b.progressPct - a.progressPct);
+
+    const medals = ['🥇', '🥈', '🥉'];
+    let msg = `🏆 ${bold('TC Forest Leaderboard')}\n\n`;
+
+    sorted.forEach((dept, i) => {
+      const rank = medals[i] ?? `${i + 1}\\.`;
+      const bar = buildProgressBar(dept.progressPct);
+      const stageName = STAGE_NAMES[dept.gardenStage] ?? 'Growing';
+      msg +=
+        `${rank} ${dept.gardenStage} ${bold(dept.department)}\n` +
+        `${bar} ${Math.round(dept.progressPct)}% — ${italic(stageName)}\n\n`;
+    });
+
+    msg += italic('Keep reflecting to climb the ranks! 🌿');
+
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/leaderboard error:', err);
+    await ctx.reply('Something went wrong. Please try again!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /mystats
 // ---------------------------------------------------------------------------
 
@@ -486,6 +526,7 @@ bot.command('help', async (ctx) => {
     `/reflect — 💧 Submit your weekly reflection\n` +
     `/mystats — 🌿 Check your plant, streak & progress\n` +
     `/department — 🌳 See your department garden\n` +
+    `/leaderboard — 🏆 See all departments ranked\n` +
     `/myreflections — 📋 Browse your past reflections\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
