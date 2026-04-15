@@ -103,10 +103,6 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
     card += `\n\n${italic('Your plant is struggling — reflect this week to save it!')}`;
   }
 
-  if (rank && totalUsers) {
-    card += `\n\n🏅 ${italic(`You're #${rank} of ${totalUsers}`)}`;
-  }
-
   return card;
 }
 
