@@ -835,9 +835,7 @@ bot.command('tutorial', async (ctx) => {
     `• Reflect each week ▸ ${bold('10 pts')}\n` +
     `• Streak bonus ▸ ${bold('+1 pt')} for each consecutive week\n` +
     `  ${italic('(week 3 of a streak = 12 pts)')}\n` +
-    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin-reviewed)')}\n` +
-    `• Get named in good news ▸ ${bold('+3 pts')} ${italic('(admin-reviewed)')}\n` +
-    `• Max 1 good news nomination per person per week\n\n` +
+    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin\\-reviewed — both you and the person you shout out earn pts\\!)')}\n\n` +
 
     `${bold('🪴 Plant Stages')}\n` +
     `🌱 Seedling ▸ 0–20 pts\n` +
