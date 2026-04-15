@@ -100,7 +100,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
     card += `${italic('Your plant is struggling \u2014 reflect this week to save it!')}\n`;
   }
 
-  card += `\n💧 Fertilizer ▸ ${fertStr}\n`;
+  card += `\n💧 Streak ▸ ${fertStr}\n`;
   card += submittedLine;
 
   if (rank && totalUsers) {
@@ -222,7 +222,7 @@ async function reflectConversation(conversation, ctx) {
   } else if (statsBefore) {
     cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
   } else {
-    cardMsg += `🌱 ${bold('Your Plant')} ▸ 0 pts\n${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n💧 Fertilizer ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
+    cardMsg += `🌱 ${bold('Your Plant')} ▸ 0 pts\n${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n💧 Streak ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
   }
 
   await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
@@ -706,7 +706,7 @@ bot.command('mystats', async (ctx) => {
       msg +=
         `🌱 ${bold('Your Plant')} ▸ 0 pts\n` +
         `${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n` +
-        `💧 Fertilizer ▸ None \\(0 weeks\\)\n` +
+        `💧 Streak ▸ None \\(0 weeks\\)\n` +
         `❌ Not submitted yet this week\n\n` +
         `Ready to plant your first seed? /reflect 💧`;
     } else {
@@ -855,9 +855,9 @@ bot.command('tutorial', async (ctx) => {
     `• Miss 2\\+ weeks ▸ plant goes 🥀 Dead\n` +
     `• ${italic('Your pts never decrease — reflect to revive your plant!')}\n\n` +
 
-    `${bold('💧 Fertilizer')}\n` +
+    `${bold('💧 Streak Bonus')}\n` +
     `• Each consecutive week you reflect adds a 💧\n` +
-    `• More fertilizer \\= bigger pts bonus per week\n\n` +
+    `• Longer streak \\= bigger pts bonus per week\n\n` +
 
     `${bold('🏆 Department Garden')}\n` +
     `• Dept score \\= average of all members' pts\n` +
