@@ -340,7 +340,7 @@ export async function getDeptStats(department) {
 }
 
 /**
- * Returns all rows from DeptStats — used by /leaderboard.
+ * Returns all rows from DeptStats — used by /deptleaderboard.
  */
 export async function getAllDeptStats() {
   const sheets = await getSheetsClient();
@@ -352,7 +352,8 @@ export async function getAllDeptStats() {
 
   const rows = res.data.values ?? [];
   return rows
-    .filter(row => row[0]) // skip empty rows
+    .slice(1)            // skip header row
+    .filter(row => row[0])
     .map(row => ({
       department:        String(row[0] ?? '').trim(),
       gardenStage:       String(row[1] ?? '🌱').trim(),
@@ -362,6 +363,73 @@ export async function getAllDeptStats() {
       avgPoints:         Number(row[5] ?? 0),
       deptStreak:        Number(row[6] ?? 0),
     }));
+}
+
+/**
+ * Returns plant stages for all members in a department — used by /department.
+ * Reads Users tab (dept mapping) and Stats tab (stages) in parallel.
+ * Returns { count, stages } where stages is an array of plant-stage emojis.
+ */
+export async function getMemberStagesForDept(department) {
+  if (!department) return { count: 0, stages: [] };
+  const sheetsClient = await getSheetsClient();
+
+  const [usersRes, statsRes] = await Promise.all([
+    sheetsClient.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'Users!A:D',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    }),
+    sheetsClient.spreadsheets.values.get({
+      spreadsheetId: process.env.SHEET_ID,
+      range: 'Stats!A:B',
+      valueRenderOption: 'UNFORMATTED_VALUE',
+    }),
+  ]);
+
+  const userRows = (usersRes.data.values ?? []).slice(1);
+  const statsRows = statsRes.data.values ?? [];
+
+  // Build name → plantStage lookup from Stats tab
+  const stageByName = {};
+  for (const row of statsRows) {
+    const name = String(row[0] ?? '').toLowerCase().trim();
+    if (name) stageByName[name] = String(row[1] ?? '🌱').trim();
+  }
+
+  const needle = department.toLowerCase().trim();
+  const stages = [];
+  for (const row of userRows) {
+    const dept = String(row[2] ?? '').toLowerCase().trim();
+    if (dept !== needle) continue;
+    const name = String(row[1] ?? '').toLowerCase().trim();
+    stages.push(stageByName[name] ?? '🌱');
+  }
+
+  return { count: stages.length, stages };
+}
+
+/**
+ * Returns all user stats sorted by totalPoints desc — used by /leaderboard (individual).
+ * Each entry: { name, plantStage, totalPoints }
+ */
+export async function getAllUserStats() {
+  const sheetsClient = await getSheetsClient();
+  const res = await sheetsClient.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Stats!A:F',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = (res.data.values ?? []).slice(1); // skip header row
+  return rows
+    .filter(row => row[0])
+    .map(row => ({
+      name:        String(row[0] ?? '').trim(),
+      plantStage:  String(row[1] ?? '🌱').trim(),
+      totalPoints: Number(row[5] ?? 0),
+    }))
+    .sort((a, b) => b.totalPoints - a.totalPoints);
 }
 
 // ---------------------------------------------------------------------------
@@ -377,7 +445,7 @@ export async function getSubmissionsForUser(realName, limit = 5) {
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'Submissions!A:F',
+    range: 'Submissions!A:G',
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
 
@@ -393,6 +461,7 @@ export async function getSubmissionsForUser(realName, limit = 5) {
         time: String(rows[i][3] ?? '').trim(),
         q1: String(rows[i][4] ?? '').trim(),
         q2: String(rows[i][5] ?? '').trim(),
+        q3: String(rows[i][6] ?? '').trim(),
       });
     }
   }
@@ -474,18 +543,19 @@ export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nom
 
 /**
  * Append one submission row to the Submissions tab.
- * Columns: Name | Department | Date (YYYY-MM-DD) | Time (HH:MM AM/PM) | Q1 | Q2
+ * Columns: Name | Department | Date (YYYY-MM-DD) | Time (HH:MM AM/PM) | Q1 | Q2 | Q3 Nomination
+ * q3 is a pre-formatted string like "Nominated Sarah — Great teamwork!" or '' if skipped.
  */
-export async function logSubmission(realName, department, q1, q2) {
+export async function logSubmission(realName, department, q1, q2, q3 = '') {
   const { date, time } = getSGTDatetime();
   const sheets = await getSheetsClient();
   await sheets.spreadsheets.values.append({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'Submissions!A:F',
+    range: 'Submissions!A:G',
     valueInputOption: 'RAW',
     insertDataOption: 'INSERT_ROWS',
     requestBody: {
-      values: [[realName, department, date, time, q1, q2]],
+      values: [[realName, department, date, time, q1, q2, q3]],
     },
   });
 }

@@ -297,8 +297,9 @@ async function reflectConversation(conversation, ctx) {
   }
 
   // --- Step 7: Log submission + good news + trigger Apps Script ---
+  const q3Stored = (hasGoodNews && nomineeName) ? `Nominated ${nomineeName} — ${q3Raw}` : '';
   await conversation.external(async () => {
-    await sheets.logSubmission(user.realName, user.department, q1, q2);
+    await sheets.logSubmission(user.realName, user.department, q1, q2, q3Stored);
     if (hasGoodNews && nomineeName) {
       await sheets.logGoodNews(user.realName, user.department, nomineeName, nomineeDept, q3Raw, getWeekNumber());
     }
@@ -314,6 +315,7 @@ async function reflectConversation(conversation, ctx) {
   const newStreak         = statsAfter?.streak            ?? streak;
   const newPoints         = statsAfter?.totalPoints       ?? totalPoints;
   const newMisses         = statsAfter?.consecutiveMisses ?? 0;
+  const ptsGained         = newPoints - totalPoints;
   const levelledUp = statsAfter &&
     HEALTHY_STAGES.indexOf(newStage) > HEALTHY_STAGES.indexOf(stage);
 
@@ -331,7 +333,10 @@ async function reflectConversation(conversation, ctx) {
       const noun = ptsNeeded === 1 ? 'pt' : 'pts';
       msg += `\n${italic(`${ptsNeeded} more ${noun} to reach ${nextEmoji}`)}\n`;
     }
-    msg += `\n⭐ ${bold(`${newPoints} pts`)} total\\. You're growing — keep it up\\! ${newStage}`;
+    if (ptsGained > 0) {
+      msg += `\n\\+${e(String(ptsGained))} pts earned this week\\!\n`;
+    }
+    msg += `⭐ ${bold(`${newPoints} pts`)} total\\. You're growing — keep it up\\! ${newStage}`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
@@ -339,6 +344,9 @@ async function reflectConversation(conversation, ctx) {
   } else {
     let msg = `💧 ${bold('Plant watered!')}\n\n`;
     msg += buildPlantCard(newStage, newPct, newStreak, true, newPoints, newMisses, null, null);
+    if (ptsGained > 0) {
+      msg += `\n\n\\+${e(String(ptsGained))} pts earned this week\\!`;
+    }
     msg += `\n\nGreat work this week\\. See you next Monday\\! 🌿`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
@@ -494,7 +502,10 @@ bot.command('department', async (ctx) => {
       return;
     }
 
-    const deptStats = await sheets.getDeptStats(user.department);
+    const [deptStats, memberData] = await Promise.all([
+      sheets.getDeptStats(user.department),
+      sheets.getMemberStagesForDept(user.department),
+    ]);
 
     if (!deptStats) {
       await ctx.reply(
@@ -508,13 +519,26 @@ bot.command('department', async (ctx) => {
     const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
     const avgPts = deptStats.avgPoints ?? 0;
     const deptStreak = deptStats.deptStreak ?? 0;
+    const { nextEmoji, ptsNeeded } = getNextStageInfo(deptStats.gardenStage, Math.floor(avgPts));
+    const gardenRow = memberData.stages.length
+      ? memberData.stages.join('')
+      : '🌱 Still taking root\\.\\.\\.';
 
-    const msg =
+    let msg =
       `${deptStats.gardenStage} ${bold(user.department)}\n` +
-      `Garden ▸ ${bar} ${Math.round(deptStats.progressPct)}%\n` +
-      `Stage ▸ ${italic(stageName)}\n` +
-      `⭐ ${bold('Avg Points')} ▸ ${e(String(avgPts))}\n` +
-      `📅 Dept Streak ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}`;
+      `${e(String(memberData.count))} members · ${e(String(avgPts))} pts avg\n\n` +
+      `Plant ▸ ${italic(stageName)} ${deptStats.gardenStage} \\(avg pts: ${e(String(avgPts))}\\)\n`;
+
+    if (nextEmoji) {
+      msg += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
+    } else {
+      msg += `Growth ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
+    }
+
+    msg +=
+      `Streaks ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}\n\n` +
+      `${bold('Your Department Garden')}\n` +
+      gardenRow;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -524,16 +548,16 @@ bot.command('department', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
-// /leaderboard
+// /deptleaderboard
 // ---------------------------------------------------------------------------
 
-bot.command('leaderboard', async (ctx) => {
+bot.command('deptleaderboard', async (ctx) => {
   try {
     const allDepts = await sheets.getAllDeptStats();
 
     if (!allDepts.length) {
       await ctx.reply(
-        `${bold('TC Forest Leaderboard')}\n\n${italic('No department data yet — check back once reflections start coming in! 🌱')}`,
+        `${bold('TC Q2 Dept Leaderboard')}\n\n${italic('No department data yet — check back once reflections start coming in! 🌱')}`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -543,7 +567,7 @@ bot.command('leaderboard', async (ctx) => {
     const sorted = [...allDepts].sort((a, b) => (b.avgPoints ?? 0) - (a.avgPoints ?? 0));
 
     const medals = ['🥇', '🥈', '🥉'];
-    let msg = `🏆 ${bold('TC Forest Leaderboard')}\n\n`;
+    let msg = `🌳 ${bold('TC Q2 Dept Leaderboard')}\n\n`;
 
     sorted.forEach((dept, i) => {
       const rank = medals[i] ?? `${i + 1}\\.`;
@@ -555,6 +579,42 @@ bot.command('leaderboard', async (ctx) => {
     });
 
     msg += italic('Keep reflecting to climb the ranks! 🌿');
+
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/deptleaderboard error:', err);
+    await ctx.reply('Something went wrong. Please try again!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /leaderboard — individual top 5 + full company garden
+// ---------------------------------------------------------------------------
+
+bot.command('leaderboard', async (ctx) => {
+  try {
+    const allStats = await sheets.getAllUserStats();
+
+    if (!allStats.length) {
+      await ctx.reply(
+        `🏆 ${bold('TC Q2 Leaderboard')}\n\n${italic('No data yet — check back once reflections start! 🌱')}`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+
+    const medals = ['🥇', '🥈', '🥉'];
+    const top5 = allStats.slice(0, 5);
+    const companyGarden = allStats.map(u => u.plantStage).join('');
+
+    let msg = `🏆 ${bold('TC Q2 Leaderboard')}\n\n`;
+
+    top5.forEach((user, i) => {
+      const rank = medals[i] ?? `${i + 1}\\.`;
+      msg += `${rank} ${e(user.name)} ${user.plantStage} — ${e(String(user.totalPoints))} pts\n`;
+    });
+
+    msg += `\n${bold('The TC Garden')}\n${companyGarden}`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -686,7 +746,7 @@ bot.command('myreflections', async (ctx) => {
       return;
     }
 
-    const submissions = await sheets.getSubmissionsForUser(user.realName, 5);
+    const submissions = await sheets.getSubmissionsForUser(user.realName, 50);
 
     if (!submissions.length) {
       await ctx.reply(
@@ -696,20 +756,61 @@ bot.command('myreflections', async (ctx) => {
       return;
     }
 
-    let msg = `📋 ${bold('Your Reflections')}\n`;
-
-    for (const sub of submissions.reverse()) {
-      msg += `\n${bold(sub.date)}\n`;
-      msg += `Q1: ${italic(sub.q1)}\n`;
-      msg += `Q2: ${italic(sub.q2)}\n`;
-    }
-
-    msg += `\n${italic('Showing your last 5 entries.')}`;
-    msg += `\nWant to make a change? /editreflection`;
+    const ordered = [...submissions].reverse(); // newest first = #1
+    let msg = `📋 ${bold('Your Reflections')}\n\n`;
+    ordered.forEach((sub, i) => {
+      msg += `/${i + 1} · ${e(sub.date)}\n`;
+    });
+    msg += `\n${italic('Type /1, /2 etc. to read a reflection.')}`;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/myreflections error:', err);
+    await ctx.reply('Something went wrong. Please try again!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /1, /2, /3 ... — read a specific reflection (used after /myreflections)
+// ---------------------------------------------------------------------------
+
+bot.hears(/^\/(\d+)$/, async (ctx) => {
+  try {
+    const n = parseInt(ctx.match[1], 10);
+    if (n < 1 || n > 50) return; // ignore out-of-range or unrelated numeric commands
+
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const user = await lookupUser(chatId, username);
+
+    if (!user?.realName) return;
+
+    const submissions = await sheets.getSubmissionsForUser(user.realName, 50);
+    const ordered = [...submissions].reverse(); // newest first = #1
+
+    if (n > ordered.length) {
+      await ctx.reply(
+        `You only have ${e(String(ordered.length))} reflection${ordered.length !== 1 ? 's' : ''} so far\\. Try a lower number\\.`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+
+    const sub = ordered[n - 1];
+    let msg =
+      `📋 ${bold(`Reflection #${n}`)} — ${e(sub.date)}\n\n` +
+      `${bold('Q1')} ${italic(sub.q1)}\n\n` +
+      `${bold('Q2')} ${italic(sub.q2)}\n\n`;
+
+    if (sub.q3) {
+      msg += `${bold('Q3')} ${italic(sub.q3)}`;
+    } else {
+      msg += `${bold('Q3')} ${italic('—')}`;
+    }
+
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/N reflection lookup error:', err);
     await ctx.reply('Something went wrong. Please try again!');
   }
 });
@@ -794,9 +895,11 @@ bot.command('help', async (ctx) => {
     `/mystats — 🌿 Check your plant, pts & streak\n` +
     `/setgoal — 🎯 Set or update your Q2 goal\n` +
     `/department — 🌳 See your department garden\n` +
-    `/leaderboard — 🏆 See all departments ranked by pts\n` +
+    `/leaderboard — 🏆 Top 5 individuals \\+ company garden\n` +
+    `/deptleaderboard — 🌳 See all departments ranked by pts\n` +
     `/tutorial — 📖 How points and stages work\n` +
-    `/myreflections — 📋 Browse your past reflections\n` +
+    `/myreflections — 📋 List your past reflections\n` +
+    `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel a reflection in progress\n` +
     `/skipweek — 🗓 \\(Admin\\) Excuse a user for a week\n` +
