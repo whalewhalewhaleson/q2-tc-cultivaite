@@ -41,7 +41,7 @@ const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 
 function getWeekNumber() {
-  const start = new Date('2026-04-20T00:00:00+08:00');
+  const start = new Date('2026-04-13T00:00:00+08:00');
   const daysSince = Math.floor((Date.now() - start.getTime()) / 86400000);
   return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
 }
@@ -168,7 +168,7 @@ async function waitForText(conversation, ctx) {
 
   if (text.startsWith('/')) {
     await ctx.reply(
-      `Reflection paused\\. 🌱\n\nNo worries — come back anytime with /reflect when you're ready\\.`,
+      `No worries\\! 🌱 Come back and /reflect whenever you're ready\\.`,
       { parse_mode: 'MarkdownV2' }
     );
     return null;
@@ -186,7 +186,7 @@ async function reflectConversation(conversation, ctx) {
   const username = ctx.from?.username?.toLowerCase();
 
   if (!chatId) {
-    await ctx.reply('Something went wrong identifying you\\. Please try again\\.', { parse_mode: 'MarkdownV2' });
+    await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2' });
     return;
   }
 
@@ -232,9 +232,8 @@ async function reflectConversation(conversation, ctx) {
 
   if (!existingGoal) {
     await ctx.reply(
-      `🎯 ${bold('One quick thing before we begin!')}\n\n` +
-      `What's your personal goal for this quarter? It'll show up as a reminder every time you reflect\\.\n\n` +
-      `${italic('Type it out — you can always change it with /setgoal.')}`,
+      `🎯 ${bold('Quick one before we start — what\'s your Q2 goal?')}\n\n` +
+      `${italic("I'll remind you of it every time you reflect. You can change it anytime with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
@@ -321,7 +320,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 9: Confirmation ---
   if (alreadySubmitted) {
-    let msg = `📝 ${bold('Reflection stored!')}\n\nYour pts are already locked in for this week — this one's just for you\\. Keep that momentum going\\! 🌿\n\nSee you next week\\.`;
+    let msg = `📝 ${bold('Reflection stored!')}\n\nYour pts are already locked in for this week — but I kept this one for you too\\. 🌿 See you next Monday\\!`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Your good news about ${nomineeName} has been noted — the team will review it!`)}`;
     }
@@ -347,7 +346,7 @@ async function reflectConversation(conversation, ctx) {
     if (ptsGained > 0) {
       msg += `\n\n\\+${e(String(ptsGained))} pts earned this week\\!`;
     }
-    msg += `\n\nGreat work this week\\. See you next Monday\\! 🌿`;
+    msg += `\n\nGreat work this week 🌿 See you Monday\\!`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
@@ -376,14 +375,14 @@ async function setGoalConversation(conversation, ctx) {
 
   if (existing) {
     await ctx.reply(
-      `🎯 ${bold('Your current Q2 goal:')}\n${italic(existing)}\n\n` +
-      `What would you like to change it to?`,
+      `🎯 ${bold('Your Q2 goal right now:')}\n${italic(existing)}\n\n` +
+      `What do you want to change it to?`,
       { parse_mode: 'MarkdownV2' }
     );
   } else {
     await ctx.reply(
-      `🎯 ${bold("What's your goal for Q2?")}\n\n` +
-      `${italic('This will show up as a reminder at the start of every reflection.')}`,
+      `🎯 ${bold("What's one thing you want to achieve this Q2?")}\n\n` +
+      `${italic("It'll pop up as a reminder every time you reflect — so make it count!")}`,
       { parse_mode: 'MarkdownV2' }
     );
   }
@@ -394,7 +393,7 @@ async function setGoalConversation(conversation, ctx) {
 
   await conversation.external(() => sheets.setGoal(user.realName, newGoal));
   await ctx.reply(
-    `✅ ${bold('Goal saved!')} 🌱\n\n🎯 ${italic(newGoal)}\n\n${italic("You'll see this at the start of every /reflect.")}`,
+    `✅ ${bold('Saved!')} 🎯 ${italic(newGoal)}\n\n${italic("I'll remind you of this every time you /reflect.")}`,
     { parse_mode: 'MarkdownV2' }
   );
 }
@@ -480,7 +479,7 @@ bot.command('reflect', async (ctx) => {
     await ctx.conversation.enter('reflectConversation');
   } catch (err) {
     console.error('/reflect error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -543,7 +542,7 @@ bot.command('department', async (ctx) => {
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/department error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -583,7 +582,7 @@ bot.command('deptleaderboard', async (ctx) => {
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/deptleaderboard error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -619,7 +618,7 @@ bot.command('leaderboard', async (ctx) => {
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/leaderboard error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -672,7 +671,7 @@ bot.command('skipweek', async (ctx) => {
     );
   } catch (err) {
     console.error('/skipweek error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -717,14 +716,14 @@ bot.command('mystats', async (ctx) => {
         stats.rank || null, totalUsers || null
       );
       if (!stats.submittedThisWeek) {
-        msg += `\n\nYour plant is waiting\\. /reflect to water it 💧`;
+        msg += `\n\nYour plant is thirsty\\! 💧 /reflect to water it\\.`;
       }
     }
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/mystats error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -750,7 +749,7 @@ bot.command('myreflections', async (ctx) => {
 
     if (!submissions.length) {
       await ctx.reply(
-        `Nothing here yet\\! Your reflections will be stored here once you start\\.\n\nBegin your journey with /reflect 🌱`,
+        `Nothing here yet\\! 🌱 Once you start reflecting, they'll all show up here\\.\n\nReady to begin? /reflect`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -766,7 +765,7 @@ bot.command('myreflections', async (ctx) => {
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/myreflections error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -811,7 +810,7 @@ bot.hears(/^\/(\d+)$/, async (ctx) => {
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/N reflection lookup error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -824,7 +823,7 @@ bot.command('editreflection', async (ctx) => {
     await ctx.conversation.enter('editReflectionConversation');
   } catch (err) {
     console.error('/editreflection error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -879,7 +878,7 @@ bot.command('setgoal', async (ctx) => {
     await ctx.conversation.enter('setGoalConversation');
   } catch (err) {
     console.error('/setgoal error:', err);
-    await ctx.reply('Something went wrong. Please try again!');
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
 
@@ -924,11 +923,10 @@ bot.command('cancel', async (ctx) => {
 
 bot.command('start', async (ctx) => {
   await ctx.reply(
-    `🌱 ${bold('Welcome to TC CultivAIte!')}\n\n` +
-    `This is your personal reflection companion for Q2\\.\n\n` +
-    `Every week you reflect, your plant grows\\. Your department's garden blooms\\. Together, we build the TC Forest\\.\n\n` +
-    `It only takes a few minutes — and every reflection counts\\.\n\n` +
-    `Start by setting your Q2 goal with /setgoal, then type /reflect to begin\\. Or /help to see all commands\\.`,
+    `Hey! 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
+    `Every week you reflect, your plant grows 🌱 — and together we'll build the TC Forest\\.\n\n` +
+    `Ready? Start with /setgoal to set your Q2 goal, then /reflect whenever you're ready\\.\n\n` +
+    `${italic('(Type /help anytime if you get lost!)')}`,
     { parse_mode: 'MarkdownV2' }
   );
 });
@@ -939,7 +937,7 @@ bot.command('start', async (ctx) => {
 
 bot.catch((err) => {
   console.error('Unhandled bot error:', err);
-  err.ctx?.reply('Something went wrong. Please try again!').catch(() => {});
+  err.ctx?.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!').catch(() => {});
 });
 
 // ---------------------------------------------------------------------------
