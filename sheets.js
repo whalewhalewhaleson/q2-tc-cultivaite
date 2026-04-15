@@ -491,7 +491,7 @@ export async function updateSubmission(rowIndex, q1, q2) {
  */
 export async function logSkip(realName, department, weekNumber) {
   // Wednesday of week N = Q2 Monday + (N-1)*7 + 2 days
-  const Q2_MONDAY_UTC = Date.UTC(2026, 3, 20); // 2026-04-20 00:00 UTC
+  const Q2_MONDAY_UTC = Date.UTC(2026, 3, 6); // 2026-04-06 00:00 UTC
   const wednesdayUTC = Q2_MONDAY_UTC + ((weekNumber - 1) * 7 + 2) * 86400000;
   const d = new Date(wednesdayUTC);
   const date = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
