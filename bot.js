@@ -900,7 +900,7 @@ bot.command('help', async (ctx) => {
     `/myreflections — 📋 List your past reflections\n` +
     `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
-    `/cancel — ❌ Cancel a reflection in progress\n` +
+    `/cancel — ❌ Cancel whatever's in progress\n` +
     `/skipweek — 🗓 \\(Admin\\) Excuse a user for a week\n` +
     `/help — Show this message\n\n` +
     `${italic('Reflect weekly. Grow together.')}`,
@@ -914,7 +914,7 @@ bot.command('help', async (ctx) => {
 
 bot.command('cancel', async (ctx) => {
   await ctx.conversation.exit();
-  await ctx.reply(`No worries\\! 🌱 Come back whenever you're ready\\.\nYour plant will be here waiting — /reflect to continue\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`Cancelled\\! 👍 Let me know if you need anything else\\.`, { parse_mode: 'MarkdownV2' });
 });
 
 // ---------------------------------------------------------------------------
