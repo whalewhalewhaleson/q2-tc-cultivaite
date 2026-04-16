@@ -663,7 +663,7 @@ bot.command('deptleaderboard', async (ctx) => {
       const avgPts = dept.avgPoints ?? 0;
       msg +=
         `${rank} ${dept.gardenStage} ${bold(dept.department)}\n` +
-        `⭐ ${e(String(avgPts))} avg pts — ${italic(stageName)}\n\n`;
+        `${e(String(avgPts))} avg pts — ${italic(stageName)}\n\n`;
     });
 
     msg += italic('Keep reflecting to climb the ranks! 🌿');
