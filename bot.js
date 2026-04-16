@@ -513,6 +513,7 @@ bot.command('department', async (ctx) => {
     const bar = buildProgressBar(deptStats.progressPct);
     const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
     const avgPts = deptStats.avgPoints ?? 0;
+    const totalPts = Math.round(avgPts * memberData.count);
     const deptStreak = deptStats.deptStreak ?? 0;
     const { nextEmoji, ptsNeeded } = getNextStageInfo(deptStats.gardenStage, Math.floor(avgPts));
     const gardenRow = memberData.stages.length
@@ -520,9 +521,9 @@ bot.command('department', async (ctx) => {
       : '🌱 Still taking root\\.\\.\\.';
 
     let msg =
-      `${deptStats.gardenStage} ${bold(user.department)}\n` +
-      `${e(String(memberData.count))} members · ${e(String(avgPts))} pts avg\n\n` +
-      `Plant ▸ ${deptStats.gardenStage} ${e(stageName)} · ${e(String(avgPts))} pts\n`;
+      `${deptStats.gardenStage} ${bold(e(user.department))}\n` +
+      `${e(String(memberData.count))} members · ${e(String(totalPts))} total pts\n\n` +
+      `Plant ▸ ${deptStats.gardenStage} ${e(stageName)} · ${e(String(avgPts))} avg pts\n`;
 
     if (nextEmoji) {
       msg += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
@@ -533,6 +534,7 @@ bot.command('department', async (ctx) => {
     msg +=
       `Streaks ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}\n\n` +
       `${bold('Department Garden')}\n` +
+      `${italic('The plants of everyone in your dept\\!')}\n` +
       gardenRow;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
