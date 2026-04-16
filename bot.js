@@ -325,10 +325,20 @@ async function reflectConversation(conversation, ctx) {
     await conversation.external(() => sheets.setGoal(user.realName, newGoal));
     await ctx.reply(`✅ Goal saved\\! Let's reflect\\. 🌿`, { parse_mode: 'MarkdownV2' });
   } else {
+    const nudges = [
+      'ready to reflect?',
+      "let's go\\! 🚀",
+      'your plant is waiting\\! 🌿',
+      "time to water your plant\\! 💧",
+      "let's keep the streak alive\\! 🔥",
+      "let's see what this week brought you\\!",
+      "time to grow\\! 🌱",
+      "let's do this\\! 💪",
+    ];
+    const nudge = nudges[Math.floor(Math.random() * nudges.length)];
     await ctx.reply(
-      `Hey ${e(displayName)}\\! 👋\n\n` +
-      `It's ${bold(`Week ${weekNum} / 13`)} of Q2, ready to reflect?\n\n` +
-      `Remember, your goal 🎯 is to ${bold(existingGoal)}\\!`,
+      `Hey ${e(displayName)}\\! 👋 It's ${bold(`Week ${weekNum} / 13`)} of Q2, ${nudge}\n\n` +
+      `Remember, 🎯 ${bold('Your Q2 Goal:')}\n${italic(existingGoal)}`,
       { parse_mode: 'MarkdownV2' }
     );
   }
