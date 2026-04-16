@@ -869,7 +869,13 @@ bot.command('mystats', async (ctx) => {
     const weekNum = getWeekNumber();
     const totalUsers = allUsers.length;
 
-    let msg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(displayName)} 👋\n\n`;
+    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
+    const dd = String(now.getDate()).padStart(2, '0');
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy = now.getFullYear();
+    const todayStr = `${dd}\\-${mm}\\-${yyyy}`;
+
+    let msg = `${todayStr} is today's date\n\n${todayStr} \\(Week ${weekNum}\\)\n\n`;
 
     if (!stats) {
       msg +=
