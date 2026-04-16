@@ -158,19 +158,112 @@ function isAdmin(ctx) {
 // Returns the message context, or null if a command was typed (exits flow)
 // ---------------------------------------------------------------------------
 
-async function waitForText(conversation, ctx) {
+async function waitForText(conversation, ctx, cancelMsg = null) {
   const msgCtx = await conversation.waitFor('message:text');
   const text = msgCtx.message.text?.trim() ?? '';
 
   if (text.startsWith('/')) {
     await ctx.reply(
-      `No worries\\! 🌱 Come back and /reflect whenever you're ready\\.`,
+      cancelMsg ?? `No worries\\! 🌱 Come back and /reflect whenever you're ready\\.`,
       { parse_mode: 'MarkdownV2' }
     );
     return null;
   }
 
   return msgCtx;
+}
+
+// ---------------------------------------------------------------------------
+// /start setup conversation — nickname then goal
+// ---------------------------------------------------------------------------
+
+async function setupConversation(conversation, ctx) {
+  const chatId = ctx.from?.id;
+  const username = ctx.from?.username?.toLowerCase();
+
+  const user = await conversation.external(() => lookupUser(chatId, username));
+
+  if (!user?.realName) {
+    await ctx.reply(
+      `Looks like you're not in our system yet\\.\nText @whalewhalewhalee to get added, then come back here\\! 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  const cancelMsg = `No worries\\! 🌱 You can always run /nick or /setgoal whenever you're ready\\.`;
+
+  // --- Nickname ---
+  const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
+  if (!existingNick) {
+    await ctx.reply(
+      `What should I call you? 🌱\n\n${italic('Type a nickname, or /cancel if you\'re not ready yet.')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    const nickCtx = await waitForText(conversation, ctx, cancelMsg);
+    if (!nickCtx) return;
+    const nick = nickCtx.message.text.trim();
+    await conversation.external(() => sheets.setNickname(user.realName, nick));
+    await ctx.reply(`Nice to meet you, ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2' });
+  }
+
+  // --- Goal ---
+  const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
+  if (!existingGoal) {
+    await ctx.reply(
+      `🎯 ${bold("What's your Q2 goal?")}\n\n` +
+      `${italic("It'll pop up as a reminder every time you reflect. You can change it anytime with /setgoal.")}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    const goalCtx = await waitForText(conversation, ctx, cancelMsg);
+    if (!goalCtx) return;
+    const goal = goalCtx.message.text.trim();
+    await conversation.external(() => sheets.setGoal(user.realName, goal));
+    await ctx.reply(
+      `✅ ${bold('Goal saved!')} 🎯\n\n${italic("You're all set — type /reflect whenever you're ready to grow. 🌱")}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// /nick conversation — set or update nickname
+// ---------------------------------------------------------------------------
+
+async function setNicknameConversation(conversation, ctx) {
+  const chatId = ctx.from?.id;
+  const username = ctx.from?.username?.toLowerCase();
+
+  const user = await conversation.external(() => lookupUser(chatId, username));
+
+  if (!user?.realName) {
+    await ctx.reply(
+      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  const existing = await conversation.external(() => sheets.getNickname(user.realName));
+
+  if (existing) {
+    await ctx.reply(
+      `Your current nickname is ${bold(existing)}\\.\n\nWhat would you like to change it to?`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } else {
+    await ctx.reply(
+      `What should I call you? 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  }
+
+  const nickCtx = await waitForText(conversation, ctx);
+  if (!nickCtx) return;
+  const nick = nickCtx.message.text.trim();
+
+  await conversation.external(() => sheets.setNickname(user.realName, nick));
+  await ctx.reply(`✅ Nickname set to ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +555,8 @@ const bot = new Bot(process.env.BOT_TOKEN);
 
 bot.use(session({ initial: () => ({}) }));
 bot.use(conversations());
+bot.use(createConversation(setupConversation));
+bot.use(createConversation(setNicknameConversation));
 bot.use(createConversation(reflectConversation));
 bot.use(createConversation(setGoalConversation));
 bot.use(createConversation(editReflectionConversation));
@@ -899,6 +994,19 @@ bot.command('setgoal', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /nick
+// ---------------------------------------------------------------------------
+
+bot.command('nick', async (ctx) => {
+  try {
+    await ctx.conversation.enter('setNicknameConversation');
+  } catch (err) {
+    console.error('/nick error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /help
 // ---------------------------------------------------------------------------
 
@@ -909,6 +1017,7 @@ bot.command('help', async (ctx) => {
     `/reflect — 💧 Submit your weekly reflection\n` +
     `/mystats — 🌿 Check your plant, pts & streak\n` +
     `/setgoal — 🎯 Set or update your Q2 goal\n` +
+    `/nick — 🏷 Set or update your nickname\n` +
     `/department — 🌳 See your department garden\n` +
     `/leaderboard — 🏆 Top 5 individuals \\+ company garden\n` +
     `/deptleaderboard — 🌳 See all departments ranked by pts\n` +
@@ -938,13 +1047,18 @@ bot.command('cancel', async (ctx) => {
 // ---------------------------------------------------------------------------
 
 bot.command('start', async (ctx) => {
-  await ctx.reply(
-    `Hey\\! 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
-    `Every week you reflect, your plant grows 🌱\n\n` +
-    `Ready? Start with /setgoal to set your Q2 goal, then /reflect whenever you're ready\\.\n\n` +
-    `${italic('(Type /help anytime if you get lost!)')}`,
-    { parse_mode: 'MarkdownV2' }
-  );
+  try {
+    await ctx.reply(
+      `Hey\\! 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
+      `Every week you reflect, your plant grows 🌱\n\n` +
+      `${italic('(Type /help anytime if you get lost!)')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    await ctx.conversation.enter('setupConversation');
+  } catch (err) {
+    console.error('/start error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
 });
 
 // ---------------------------------------------------------------------------

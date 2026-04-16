@@ -209,6 +209,58 @@ export async function getGoal(realName) {
 }
 
 /**
+ * Get the nickname for a user (column F of Users tab).
+ * Returns the nickname string or null if not set.
+ */
+export async function getNickname(realName) {
+  if (!realName) return null;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:F',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+
+  for (const row of rows) {
+    if (String(row[1] ?? '').toLowerCase().trim() === needle) {
+      return row[5] ? String(row[5]).trim() : null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Save or update the nickname for a user (column F of Users tab).
+ */
+export async function setNickname(realName, nickname) {
+  if (!realName) return;
+  const sheets = await getSheetsClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.SHEET_ID,
+    range: 'Users!A:F',
+    valueRenderOption: 'UNFORMATTED_VALUE',
+  });
+
+  const rows = res.data.values ?? [];
+  const needle = realName.toLowerCase().trim();
+
+  for (let i = 0; i < rows.length; i++) {
+    if (String(rows[i][1] ?? '').toLowerCase().trim() === needle) {
+      await sheets.spreadsheets.values.update({
+        spreadsheetId: process.env.SHEET_ID,
+        range: `Users!F${i + 1}`,
+        valueInputOption: 'RAW',
+        requestBody: { values: [[nickname]] },
+      });
+      return;
+    }
+  }
+}
+
+/**
  * Save or update the Q2 goal for a user (column E of Users tab).
  */
 export async function setGoal(realName, goal) {
