@@ -875,7 +875,7 @@ bot.command('mystats', async (ctx) => {
     const yyyy = now.getFullYear();
     const todayStr = `${dd}\\-${mm}\\-${yyyy}`;
 
-    let msg = `${todayStr} is today's date\n\n${todayStr} \\(Week ${weekNum}\\)\n\n`;
+    let msg = `${todayStr} \\(Week ${weekNum}\\)\n\n`;
 
     if (!stats) {
       msg +=
