@@ -197,7 +197,7 @@ async function setupConversation(conversation, ctx) {
   const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
   if (!existingNick) {
     await ctx.reply(
-      `What should I call you? 🌱\n\n${italic('Type a nickname, or /cancel if you\'re not ready yet.')}`,
+      `What should I call you? 🌱\n${italic('Type a nickname, or /cancel if you\'re not ready yet.')}`,
       { parse_mode: 'MarkdownV2' }
     );
     const nickCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -339,7 +339,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 4: Q1 prompt (message 2) ---
   await ctx.reply(
-    `${bold("Q1: What's one thing you've grown in personally this week?")}\n\n${italic('Take your time — there are no wrong answers here.')}`,
+    `${bold("Q1: What's one thing you've grown in personally this week?")}\n${italic('Take your time — there are no wrong answers here.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -349,7 +349,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 5: Q2 prompt (message 3) ---
   await ctx.reply(
-    `${bold('Q2: How have you improved professionally this week?')}\n\n${italic('Even small steps count.')}`,
+    `${bold('Q2: How have you improved professionally this week?')}\n${italic('Even small steps count.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -360,7 +360,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 6b: Optional Q3 — Good News ---
   await ctx.reply(
-    `${bold('Q3 (Optional): Got any good news to share about someone this week?')}\n\n` +
+    `${bold('Q3 (Optional): Got any good news to share about someone this week?')}\n` +
     `${italic('Name them and what they did \u2014 both your dept and theirs earn bonus pts! Or type')} ${bold('skip')} ${italic('to finish.')}`,
     { parse_mode: 'MarkdownV2' }
   );
@@ -530,14 +530,14 @@ async function editReflectionConversation(conversation, ctx) {
   let newQ2 = latest.q2;
 
   if (choice === '1' || choice === '3') {
-    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}\n\n${italic('Take your time — there are no wrong answers here.')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}\n${italic('Take your time — there are no wrong answers here.')}`, { parse_mode: 'MarkdownV2' });
     const q1Ctx = await waitForText(conversation, ctx);
     if (!q1Ctx) return;
     newQ1 = q1Ctx.message.text;
   }
 
   if (choice === '2' || choice === '3') {
-    await ctx.reply(`${bold('Q2: How have you improved professionally this week?')}\n\n${italic('Even small steps count.')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold('Q2: How have you improved professionally this week?')}\n${italic('Even small steps count.')}`, { parse_mode: 'MarkdownV2' });
     const q2Ctx = await waitForText(conversation, ctx);
     if (!q2Ctx) return;
     newQ2 = q2Ctx.message.text;
