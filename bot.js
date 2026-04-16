@@ -90,7 +90,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
   if (nextEmoji) {
     card += `Next ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
   } else {
-    card += `Next ▸ ${bar} ${italic('Full bloom\\! 🍎')}\n`;
+    card += `Next ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
   }
 
   card += `\n🔥 Streak ▸ ${streakStr}\n`;
@@ -194,7 +194,7 @@ async function setupConversation(conversation, ctx) {
   const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
   if (!existingNick) {
     await ctx.reply(
-      `What should I call you? 🌱\n${italic("Type a nickname to get started — or /cancel if you're not ready yet\\.")}`,
+      `What should I call you? 🌱\n${italic("Type a nickname to get started — or /cancel if you're not ready yet.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const nickCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -209,7 +209,7 @@ async function setupConversation(conversation, ctx) {
   if (!existingGoal) {
     await ctx.reply(
       `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
-      `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
+      `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -217,8 +217,8 @@ async function setupConversation(conversation, ctx) {
     const goal = goalCtx.message.text.trim();
     await conversation.external(() => sheets.setGoal(user.realName, goal));
     const goalConfirms = [
-      `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('Locked in\\!')} Ready to /reflect?`,
+      `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
+      `✅ ${bold('Locked in!')} Ready to /reflect?`,
       `✅ And you're set\\! /reflect whenever you're ready\\!`,
     ];
     const goalConfirm = goalConfirms[Math.floor(Math.random() * goalConfirms.length)];
@@ -311,14 +311,14 @@ async function reflectConversation(conversation, ctx) {
   if (!existingGoal) {
     await ctx.reply(
       `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
-      `Before we start — ${bold("What kind of person do you want to be by the end of Q2?")} ${italic("I'll show it to you every time you reflect\\. Change it anytime with /setgoal\\.")}`,
+      `Before we start — ${bold("What kind of person do you want to be by the end of Q2?")} ${italic("I'll show it to you every time you reflect. Change it anytime with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
     if (!goalCtx) return;
     const newGoal = goalCtx.message.text.trim();
     await conversation.external(() => sheets.setGoal(user.realName, newGoal));
-    await ctx.reply(`✅ ${bold('Saved\\.')} Let's reflect\\. 🌱`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`✅ ${bold('Saved.')} Let's reflect\\. 🌱`, { parse_mode: 'MarkdownV2' });
   } else {
     const reflectOpeners = [
       `Nice to see you again, ${e(displayName)}\\! 🌳🦋 Week ${weekNum}, let's go\\!\n\n` +
@@ -374,7 +374,7 @@ async function reflectConversation(conversation, ctx) {
 
   if (nomineeName.toLowerCase() !== 'skip') {
     await ctx.reply(
-      `${bold('Q3: What did they do? Both your dept and theirs earn bonus pts — share away\\!')}`,
+      `${bold('Q3: What did they do? Both your dept and theirs earn bonus pts — share away!')}`,
       { parse_mode: 'MarkdownV2' }
     );
 
@@ -413,7 +413,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 9: Confirmation ---
   if (alreadySubmitted) {
-    let msg = `📝 ${bold('Reflection stored\\.')}\n\nYour pts for this week are already in — but this one is saved too\\. Keep the habit going\\. 🌱 See you next Monday\\.`;
+    let msg = `📝 ${bold('Reflection stored.')}\n\nYour pts for this week are already in — but this one is saved too\\. Keep the habit going\\. 🌱 See you next Monday\\.`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Your good news about ${nomineeName} has been noted — the team will review it!`)}`;
     }
@@ -428,7 +428,7 @@ async function reflectConversation(conversation, ctx) {
     if (ptsGained > 0) {
       msg += `\n\\+${e(String(ptsGained))} pts earned this week\\!\n`;
     }
-    msg += `⭐ ${bold(`${newPoints} pts`)} total\\. Your plant is growing — and so are you\\. ${newStage}\n\n${italic('See you Monday — your team is counting on the streak\\.')}`;
+    msg += `⭐ ${bold(`${newPoints} pts`)} total\\. Your plant is growing — and so are you\\. ${newStage}\n\n${italic('See you Monday — your team is counting on the streak.')}`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
@@ -475,7 +475,7 @@ async function setGoalConversation(conversation, ctx) {
   } else {
     await ctx.reply(
       `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
-      `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
+      `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
   }
@@ -488,8 +488,8 @@ async function setGoalConversation(conversation, ctx) {
   await ctx.reply(
     (() => {
     const confirms = [
-      `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('Locked in\\!')} Ready to /reflect?`,
+      `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
+      `✅ ${bold('Locked in!')} Ready to /reflect?`,
       `✅ And you're set\\! /reflect whenever you're ready\\!`,
     ];
     return confirms[Math.floor(Math.random() * confirms.length)];
@@ -641,7 +641,7 @@ bot.command('department', async (ctx) => {
     if (nextEmoji) {
       msg += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
     } else {
-      msg += `Growth ▸ ${bar} ${italic('Full bloom\\! 🍎')}\n`;
+      msg += `Growth ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
     }
 
     msg +=
@@ -741,7 +741,7 @@ bot.command('leaderboard', async (ctx) => {
     if (currentUser?.realName) {
       const me = ranked.find(u => u.name.toLowerCase() === currentUser.realName.toLowerCase());
       if (me && me.rank > 10) {
-        msg += `\n\\.\\.\\.\n${e(String(me.rank))}\\. ${e(me.name)} ${me.plantStage} — ${e(String(me.totalPoints))} pts ${italic('\\(you\\)')}\n`;
+        msg += `\n\\.\\.\\.\n${e(String(me.rank))}\\. ${e(me.name)} ${me.plantStage} — ${e(String(me.totalPoints))} pts ${italic('(you)')}\n`;
       }
     }
 
