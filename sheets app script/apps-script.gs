@@ -17,7 +17,7 @@
 // ============================================================
 
 const CONFIG = {
-  Q2_START_DATE: '2026-03-31',   // Monday — first day of Q2 (YYYY-MM-DD)
+  Q2_START_DATE: '2026-03-30',   // Monday — first day of Q2 (YYYY-MM-DD)
   TOTAL_WEEKS: 13,
   RESET_HOUR_SGT: 18,            // 6 PM SGT = week boundary hour
 
