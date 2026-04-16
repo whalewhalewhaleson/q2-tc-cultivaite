@@ -338,8 +338,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 4: Q1 prompt (message 2) ---
   await ctx.reply(
-    `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
-    `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
+    `${bold("Q1: What is one TC value you've lived out and how? 🤔 And in the coming week, how can you live out our values even more? 🌱☁️")}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -349,7 +348,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 5: Q2 prompt (message 3) ---
   await ctx.reply(
-    `${bold('Q2: How did you do in your role? What would a coach be telling you? 💭💪🏻')}`,
+    `${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -362,8 +361,8 @@ async function reflectConversation(conversation, ctx) {
   let nomineeName = null;
   let nomineeDept = null;
   await ctx.reply(
-    `${bold('Q3 (Optional): Got any good news to share about someone this week? Who is it? :O')}\n` +
-    `${italic("(Type out their name first or type")} ${bold('skip')} ${italic("if you don't have any!)")}`,
+    `${bold('Q3 (Optional): Any good news to share about someone this week? ⭐️')}\n` +
+    `${italic("(Type out their name or type skip if you don't have any!)")}`,
     { parse_mode: 'MarkdownV2' }
   );
   const nomineeCtx = await waitForText(conversation, ctx);
@@ -375,7 +374,7 @@ async function reflectConversation(conversation, ctx) {
 
   if (nomineeName.toLowerCase() !== 'skip') {
     await ctx.reply(
-      `What did they do? Both your dept and theirs earn bonus pts — share away\\!`,
+      `${bold('Q3: What did they do? Both your dept and theirs earn bonus pts — share away\\!')}`,
       { parse_mode: 'MarkdownV2' }
     );
 
@@ -554,7 +553,7 @@ async function editReflectionConversation(conversation, ctx) {
 
   if (choice === '2' || choice === '3') {
     await ctx.reply(
-      `${bold('Q2: How did you do in your role? What would a coach be telling you? 💭💪🏻')}`,
+      `${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`,
       { parse_mode: 'MarkdownV2' }
     );
     const q2Ctx = await waitForText(conversation, ctx);
