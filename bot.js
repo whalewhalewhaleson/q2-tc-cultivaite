@@ -1010,7 +1010,7 @@ bot.command('tutorial', async (ctx) => {
     `• Reflect each week ▸ ${bold('10 pts')}\n` +
     `• Streak bonus ▸ ${bold('+1 pt')} for each consecutive week\n` +
     `  ${italic('(week 3 of a streak = 12 pts)')}\n` +
-    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin\\-reviewed — both you and the person you shout out earn pts!)')}\n\n` +
+    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin-reviewed — both you and the person you shout out earn pts!)')}\n\n` +
 
     `${bold('🏆 Department Points')}\n` +
     `• Dept score \\= average of all members' pts\n` +
