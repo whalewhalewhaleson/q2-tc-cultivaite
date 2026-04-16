@@ -600,16 +600,29 @@ bot.command('leaderboard', async (ctx) => {
       return;
     }
 
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const currentUser = await lookupUser(chatId, username);
+
     const medals = ['🥇', '🥈', '🥉'];
-    const top5 = allStats.slice(0, 5);
+    const top10 = allStats.slice(0, 10);
     const companyGarden = allStats.map(u => u.plantStage).join('');
 
     let msg = `🏆 ${bold('TC Q2 Leaderboard')}\n\n`;
 
-    top5.forEach((user, i) => {
-      const rank = medals[i] ?? `${i + 1}\\.`;
+    top10.forEach((user, i) => {
+      const rank = medals[i] ?? `${e(String(i + 1))}\\.`;
       msg += `${rank} ${e(user.name)} ${user.plantStage} — ${e(String(user.totalPoints))} pts\n`;
     });
+
+    // Show current user's rank if outside top 10
+    if (currentUser?.realName) {
+      const myIndex = allStats.findIndex(u => u.name.toLowerCase() === currentUser.realName.toLowerCase());
+      if (myIndex >= 10) {
+        const me = allStats[myIndex];
+        msg += `\n\\.\\.\\.\n${e(String(myIndex + 1))}\\. ${e(me.name)} ${me.plantStage} — ${e(String(me.totalPoints))} pts ${italic('\\(you\\)')}\n`;
+      }
+    }
 
     msg += `\n${bold('The TC Garden')}\n${italic('the plants of everyone in the company')}\n${companyGarden}`;
 
