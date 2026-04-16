@@ -870,12 +870,12 @@ bot.command('mystats', async (ctx) => {
     const totalUsers = allUsers.length;
 
     const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
-    const dd = String(now.getDate()).padStart(2, '0');
-    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dd = now.getDate();
     const yyyy = now.getFullYear();
-    const todayStr = `${dd}\\-${mm}\\-${yyyy}`;
+    const todayStr = `${dd} ${months[now.getMonth()]} ${yyyy}`;
 
-    let msg = `${todayStr} \\(Week ${weekNum}\\)\n\n`;
+    let msg = `${e(todayStr)} \\(Week ${weekNum}\\)\n\n`;
 
     if (!stats) {
       msg +=
