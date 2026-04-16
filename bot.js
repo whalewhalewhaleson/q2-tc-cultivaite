@@ -2,7 +2,7 @@ import 'dotenv/config';
 import { Bot, session } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
-import * as sheets from './sheets.js';
+import * as sheets from './db.js';
 
 // ---------------------------------------------------------------------------
 // MarkdownV2 helpers
@@ -106,16 +106,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
   return card;
 }
 
-// Ping Apps Script Web App to trigger instant stats recalculation
-async function triggerAppsScript() {
-  const url = process.env.APPS_SCRIPT_URL;
-  if (!url) return;
-  try {
-    await fetch(url, { method: 'GET', signal: AbortSignal.timeout(10000) });
-  } catch (err) {
-    console.warn('[AppsScript] Trigger failed (non-fatal):', err.message);
-  }
-}
+
 
 // Returns nickname if set, otherwise falls back to realName
 async function getDisplayName(realName) {
@@ -397,11 +388,10 @@ async function reflectConversation(conversation, ctx) {
     if (hasGoodNews && nomineeName) {
       await sheets.logGoodNews(user.realName, user.department, nomineeName, nomineeDept, q3Raw, getWeekNumber());
     }
-    await triggerAppsScript();
+    sheets.invalidateStatsCache();
   });
 
-  // --- Step 8: Wait for stats recalc, then re-read ---
-  await conversation.external(() => new Promise(r => setTimeout(r, 3000)));
+  // --- Step 8: Re-read stats (instant — calculated live from Supabase) ---
   const statsAfter = await conversation.external(() => sheets.getStatsForUser(user.realName));
 
   const newStage          = statsAfter?.plantStage        ?? stage;
@@ -781,7 +771,7 @@ bot.command('skipweek', async (ctx) => {
     }
 
     await sheets.logSkip(user.realName, user.department, weekNum);
-    await triggerAppsScript();
+    sheets.invalidateStatsCache();
 
     await ctx.reply(
       `✅ ${bold('Week skipped!')}\n\n` +
