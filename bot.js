@@ -365,6 +365,16 @@ async function reflectConversation(conversation, ctx) {
   const q2 = q2Ctx.message.text;
 
   // --- Step 6b: Optional Q3 — Good News ---
+  let nomineeName = null;
+  let nomineeDept = null;
+  await ctx.reply(
+    `Who are you nominating? ${italic('Type their full name as it appears in the system.')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+  const nomineeCtx = await waitForText(conversation, ctx);
+  if (!nomineeCtx) return;
+  nomineeName = nomineeCtx.message.text.trim();
+
   await ctx.reply(
     `${bold('Q3 (Optional): Got any good news to share about someone this week?')}\n` +
     `${italic('Name them and what they did \u2014 both your dept and theirs earn bonus pts! Or type')} ${bold('skip')} ${italic('to finish.')}`,
@@ -376,16 +386,7 @@ async function reflectConversation(conversation, ctx) {
   const q3Raw = q3Ctx.message.text.trim();
   const hasGoodNews = q3Raw.toLowerCase() !== 'skip' && q3Raw.length > 0;
 
-  let nomineeName = null;
-  let nomineeDept = null;
   if (hasGoodNews) {
-    await ctx.reply(
-      `Who are you nominating? ${italic('Type their full name as it appears in the system.')}`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    const nomineeCtx = await waitForText(conversation, ctx);
-    if (!nomineeCtx) return;
-    nomineeName = nomineeCtx.message.text.trim();
     const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
     nomineeDept = nomineeUser?.department ?? 'Unknown';
   }
