@@ -17,7 +17,7 @@
 // ============================================================
 
 const CONFIG = {
-  Q2_START_DATE: '2026-04-20',   // Monday — first day of Q2 (YYYY-MM-DD)
+  Q2_START_DATE: '2026-03-31',   // Monday — first day of Q2 (YYYY-MM-DD)
   TOTAL_WEEKS: 13,
   RESET_HOUR_SGT: 18,            // 6 PM SGT = week boundary hour
 
@@ -316,6 +316,15 @@ function calculateUserStats(realName, allSubmissions, currentWeekKey, goodNewsEn
 
   const currentWeekNum = Math.max(1, Math.min(CONFIG.TOTAL_WEEKS, getWeekNumber(currentWeekKey)));
 
+  // Find the first week the user ever submitted — misses before this don't count
+  let firstSubmissionWeek = null;
+  for (const wKey of Object.keys(weekMap)) {
+    const wNum = getWeekNumber(wKey);
+    if (firstSubmissionWeek === null || wNum < firstSubmissionWeek) {
+      firstSubmissionWeek = wNum;
+    }
+  }
+
   // Walk week-by-week, accumulating pts
   let totalPoints = 0;
   let streakSoFar = 0;       // running streak at time of each submission
@@ -335,7 +344,8 @@ function calculateUserStats(realName, allSubmissions, currentWeekKey, goodNewsEn
         weekPts *= CONFIG.DEPT_STREAK_MULTIPLIER;
       }
       totalPoints += weekPts;
-    } else {
+    } else if (firstSubmissionWeek !== null && w >= firstSubmissionWeek) {
+      // Only count as a miss once the user has submitted at least once
       streakSoFar = 0;
       consecutiveMisses++;
     }
