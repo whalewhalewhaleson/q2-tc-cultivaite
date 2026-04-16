@@ -302,7 +302,7 @@ async function reflectConversation(conversation, ctx) {
   );
   const alreadySubmitted = statsBefore?.submittedThisWeek === true;
 
-  // --- Step 3: Plant card (message 1) ---
+  // --- Step 3: Greeting ---
   const weekNum = getWeekNumber();
   const stage              = statsBefore?.plantStage        ?? '🌱';
   const pct                = statsBefore?.progressPct       ?? 0;
@@ -310,18 +310,10 @@ async function reflectConversation(conversation, ctx) {
   const totalPoints        = statsBefore?.totalPoints       ?? 0;
   const consecutiveMisses  = statsBefore?.consecutiveMisses ?? 0;
 
-  let cardMsg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(displayName)} 👋\n\n`;
-
-  if (alreadySubmitted) {
-    cardMsg += buildPlantCard(stage, pct, streak, true, totalPoints, consecutiveMisses, null, null);
-    cardMsg += `\n\n${italic("You've already reflected this week — this one won't move your pts, but it's still stored. Keep going!")}`;
-  } else if (statsBefore) {
-    cardMsg += buildPlantCard(stage, pct, streak, false, totalPoints, consecutiveMisses, null, null);
-  } else {
-    cardMsg += `Plant ▸ 🌱 Seedling · 0 pts\nNext ▸ ${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n🔥 Streak ▸ None \\(0 weeks\\)\n❌ Not submitted yet`;
-  }
-
-  await ctx.reply(cardMsg, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(
+    `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}`,
+    { parse_mode: 'MarkdownV2' }
+  );
 
   // --- Step 3b: Goal reminder / first-time prompt ---
   const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
