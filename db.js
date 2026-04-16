@@ -26,7 +26,8 @@ function getSGTDatetime() {
 // Week number (mirrors bot.js getWeekNumber, but applied to a date string)
 // ---------------------------------------------------------------------------
 
-const Q2_START = new Date('2026-03-30T00:00:00+08:00');
+const Q2_START    = new Date('2026-03-30T00:00:00+08:00');
+const LAUNCH_DATE = '2026-04-17'; // Week bot went live — misses only counted from here
 
 function dateToWeekNumber(dateStr) {
   // dateStr is YYYY-MM-DD (SGT)
@@ -113,7 +114,8 @@ async function buildStatsCache() {
   const news     = approvedNews ?? [];
   const users    = allUsers    ?? [];
 
-  const weekNow = currentWeekNumber();
+  const weekNow    = currentWeekNumber();
+  const launchWeek = dateToWeekNumber(LAUNCH_DATE);
 
   // Build dept → member list
   const deptMembers = {}; // dept → Set of real_name
@@ -140,7 +142,7 @@ async function buildStatsCache() {
     const name = u.real_name.toLowerCase().trim();
     if (EXCLUDED_DEPARTMENTS.includes(dept)) continue;
     if (!deptWeekRate[dept]) deptWeekRate[dept] = {};
-    for (let wk = 1; wk <= weekNow; wk++) {
+    for (let wk = launchWeek; wk <= weekNow; wk++) {
       if (!deptWeekRate[dept][wk]) deptWeekRate[dept][wk] = { submitted: 0, total: 0 };
       deptWeekRate[dept][wk].total++;
       if (userWeekMap[name]?.[wk]?.submitted) deptWeekRate[dept][wk].submitted++;
@@ -153,7 +155,7 @@ async function buildStatsCache() {
   for (const dept of Object.keys(deptWeekRate)) {
     deptConsec[dept] = {};
     let run = 0;
-    for (let wk = 1; wk <= weekNow; wk++) {
+    for (let wk = launchWeek; wk <= weekNow; wk++) {
       const rate = deptWeekRate[dept][wk];
       if (rate && rate.total > 0 && rate.submitted === rate.total) {
         run++;
@@ -185,7 +187,7 @@ async function buildStatsCache() {
     let consecutiveMisses  = 0;
     let currentStreak      = 0;
 
-    for (let wk = 1; wk <= weekNow; wk++) {
+    for (let wk = launchWeek; wk <= weekNow; wk++) {
       const entry = weekMap[wk];
       if (entry?.submitted) {
         consecutiveMisses = 0;
@@ -253,7 +255,7 @@ async function buildStatsCache() {
     const totalSubs = members.reduce((s, n) => {
       return s + Object.values(userWeekMap[n] ?? {}).filter(e => e.submitted && !e.excused).length;
     }, 0);
-    const targetSubs = members.length * weekNow;
+    const targetSubs = members.length * (weekNow - launchWeek + 1);
 
     const gardenStage = pointsToStage(avgPoints);
     const progressPct  = stageProgressPct(avgPoints);
