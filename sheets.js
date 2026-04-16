@@ -296,7 +296,7 @@ export async function getAllUsersWithChatId() {
   const sheets = await getSheetsClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.SHEET_ID,
-    range: 'Users!A:D',
+    range: 'Users!A:F',
     valueRenderOption: 'UNFORMATTED_VALUE',
   });
 
@@ -308,6 +308,7 @@ export async function getAllUsersWithChatId() {
       result.push({
         realName: String(row[1] ?? '').trim(),
         chatId,
+        nickname: row[5] ? String(row[5]).trim() : null,
       });
     }
   }

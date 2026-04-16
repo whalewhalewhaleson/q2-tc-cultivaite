@@ -117,6 +117,12 @@ async function triggerAppsScript() {
   }
 }
 
+// Returns nickname if set, otherwise falls back to realName
+async function getDisplayName(realName) {
+  const nick = await sheets.getNickname(realName);
+  return nick ?? realName;
+}
+
 // ---------------------------------------------------------------------------
 // User lookup — prefers Telegram user ID over handle (IDs never change)
 // ---------------------------------------------------------------------------
@@ -211,8 +217,7 @@ async function setupConversation(conversation, ctx) {
   const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
   if (!existingGoal) {
     await ctx.reply(
-      `🎯 ${bold("What's your Q2 goal?")}\n\n` +
-      `${italic("It'll pop up as a reminder every time you reflect. You can change it anytime with /setgoal.")}`,
+      `🎯 ${bold("What's your Q2 goal?")} ${italic("It'll pop up as a reminder every time you reflect. You can change it anytime with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -292,7 +297,9 @@ async function reflectConversation(conversation, ctx) {
   }
 
   // --- Step 2: Check if already submitted this week ---
-  const statsBefore = await conversation.external(() => sheets.getStatsForUser(user.realName));
+  const [statsBefore, displayName] = await conversation.external(() =>
+    Promise.all([sheets.getStatsForUser(user.realName), getDisplayName(user.realName)])
+  );
   const alreadySubmitted = statsBefore?.submittedThisWeek === true;
 
   // --- Step 3: Plant card (message 1) ---
@@ -303,7 +310,7 @@ async function reflectConversation(conversation, ctx) {
   const totalPoints        = statsBefore?.totalPoints       ?? 0;
   const consecutiveMisses  = statsBefore?.consecutiveMisses ?? 0;
 
-  let cardMsg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(user.realName)} 👋\n\n`;
+  let cardMsg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(displayName)} 👋\n\n`;
 
   if (alreadySubmitted) {
     cardMsg += buildPlantCard(stage, pct, streak, true, totalPoints, consecutiveMisses, null, null);
@@ -321,8 +328,7 @@ async function reflectConversation(conversation, ctx) {
 
   if (!existingGoal) {
     await ctx.reply(
-      `🎯 ${bold('Quick one before we start — what\'s your Q2 goal?')}\n\n` +
-      `${italic("I'll remind you of it every time you reflect. You can change it anytime with /setgoal.")}`,
+      `🎯 ${bold('Quick one before we start — what\'s your Q2 goal?')} ${italic("I'll remind you of it every time you reflect. You can change it anytime with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
@@ -790,6 +796,41 @@ bot.command('skipweek', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /testnudge — admin only, sends the Monday nudge message to yourself
+// ---------------------------------------------------------------------------
+
+bot.command('testnudge', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const user = await lookupUser(chatId, username);
+
+    if (!user?.realName) {
+      await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const displayName = await getDisplayName(user.realName);
+
+    await ctx.reply(
+      `🌱 Hey ${e(displayName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
+      `You haven't reflected this week yet — and your plant is waiting to be watered\\! 💧\n\n` +
+      `Submit before ${bold('6 PM today')} to keep your streak alive\\.\n` +
+      `/reflect — it only takes a couple of minutes\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } catch (err) {
+    console.error('/testnudge error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /mystats
 // ---------------------------------------------------------------------------
 
@@ -807,14 +848,15 @@ bot.command('mystats', async (ctx) => {
       return;
     }
 
-    const [stats, allUsers] = await Promise.all([
+    const [stats, allUsers, displayName] = await Promise.all([
       sheets.getStatsForUser(user.realName),
       sheets.getAllUsersWithChatId(),
+      getDisplayName(user.realName),
     ]);
     const weekNum = getWeekNumber();
     const totalUsers = allUsers.length;
 
-    let msg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(user.realName)} 👋\n\n`;
+    let msg = `${bold(`Week ${weekNum} / 13`)}\n\nHey ${e(displayName)} 👋\n\n`;
 
     if (!stats) {
       msg +=
@@ -1011,7 +1053,7 @@ bot.command('nick', async (ctx) => {
 // ---------------------------------------------------------------------------
 
 bot.command('help', async (ctx) => {
-  await ctx.reply(
+  let msg =
     `🌱 ${bold('TC CultivAIte')}\n` +
     `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
@@ -1026,11 +1068,18 @@ bot.command('help', async (ctx) => {
     `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
     `/editreflection — ✏️ Update your most recent reflection\n` +
     `/cancel — ❌ Cancel whatever's in progress\n` +
-    `/skipweek — 🗓 \\(Admin\\) Excuse a user for a week\n` +
-    `/help — Show this message\n\n` +
-    `${italic('Reflect weekly. Grow together.')}`,
-    { parse_mode: 'MarkdownV2' }
-  );
+    `/help — Show this message\n`;
+
+  if (isAdmin(ctx)) {
+    msg +=
+      `\n${bold('Admin')}\n` +
+      `/skipweek — 🗓 Excuse a user for a week\n` +
+      `/testnudge — 🔔 Preview the Monday nudge message\n`;
+  }
+
+  msg += `\n${italic('Reflect weekly. Grow together.')}`;
+
+  await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
 });
 
 // ---------------------------------------------------------------------------
@@ -1086,13 +1135,14 @@ cron.schedule('0 2 * * 1', async () => {
   console.log('[Cron] Running Monday nudge...');
   try {
     const users = await sheets.getAllUsersWithChatId();
-    for (const { realName, chatId } of users) {
+    for (const { realName, chatId, nickname } of users) {
       try {
         const stats = await sheets.getStatsForUser(realName);
         if (stats && stats.submittedThisWeek === false) {
+          const displayName = nickname ?? realName;
           await bot.api.sendMessage(
             chatId,
-            `🌱 Hey ${e(realName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
+            `🌱 Hey ${e(displayName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
             `You haven't reflected this week yet — and your plant is waiting to be watered\\! 💧\n\n` +
             `Submit before ${bold('6 PM today')} to keep your streak alive\\.\n` +
             `/reflect — it only takes a couple of minutes\\.`,
