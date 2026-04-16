@@ -161,7 +161,7 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
 
   if (text.startsWith('/')) {
     await ctx.reply(
-      cancelMsg ?? `No worries\\! 🌱 Come back and /reflect whenever you're ready\\.`,
+      cancelMsg ?? `No worries\\. Come back and /reflect whenever you're ready\\. 🌱`,
       { parse_mode: 'MarkdownV2' }
     );
     return null;
@@ -194,7 +194,7 @@ async function setupConversation(conversation, ctx) {
   const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
   if (!existingNick) {
     await ctx.reply(
-      `What should I call you? 🌱\n${italic('Type a nickname, or /cancel if you\'re not ready yet.')}`,
+      `what should i call you? 🌱\n${italic("type a nickname to get started — or /cancel if you're not ready yet\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const nickCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -208,17 +208,21 @@ async function setupConversation(conversation, ctx) {
   const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
   if (!existingGoal) {
     await ctx.reply(
-      `🎯 ${bold("What's your Q2 goal?")} ${italic("It'll pop up as a reminder every time you reflect. You can change it anytime with /setgoal.")}`,
+      `Who do you want to become by the end of Q2? ❤️🎯🥊\n\n` +
+      `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx, cancelMsg);
     if (!goalCtx) return;
     const goal = goalCtx.message.text.trim();
     await conversation.external(() => sheets.setGoal(user.realName, goal));
-    await ctx.reply(
-      `✅ ${bold('Goal saved!')} 🎯\n\n${italic("You're all set — type /reflect whenever you're ready to grow. 🌱")}`,
-      { parse_mode: 'MarkdownV2' }
-    );
+    const goalConfirms = [
+      `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
+      `✅ ${bold('locked in\\!')} Ready to /reflect?`,
+      `✅ and you're set\\! /reflect whenever you're ready\\!`,
+    ];
+    const goalConfirm = goalConfirms[Math.floor(Math.random() * goalConfirms.length)];
+    await ctx.reply(goalConfirm, { parse_mode: 'MarkdownV2' });
   }
 }
 
@@ -307,36 +311,35 @@ async function reflectConversation(conversation, ctx) {
   if (!existingGoal) {
     await ctx.reply(
       `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
-      `🎯 ${bold('Quick one before we start — what\'s your Q2 goal?')} ${italic("I'll remind you of it every time you reflect. You can change it anytime with /setgoal.")}`,
+      `Before we start — ${bold("who do you want to become by the end of Q2?")} ${italic("I'll show it to you every time you reflect\\. Change it anytime with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
     if (!goalCtx) return;
     const newGoal = goalCtx.message.text.trim();
     await conversation.external(() => sheets.setGoal(user.realName, newGoal));
-    await ctx.reply(`✅ Goal saved\\! Let's reflect\\. 🌿`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`✅ ${bold('Saved\\.')} Let's reflect\\. 🌱`, { parse_mode: 'MarkdownV2' });
   } else {
-    const nudges = [
-      'ready to reflect?',
-      "let's go\\! 🚀",
-      'your plant is waiting\\! 🌿',
-      "time to water your plant\\! 💧",
-      "let's keep the streak alive\\! 🔥",
-      "let's see what this week brought you\\!",
-      "time to grow\\! 🌱",
-      "let's do this\\! 💪",
+    const reflectOpeners = [
+      `nice to see you again, ${e(displayName)}\\! 🌳🦋 week ${weekNum}, let's go\\!\n\n` +
+      `🎯 your goal this quarter was: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
+      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
+
+      `hey there, ${e(displayName)}\\! ready for week ${weekNum}\\? 🌱\n\n` +
+      `made any progress on your goal 🎯 ${italic(`"${existingGoal}"`)}\?\n\n` +
+      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
+
+      `how was your week, ${e(displayName)}\\? 😎 Your 🎯 goal this quarter is: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
+      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
     ];
-    const nudge = nudges[Math.floor(Math.random() * nudges.length)];
-    await ctx.reply(
-      `Hey ${e(displayName)}\\! 👋 It's ${bold(`Week ${weekNum} / 13`)} of Q2, ${nudge}\n\n` +
-      `Remember, 🎯 ${bold('Your Q2 Goal:')}\n${italic(existingGoal)}`,
-      { parse_mode: 'MarkdownV2' }
-    );
+    const opener = reflectOpeners[Math.floor(Math.random() * reflectOpeners.length)];
+    await ctx.reply(opener, { parse_mode: 'MarkdownV2' });
   }
 
   // --- Step 4: Q1 prompt (message 2) ---
   await ctx.reply(
-    `${bold("Q1: What's one thing you've grown in personally this week?")}\n${italic('Take your time — there are no wrong answers here.')}`,
+    `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
+    `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -346,7 +349,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 5: Q2 prompt (message 3) ---
   await ctx.reply(
-    `${bold('Q2: How have you improved professionally this week?')}\n${italic('Even small steps count.')}`,
+    `${bold('Q2: How did you do in your role? What would a coach be telling you? 💭💪🏻')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -359,7 +362,8 @@ async function reflectConversation(conversation, ctx) {
   let nomineeName = null;
   let nomineeDept = null;
   await ctx.reply(
-    `${bold('Q3 (Optional): Got any good news to share about someone this week?')} ${italic('First, type out their full name as it appears in the system \u2014 or type')} ${bold('skip')} ${italic('to finish.')}`,
+    `${bold('Q3 (Optional): Got any good news to share about someone this week? Who is it? :O')}\n` +
+    `${italic("(Type out their name first or type")} ${bold('skip')} ${italic("if you don't have any!)")}`,
     { parse_mode: 'MarkdownV2' }
   );
   const nomineeCtx = await waitForText(conversation, ctx);
@@ -371,7 +375,7 @@ async function reflectConversation(conversation, ctx) {
 
   if (nomineeName.toLowerCase() !== 'skip') {
     await ctx.reply(
-      `${italic('What did they do? Both your dept and theirs earn bonus pts \u2014 share away!')}`,
+      `What did they do? Both your dept and theirs earn bonus pts — share away\\!`,
       { parse_mode: 'MarkdownV2' }
     );
 
@@ -410,7 +414,7 @@ async function reflectConversation(conversation, ctx) {
 
   // --- Step 9: Confirmation ---
   if (alreadySubmitted) {
-    let msg = `📝 ${bold('Reflection stored!')}\n\nYour pts are already locked in for this week — but I kept this one for you too\\. 🌿 See you next Monday\\!`;
+    let msg = `📝 ${bold('Reflection stored\\.')}\n\nYour pts for this week are already in — but this one is saved too\\. Keep the habit going\\. 🌱 See you next Monday\\.`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Your good news about ${nomineeName} has been noted — the team will review it!`)}`;
     }
@@ -425,7 +429,7 @@ async function reflectConversation(conversation, ctx) {
     if (ptsGained > 0) {
       msg += `\n\\+${e(String(ptsGained))} pts earned this week\\!\n`;
     }
-    msg += `⭐ ${bold(`${newPoints} pts`)} total\\. You're growing — keep it up\\! ${newStage}`;
+    msg += `⭐ ${bold(`${newPoints} pts`)} total\\. Your plant is growing — and so are you\\. ${newStage}\n\n${italic('See you Monday — your team is counting on the streak\\.')}`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
@@ -436,7 +440,7 @@ async function reflectConversation(conversation, ctx) {
     if (ptsGained > 0) {
       msg += `\n\n\\+${e(String(ptsGained))} pts earned this week\\!`;
     }
-    msg += `\n\nGreat work this week 🌿 See you Monday\\!`;
+    msg += `\n\nGood work showing up this week\\. 🌱 See you Monday — the whole team is building this together\\.`;
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
@@ -465,14 +469,14 @@ async function setGoalConversation(conversation, ctx) {
 
   if (existing) {
     await ctx.reply(
-      `🎯 ${bold('Your Q2 goal right now:')}\n${italic(existing)}\n\n` +
+      `🎯 ${bold('Your current goal:')}\n${italic(existing)}\n\n` +
       `What do you want to change it to?`,
       { parse_mode: 'MarkdownV2' }
     );
   } else {
     await ctx.reply(
-      `🎯 ${bold("What's one thing you want to achieve this Q2?")}\n\n` +
-      `${italic("It'll pop up as a reminder every time you reflect — so make it count!")}`,
+      `Who do you want to become by the end of Q2? ❤️🎯🥊\n\n` +
+      `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
   }
@@ -483,7 +487,14 @@ async function setGoalConversation(conversation, ctx) {
 
   await conversation.external(() => sheets.setGoal(user.realName, newGoal));
   await ctx.reply(
-    `✅ ${bold('Saved!')} 🎯 ${italic(newGoal)}\n\n${italic("I'll remind you of this every time you /reflect.")}`,
+    (() => {
+    const confirms = [
+      `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
+      `✅ ${bold('locked in\\!')} Ready to /reflect?`,
+      `✅ and you're set\\! /reflect whenever you're ready\\!`,
+    ];
+    return confirms[Math.floor(Math.random() * confirms.length)];
+  })(),
     { parse_mode: 'MarkdownV2' }
   );
 }
@@ -531,14 +542,21 @@ async function editReflectionConversation(conversation, ctx) {
   let newQ2 = latest.q2;
 
   if (choice === '1' || choice === '3') {
-    await ctx.reply(`${bold("Q1: What's one thing you've grown in personally this week?")}\n${italic('Take your time — there are no wrong answers here.')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(
+      `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
+      `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
     const q1Ctx = await waitForText(conversation, ctx);
     if (!q1Ctx) return;
     newQ1 = q1Ctx.message.text;
   }
 
   if (choice === '2' || choice === '3') {
-    await ctx.reply(`${bold('Q2: How have you improved professionally this week?')}\n${italic('Even small steps count.')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(
+      `${bold('Q2: How did you do in your role? What would a coach be telling you? 💭💪🏻')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
     const q2Ctx = await waitForText(conversation, ctx);
     if (!q2Ctx) return;
     newQ2 = q2Ctx.message.text;
@@ -813,10 +831,10 @@ bot.command('testnudge', async (ctx) => {
     const displayName = await getDisplayName(user.realName);
 
     await ctx.reply(
-      `🌱 Hey ${e(displayName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
-      `You haven't reflected this week yet — and your plant is waiting to be watered\\! 💧\n\n` +
-      `Submit before ${bold('6 PM today')} to keep your streak alive\\.\n` +
-      `/reflect — it only takes a couple of minutes\\.`,
+      `Hey ${e(displayName)}\\! Quick check\\-in — have you reflected this week? 🌱\n\n` +
+      `Two minutes\\. That's all it takes\\. Consistency is what builds identity\\.\n\n` +
+      `Don't break the streak — future you will thank you\\.\n` +
+      `/reflect`,
       { parse_mode: 'MarkdownV2' }
     );
   } catch (err) {
@@ -986,11 +1004,13 @@ bot.command('tutorial', async (ctx) => {
   await ctx.reply(
     `📖 ${bold('How TC CultivAIte Works')}\n\n` +
 
-    `${bold('⭐ Earning Points')}\n` +
+    `🍎 Everyone starts off with one of these: 🌱 — as you /reflect every week, earn points and watch the plant grow with you\\!\n\n` +
+
+    `${bold('⭐️ Earning Points')}\n` +
     `• Reflect each week ▸ ${bold('10 pts')}\n` +
     `• Streak bonus ▸ ${bold('+1 pt')} for each consecutive week\n` +
     `  ${italic('(week 3 of a streak = 12 pts)')}\n` +
-    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin-reviewed — both you and the person you shout out earn pts!)')}\n\n` +
+    `• Share good news ▸ ${bold('+5 pts')} ${italic('(admin\\-reviewed — both you and the person you shout out earn pts!)')}\n\n` +
 
     `${bold('🏆 Department Points')}\n` +
     `• Dept score \\= average of all members' pts\n` +
@@ -1011,6 +1031,8 @@ bot.command('tutorial', async (ctx) => {
     `${bold('💧 Streak Bonus')}\n` +
     `• Each consecutive week you reflect adds a 💧\n` +
     `• Longer streak \\= bigger pts bonus per week\n\n` +
+
+    `Type /help for a list of all the commands available to you\\!\n\n` +
 
     `${italic('Reflect weekly. Grow together. 🌱')}`,
     { parse_mode: 'MarkdownV2' }
@@ -1083,7 +1105,7 @@ bot.command('help', async (ctx) => {
 
 bot.command('cancel', async (ctx) => {
   await ctx.conversation.exit();
-  await ctx.reply(`Cancelled\\! 👍 Let me know if you need anything else\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`No worries\\. Come back and /reflect whenever you're ready\\. 🌱`, { parse_mode: 'MarkdownV2' });
 });
 
 // ---------------------------------------------------------------------------
@@ -1101,9 +1123,9 @@ bot.command('start', async (ctx) => {
     const greeting = nick ? `Hey ${e(nick)}\\!` : `Hey\\!`;
 
     await ctx.reply(
-      `${greeting} 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
-      `Every week you reflect, your plant grows 🌱\n\n` +
-      `${italic('(Type /help anytime if you get lost!)')}`,
+      `hey there\\! 🤟 heard you're ${bold(e(user?.realName ?? 'you'))} — ready to grow this quarter? i'm here to help you out\\!\n\n` +
+      `🌱 ▸ this is your plant, and the goal is for it to bare many fruits 🍎\\! water it weekly with a /reflect and watch it grow with you\\! 🌳\n\n` +
+      `type /tutorial for a quick crash course, /help to explore all the commands available to you\\! 🙂`,
       { parse_mode: 'MarkdownV2' }
     );
     await ctx.conversation.enter('setupConversation');
@@ -1137,10 +1159,7 @@ cron.schedule('0 2 * * 1', async () => {
           const displayName = nickname ?? realName;
           await bot.api.sendMessage(
             chatId,
-            `🌱 Hey ${e(displayName)}\\! Just a gentle nudge from your reflection companion\\.\n\n` +
-            `You haven't reflected this week yet — and your plant is waiting to be watered\\! 💧\n\n` +
-            `Submit before ${bold('6 PM today')} to keep your streak alive\\.\n` +
-            `/reflect — it only takes a couple of minutes\\.`,
+            `Hey ${e(displayName)}\\! /reflect on the past week yet\\? Take a break to water your plant\\! 🌱🌊`,
             { parse_mode: 'MarkdownV2' }
           );
           await new Promise(r => setTimeout(r, 200));
