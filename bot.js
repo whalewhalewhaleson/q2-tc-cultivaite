@@ -194,7 +194,7 @@ async function setupConversation(conversation, ctx) {
   const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
   if (!existingNick) {
     await ctx.reply(
-      `what should i call you? 🌱\n${italic("type a nickname to get started — or /cancel if you're not ready yet\\.")}`,
+      `What should I call you? 🌱\n${italic("Type a nickname to get started — or /cancel if you're not ready yet\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const nickCtx = await waitForText(conversation, ctx, cancelMsg);
@@ -208,7 +208,7 @@ async function setupConversation(conversation, ctx) {
   const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
   if (!existingGoal) {
     await ctx.reply(
-      `Who do you want to become by the end of Q2? ❤️🎯🥊\n\n` +
+      `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
       `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
@@ -218,8 +218,8 @@ async function setupConversation(conversation, ctx) {
     await conversation.external(() => sheets.setGoal(user.realName, goal));
     const goalConfirms = [
       `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('locked in\\!')} Ready to /reflect?`,
-      `✅ and you're set\\! /reflect whenever you're ready\\!`,
+      `✅ ${bold('Locked in\\!')} Ready to /reflect?`,
+      `✅ And you're set\\! /reflect whenever you're ready\\!`,
     ];
     const goalConfirm = goalConfirms[Math.floor(Math.random() * goalConfirms.length)];
     await ctx.reply(goalConfirm, { parse_mode: 'MarkdownV2' });
@@ -311,7 +311,7 @@ async function reflectConversation(conversation, ctx) {
   if (!existingGoal) {
     await ctx.reply(
       `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
-      `Before we start — ${bold("who do you want to become by the end of Q2?")} ${italic("I'll show it to you every time you reflect\\. Change it anytime with /setgoal\\.")}`,
+      `Before we start — ${bold("What kind of person do you want to be by the end of Q2?")} ${italic("I'll show it to you every time you reflect\\. Change it anytime with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
@@ -321,16 +321,16 @@ async function reflectConversation(conversation, ctx) {
     await ctx.reply(`✅ ${bold('Saved\\.')} Let's reflect\\. 🌱`, { parse_mode: 'MarkdownV2' });
   } else {
     const reflectOpeners = [
-      `nice to see you again, ${e(displayName)}\\! 🌳🦋 week ${weekNum}, let's go\\!\n\n` +
-      `🎯 your goal this quarter was: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
-      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
+      `Nice to see you again, ${e(displayName)}\\! 🌳🦋 Week ${weekNum}, let's go\\!\n\n` +
+      `🎯 Your goal this quarter was: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
+      `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
-      `hey there, ${e(displayName)}\\! ready for week ${weekNum}\\? 🌱\n\n` +
-      `made any progress on your goal 🎯 ${italic(`"${existingGoal}"`)}\?\n\n` +
-      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
+      `Hey there, ${e(displayName)}\\! Ready for week ${weekNum}\\? 🌱\n\n` +
+      `Made any progress on your goal 🎯 ${italic(`"${existingGoal}"`)}\?\n\n` +
+      `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
-      `how was your week, ${e(displayName)}\\? 😎 Your 🎯 goal this quarter is: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
-      `${italic('(your reflections will be visible to your managers/HODs!)')}`,
+      `How was your week, ${e(displayName)}\\? 😎 Your 🎯 goal this quarter is: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
+      `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
     ];
     const opener = reflectOpeners[Math.floor(Math.random() * reflectOpeners.length)];
     await ctx.reply(opener, { parse_mode: 'MarkdownV2' });
@@ -475,7 +475,7 @@ async function setGoalConversation(conversation, ctx) {
     );
   } else {
     await ctx.reply(
-      `Who do you want to become by the end of Q2? ❤️🎯🥊\n\n` +
+      `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
       `${italic("This will show up every time you reflect — so make it personal\\. You can always change it with /setgoal\\.")}`,
       { parse_mode: 'MarkdownV2' }
     );
@@ -490,8 +490,8 @@ async function setGoalConversation(conversation, ctx) {
     (() => {
     const confirms = [
       `✅ ${bold('Set\\.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('locked in\\!')} Ready to /reflect?`,
-      `✅ and you're set\\! /reflect whenever you're ready\\!`,
+      `✅ ${bold('Locked in\\!')} Ready to /reflect?`,
+      `✅ And you're set\\! /reflect whenever you're ready\\!`,
     ];
     return confirms[Math.floor(Math.random() * confirms.length)];
   })(),
@@ -1129,9 +1129,9 @@ bot.command('start', async (ctx) => {
     const greeting = nick ? `Hey ${e(nick)}\\!` : `Hey\\!`;
 
     await ctx.reply(
-      `hey there\\! 🤟 heard you're ${bold(e(user?.realName ?? 'you'))} — ready to grow this quarter? i'm here to help you out\\!\n\n` +
-      `🌱 ▸ this is your plant, and the goal is for it to bare many fruits 🍎\\! water it weekly with a /reflect and watch it grow with you\\! 🌳\n\n` +
-      `type /tutorial for a quick crash course, /help to explore all the commands available to you\\! 🙂`,
+      `Hey there\\! 🤟 Heard you're ${bold(e(user?.realName ?? 'you'))} — ready to grow this quarter? I'm here to help you out\\!\n\n` +
+      `🌱 ▸ This is your plant, and the goal is for it to bear many fruits 🍎\\! Water it weekly with a /reflect and watch it grow with you\\! 🌳\n\n` +
+      `Type /tutorial for a quick crash course, /help to explore all the commands available to you\\! 🙂`,
       { parse_mode: 'MarkdownV2' }
     );
     await ctx.conversation.enter('setupConversation');
