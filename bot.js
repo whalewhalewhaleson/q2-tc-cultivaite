@@ -534,7 +534,7 @@ bot.command('department', async (ctx) => {
     msg +=
       `Streaks ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}\n\n` +
       `${bold('Department Garden')}\n` +
-      `${italic('The plants of everyone in your dept\\!')}\n` +
+      `${italic('The plants of everyone in your dept!')}\n` +
       gardenRow;
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
