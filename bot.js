@@ -326,8 +326,9 @@ async function reflectConversation(conversation, ctx) {
     await ctx.reply(`✅ Goal saved\\! Let's reflect\\. 🌿`, { parse_mode: 'MarkdownV2' });
   } else {
     await ctx.reply(
-      `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
-      `🎯 ${bold('This week\'s goal:')} ${italic(existingGoal)}`,
+      `Hey ${e(displayName)}\\! 👋\n\n` +
+      `It's ${bold(`Week ${weekNum} / 13`)} of Q2, ready to reflect?\n\n` +
+      `Remember, your goal 🎯 is to ${bold(existingGoal)}\\!`,
       { parse_mode: 'MarkdownV2' }
     );
   }
