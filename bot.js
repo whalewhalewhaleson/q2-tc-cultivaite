@@ -605,22 +605,35 @@ bot.command('leaderboard', async (ctx) => {
     const currentUser = await lookupUser(chatId, username);
 
     const medals = ['🥇', '🥈', '🥉'];
-    const top10 = allStats.slice(0, 10);
     const companyGarden = allStats.map(u => u.plantStage).join('');
+
+    // Assign ranks with ties (1,1,3 style)
+    const ranked = allStats.map((user, i) => {
+      const rank = i === 0 ? 1 : (allStats[i].totalPoints === allStats[i - 1].totalPoints
+        ? null // fill in after
+        : i + 1);
+      return { ...user, rank };
+    });
+    let lastRank = 1;
+    for (let i = 0; i < ranked.length; i++) {
+      if (ranked[i].rank !== null) lastRank = ranked[i].rank;
+      else ranked[i].rank = lastRank;
+    }
+
+    const top10 = ranked.slice(0, 10);
 
     let msg = `🏆 ${bold('TC Q2 Leaderboard')}\n\n`;
 
-    top10.forEach((user, i) => {
-      const rank = medals[i] ?? `${e(String(i + 1))}\\.`;
-      msg += `${rank} ${e(user.name)} ${user.plantStage} — ${e(String(user.totalPoints))} pts\n`;
+    top10.forEach(user => {
+      const rankDisplay = medals[user.rank - 1] ?? `${e(String(user.rank))}\\.`;
+      msg += `${rankDisplay} ${e(user.name)} ${user.plantStage} — ${e(String(user.totalPoints))} pts\n`;
     });
 
     // Show current user's rank if outside top 10
     if (currentUser?.realName) {
-      const myIndex = allStats.findIndex(u => u.name.toLowerCase() === currentUser.realName.toLowerCase());
-      if (myIndex >= 10) {
-        const me = allStats[myIndex];
-        msg += `\n\\.\\.\\.\n${e(String(myIndex + 1))}\\. ${e(me.name)} ${me.plantStage} — ${e(String(me.totalPoints))} pts ${italic('\\(you\\)')}\n`;
+      const me = ranked.find(u => u.name.toLowerCase() === currentUser.realName.toLowerCase());
+      if (me && me.rank > 10) {
+        msg += `\n\\.\\.\\.\n${e(String(me.rank))}\\. ${e(me.name)} ${me.plantStage} — ${e(String(me.totalPoints))} pts ${italic('\\(you\\)')}\n`;
       }
     }
 
