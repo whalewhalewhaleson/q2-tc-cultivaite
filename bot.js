@@ -368,7 +368,7 @@ async function reflectConversation(conversation, ctx) {
   let nomineeName = null;
   let nomineeDept = null;
   await ctx.reply(
-    `${bold('Q3 (Optional): Got any good news to share about someone this week?')} ${italic('Type their full name as it appears in the system, or type')} ${bold('skip')} ${italic('to finish.')}`,
+    `${bold('Q3 (Optional): Got any good news to share about someone this week?')} ${italic('First, type out their full name as it appears in the system \u2014 or type')} ${bold('skip')} ${italic('to finish.')}`,
     { parse_mode: 'MarkdownV2' }
   );
   const nomineeCtx = await waitForText(conversation, ctx);
