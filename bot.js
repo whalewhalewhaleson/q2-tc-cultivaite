@@ -521,7 +521,7 @@ bot.command('department', async (ctx) => {
       : '🌱 Still taking root\\.\\.\\.';
 
     let msg =
-      `${deptStats.gardenStage} ${bold(e(user.department))}\n` +
+      `${deptStats.gardenStage} ${bold(user.department)}\n` +
       `${e(String(memberData.count))} members · ${e(String(totalPts))} total pts\n\n` +
       `Plant ▸ ${deptStats.gardenStage} ${e(stageName)} · ${e(String(avgPts))} avg pts\n`;
 
