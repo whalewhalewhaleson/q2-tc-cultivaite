@@ -917,7 +917,7 @@ bot.command('cancel', async (ctx) => {
 bot.command('start', async (ctx) => {
   await ctx.reply(
     `Hey\\! 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
-    `Every week you reflect, your plant grows 🌱 — and together we'll build the TC Forest\\.\n\n` +
+    `Every week you reflect, your plant grows 🌱\n\n` +
     `Ready? Start with /setgoal to set your Q2 goal, then /reflect whenever you're ready\\.\n\n` +
     `${italic('(Type /help anytime if you get lost!)')}`,
     { parse_mode: 'MarkdownV2' }
