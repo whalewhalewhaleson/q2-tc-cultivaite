@@ -1048,8 +1048,16 @@ bot.command('cancel', async (ctx) => {
 
 bot.command('start', async (ctx) => {
   try {
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const user = await lookupUser(chatId, username);
+    const nick = user?.realName
+      ? await sheets.getNickname(user.realName) ?? user.realName
+      : null;
+    const greeting = nick ? `Hey ${e(nick)}\\!` : `Hey\\!`;
+
     await ctx.reply(
-      `Hey\\! 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
+      `${greeting} 👋 I'm ${bold('CultivAIte')}, your Q2 reflection buddy\\.\n\n` +
       `Every week you reflect, your plant grows 🌱\n\n` +
       `${italic('(Type /help anytime if you get lost!)')}`,
       { parse_mode: 'MarkdownV2' }
