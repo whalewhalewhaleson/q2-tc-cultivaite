@@ -310,16 +310,12 @@ async function reflectConversation(conversation, ctx) {
   const totalPoints        = statsBefore?.totalPoints       ?? 0;
   const consecutiveMisses  = statsBefore?.consecutiveMisses ?? 0;
 
-  await ctx.reply(
-    `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}`,
-    { parse_mode: 'MarkdownV2' }
-  );
-
   // --- Step 3b: Goal reminder / first-time prompt ---
   const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
 
   if (!existingGoal) {
     await ctx.reply(
+      `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
       `🎯 ${bold('Quick one before we start — what\'s your Q2 goal?')} ${italic("I'll remind you of it every time you reflect. You can change it anytime with /setgoal.")}`,
       { parse_mode: 'MarkdownV2' }
     );
@@ -330,7 +326,8 @@ async function reflectConversation(conversation, ctx) {
     await ctx.reply(`✅ Goal saved\\! Let's reflect\\. 🌿`, { parse_mode: 'MarkdownV2' });
   } else {
     await ctx.reply(
-      `🎯 ${bold('Your Q2 Goal')}\n${italic(existingGoal)}`,
+      `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
+      `🎯 ${bold('This week\'s goal:')} ${italic(existingGoal)}`,
       { parse_mode: 'MarkdownV2' }
     );
   }
