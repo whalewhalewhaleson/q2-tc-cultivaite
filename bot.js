@@ -607,17 +607,12 @@ bot.command('leaderboard', async (ctx) => {
     const medals = ['🥇', '🥈', '🥉'];
     const companyGarden = allStats.map(u => u.plantStage).join('');
 
-    // Assign ranks with ties (1,1,3 style)
-    const ranked = allStats.map((user, i) => {
-      const rank = i === 0 ? 1 : (allStats[i].totalPoints === allStats[i - 1].totalPoints
-        ? null // fill in after
-        : i + 1);
-      return { ...user, rank };
-    });
-    let lastRank = 1;
-    for (let i = 0; i < ranked.length; i++) {
-      if (ranked[i].rank !== null) lastRank = ranked[i].rank;
-      else ranked[i].rank = lastRank;
+    // Assign ranks with dense ties (1,1,2 style)
+    const ranked = [];
+    let denseRank = 0;
+    for (let i = 0; i < allStats.length; i++) {
+      if (i === 0 || allStats[i].totalPoints !== allStats[i - 1].totalPoints) denseRank++;
+      ranked.push({ ...allStats[i], rank: denseRank });
     }
 
     const top10 = ranked.slice(0, 10);
