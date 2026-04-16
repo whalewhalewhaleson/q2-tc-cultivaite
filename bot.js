@@ -366,19 +366,24 @@ async function reflectConversation(conversation, ctx) {
   if (!nomineeCtx) return;
   nomineeName = nomineeCtx.message.text.trim();
 
-  await ctx.reply(
-    `${italic('What did they do? Both your dept and theirs earn bonus pts \u2014 share away!')}`,
-    { parse_mode: 'MarkdownV2' }
-  );
+  let hasGoodNews = false;
+  let q3Raw = '';
 
-  const q3Ctx = await waitForText(conversation, ctx);
-  if (!q3Ctx) return;
-  const q3Raw = q3Ctx.message.text.trim();
-  const hasGoodNews = q3Raw.toLowerCase() !== 'skip' && q3Raw.length > 0;
+  if (nomineeName.toLowerCase() !== 'skip') {
+    await ctx.reply(
+      `${italic('What did they do? Both your dept and theirs earn bonus pts \u2014 share away!')}`,
+      { parse_mode: 'MarkdownV2' }
+    );
 
-  if (hasGoodNews) {
-    const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
-    nomineeDept = nomineeUser?.department ?? 'Unknown';
+    const q3Ctx = await waitForText(conversation, ctx);
+    if (!q3Ctx) return;
+    q3Raw = q3Ctx.message.text.trim();
+    hasGoodNews = q3Raw.length > 0;
+
+    if (hasGoodNews) {
+      const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
+      nomineeDept = nomineeUser?.department ?? 'Unknown';
+    }
   }
 
   // --- Step 7: Log submission + good news + trigger Apps Script ---
