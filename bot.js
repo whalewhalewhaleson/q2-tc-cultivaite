@@ -596,6 +596,40 @@ bot.command('reflect', async (ctx) => {
 // /department
 // ---------------------------------------------------------------------------
 
+function buildDeptBlock(deptName, deptStats, memberData) {
+  if (!deptStats) {
+    return `${bold(deptName)}\n${italic('Your garden is just taking root — check back after your first reflections come in!')}`;
+  }
+  const bar = buildProgressBar(deptStats.progressPct);
+  const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
+  const avgPts = deptStats.avgPoints ?? 0;
+  const totalPts = Math.round(avgPts * memberData.count);
+  const deptStreak = deptStats.deptStreak ?? 0;
+  const { nextEmoji, ptsNeeded } = getNextStageInfo(deptStats.gardenStage, Math.floor(avgPts));
+  const gardenRow = memberData.stages.length
+    ? memberData.stages.join('')
+    : '🌱 Still taking root\\.\\.\\.';
+
+  let block =
+    `${deptStats.gardenStage} ${bold(deptName)}\n` +
+    `${e(String(memberData.count))} members · ${e(String(totalPts))} total pts\n\n` +
+    `Plant ▸ ${deptStats.gardenStage} ${e(stageName)} · ${e(String(avgPts))} avg pts\n`;
+
+  if (nextEmoji) {
+    block += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
+  } else {
+    block += `Growth ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
+  }
+
+  block +=
+    `Streaks ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}\n\n` +
+    `${bold('Department Garden')}\n` +
+    `${italic('the plants of everyone in your dept!')}\n` +
+    gardenRow;
+
+  return block;
+}
+
 bot.command('department', async (ctx) => {
   try {
     const chatId = ctx.from?.id;
@@ -610,46 +644,17 @@ bot.command('department', async (ctx) => {
       return;
     }
 
-    const [deptStats, memberData] = await Promise.all([
-      sheets.getDeptStats(user.department),
-      sheets.getMemberStagesForDept(user.department),
-    ]);
+    const depts = [user.department, user.secondaryDepartment].filter(Boolean);
 
-    if (!deptStats) {
-      await ctx.reply(
-        `${bold(user.department)}\n${italic('Your garden is just taking root — check back after your first reflections come in!')}`,
-        { parse_mode: 'MarkdownV2' }
-      );
-      return;
-    }
+    const blocks = await Promise.all(depts.map(async (dept) => {
+      const [deptStats, memberData] = await Promise.all([
+        sheets.getDeptStats(dept),
+        sheets.getMemberStagesForDept(dept),
+      ]);
+      return buildDeptBlock(dept, deptStats, memberData);
+    }));
 
-    const bar = buildProgressBar(deptStats.progressPct);
-    const stageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
-    const avgPts = deptStats.avgPoints ?? 0;
-    const totalPts = Math.round(avgPts * memberData.count);
-    const deptStreak = deptStats.deptStreak ?? 0;
-    const { nextEmoji, ptsNeeded } = getNextStageInfo(deptStats.gardenStage, Math.floor(avgPts));
-    const gardenRow = memberData.stages.length
-      ? memberData.stages.join('')
-      : '🌱 Still taking root\\.\\.\\.';
-
-    let msg =
-      `${deptStats.gardenStage} ${bold(user.department)}\n` +
-      `${e(String(memberData.count))} members · ${e(String(totalPts))} total pts\n\n` +
-      `Plant ▸ ${deptStats.gardenStage} ${e(stageName)} · ${e(String(avgPts))} avg pts\n`;
-
-    if (nextEmoji) {
-      msg += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
-    } else {
-      msg += `Growth ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
-    }
-
-    msg +=
-      `Streaks ▸ ${e(String(deptStreak))} consecutive 100% week${deptStreak !== 1 ? 's' : ''}\n\n` +
-      `${bold('Department Garden')}\n` +
-      `${italic('the plants of everyone in your dept!')}\n` +
-      gardenRow;
-
+    const msg = blocks.join('\n\n─────────────────\n\n');
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/department error:', err);

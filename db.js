@@ -5,7 +5,7 @@ const supabase = createClient(
   process.env.SUPABASE_ANON_KEY,
 );
 
-const EXCLUDED_DEPARTMENTS = ['Leadership Team'];
+const EXCLUDED_DEPARTMENTS = [];
 
 // ---------------------------------------------------------------------------
 // SGT timestamp helper
@@ -107,7 +107,7 @@ async function buildStatsCache() {
   const [{ data: allSubs }, { data: approvedNews }, { data: allUsers }] = await Promise.all([
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
     supabase.from('good_news').select('*').eq('status', 'Approved'),
-    supabase.from('users').select('real_name, department'),
+    supabase.from('users').select('real_name, department, secondary_department'),
   ]);
 
   const subs     = allSubs     ?? [];
@@ -117,12 +117,14 @@ async function buildStatsCache() {
   const weekNow    = currentWeekNumber();
   const launchWeek = dateToWeekNumber(LAUNCH_DATE);
 
-  // Build dept → member list
+  // Build dept → member list (supports dual-dept membership)
   const deptMembers = {}; // dept → Set of real_name
   for (const u of users) {
-    const dept = u.department ?? '';
-    if (!deptMembers[dept]) deptMembers[dept] = new Set();
-    deptMembers[dept].add(u.real_name.toLowerCase());
+    const depts = [u.department, u.secondary_department].filter(Boolean);
+    for (const dept of depts) {
+      if (!deptMembers[dept]) deptMembers[dept] = new Set();
+      deptMembers[dept].add(u.real_name.toLowerCase());
+    }
   }
 
   // Per-user submission map: name → weekNum → true/false (excused counts as true)
@@ -136,16 +138,18 @@ async function buildStatsCache() {
   }
 
   // Dept week submission rate: dept → weekNum → { submitted, total }
+  // Dual-dept members count toward both departments.
   const deptWeekRate = {};
   for (const u of users) {
-    const dept = (u.department ?? '').trim();
     const name = u.real_name.toLowerCase().trim();
-    if (EXCLUDED_DEPARTMENTS.includes(dept)) continue;
-    if (!deptWeekRate[dept]) deptWeekRate[dept] = {};
-    for (let wk = launchWeek; wk <= weekNow; wk++) {
-      if (!deptWeekRate[dept][wk]) deptWeekRate[dept][wk] = { submitted: 0, total: 0 };
-      deptWeekRate[dept][wk].total++;
-      if (userWeekMap[name]?.[wk]?.submitted) deptWeekRate[dept][wk].submitted++;
+    const depts = [u.department, u.secondary_department].map(d => (d ?? '').trim()).filter(Boolean);
+    for (const dept of depts) {
+      if (!deptWeekRate[dept]) deptWeekRate[dept] = {};
+      for (let wk = launchWeek; wk <= weekNow; wk++) {
+        if (!deptWeekRate[dept][wk]) deptWeekRate[dept][wk] = { submitted: 0, total: 0 };
+        deptWeekRate[dept][wk].total++;
+        if (userWeekMap[name]?.[wk]?.submitted) deptWeekRate[dept][wk].submitted++;
+      }
     }
   }
 
@@ -219,6 +223,7 @@ async function buildStatsCache() {
     statsMap[name] = {
       realName: u.real_name,
       department: dept,
+      secondaryDepartment: (u.secondary_department ?? '').trim() || null,
       plantStage,
       progressPct,
       streak,
@@ -302,7 +307,7 @@ export async function getUserByChatId(chatId) {
   const needle = String(chatId).trim();
   const row = rows.find(r => r.chat_id && String(r.chat_id).trim() === needle);
   if (!row) return null;
-  return { realName: row.real_name, department: row.department, chatId: row.chat_id };
+  return { realName: row.real_name, department: row.department, secondaryDepartment: row.secondary_department ?? null, chatId: row.chat_id };
 }
 
 export async function getUserByUsername(username) {
@@ -311,7 +316,7 @@ export async function getUserByUsername(username) {
   const needle = username.toLowerCase().trim();
   const row = rows.find(r => String(r.username ?? '').toLowerCase().trim() === needle);
   if (!row) return null;
-  return { realName: row.real_name, department: row.department, chatId: row.chat_id ?? null };
+  return { realName: row.real_name, department: row.department, secondaryDepartment: row.secondary_department ?? null, chatId: row.chat_id ?? null };
 }
 
 export async function getUserByRealName(realName) {
@@ -320,7 +325,7 @@ export async function getUserByRealName(realName) {
   const needle = realName.toLowerCase().trim();
   const row = rows.find(r => String(r.real_name ?? '').toLowerCase().trim() === needle);
   if (!row) return null;
-  return { realName: row.real_name, department: row.department, chatId: row.chat_id ?? null };
+  return { realName: row.real_name, department: row.department, secondaryDepartment: row.secondary_department ?? null, chatId: row.chat_id ?? null };
 }
 
 export async function getNickname(realName) {
