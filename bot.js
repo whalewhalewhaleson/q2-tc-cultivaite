@@ -786,7 +786,7 @@ bot.command('skipweek', async (ctx) => {
     const user = await sheets.getUserByRealName(nameArg);
     if (!user?.realName) {
       await ctx.reply(
-        `${bold(e(nameArg))} not found in the Users tab\\.\n\nCheck the spelling matches column B exactly\\.`,
+        `${bold(nameArg)} not found in the Users tab\\.\n\nCheck the spelling matches column B exactly\\.`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
@@ -797,7 +797,7 @@ bot.command('skipweek', async (ctx) => {
 
     await ctx.reply(
       `✅ ${bold('Week skipped!')}\n\n` +
-      `${bold(e(user.realName))} \\(${e(user.department)}\\) has been marked as excused for ${bold(`Week ${weekNum}`)}\\.\n\n` +
+      `${bold(user.realName)} \\(${e(user.department)}\\) has been marked as excused for ${bold(`Week ${weekNum}`)}\\.\n\n` +
       `Their streak will be preserved once Apps Script recalculates\\.`,
       { parse_mode: 'MarkdownV2' }
     );
@@ -1128,7 +1128,7 @@ bot.command('start', async (ctx) => {
     const greeting = nick ? `Hey ${e(nick)}\\!` : `Hey\\!`;
 
     await ctx.reply(
-      `Hey there\\! 🤟 Heard you're ${bold(e(user?.realName ?? 'you'))} — ready to grow this quarter? I'm here to help you out\\!\n\n` +
+      `Hey there\\! 🤟 Heard you're ${bold(user?.realName ?? 'you')} — ready to grow this quarter? I'm here to help you out\\!\n\n` +
       `🌱 ▸ This is your plant, and the goal is for it to bear many fruits 🍎\\! Water it weekly with a /reflect and watch it grow with you\\! 🌳\n\n` +
       `Type /tutorial for a quick crash course, /help to explore all the commands available to you\\! 🙂`,
       { parse_mode: 'MarkdownV2' }
