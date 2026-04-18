@@ -842,11 +842,11 @@ bot.command('testnudge', async (ctx) => {
     let targetChatId, targetDisplayName;
 
     if (arg) {
-      // Look up specified user by username
+      // Look up specified user by realName (case-insensitive, partial match)
       const allUsers = await sheets.getAllUsersWithChatId();
-      const match = allUsers.find(u => u.username?.toLowerCase() === arg);
+      const match = allUsers.find(u => u.realName?.toLowerCase().includes(arg));
       if (!match) {
-        await ctx.reply(`Couldn't find @${arg} in the system\\.`, { parse_mode: 'MarkdownV2' });
+        await ctx.reply(`Couldn't find "${arg}" in the system\\.`, { parse_mode: 'MarkdownV2' });
         return;
       }
       targetChatId = match.chatId;
@@ -871,7 +871,7 @@ bot.command('testnudge', async (ctx) => {
     );
 
     if (arg) {
-      await ctx.reply(`Nudge sent to @${arg} ✅`);
+      await ctx.reply(`Nudge sent to ${targetDisplayName} ✅`);
     }
   } catch (err) {
     console.error('/testnudge error:', err);
