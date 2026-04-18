@@ -108,7 +108,7 @@ async function buildStatsCache() {
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
     supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee').eq('status', 'Approved'),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
-    supabase.from('users').select('real_name, department, secondary_department'),
+    supabase.from('users').select('real_name, department, secondary_department, goal, nickname'),
   ]);
 
   const subs     = allSubs      ?? [];
@@ -236,6 +236,7 @@ async function buildStatsCache() {
       realName: u.real_name,
       department: dept,
       secondaryDepartment: (u.secondary_department ?? '').trim() || null,
+      goal: (u.goal ?? '').trim() || null,
       plantStage,
       progressPct,
       streak,
@@ -295,7 +296,7 @@ async function buildStatsCache() {
     };
   }
 
-  const result = { statsMap, deptStatsMap, sorted };
+  const result = { statsMap, deptStatsMap, sorted, userWeekMap, deptWeekRate, weekNow, launchWeek };
   cacheSet('stats', result, TTL.STATS);
   return result;
 }
@@ -520,6 +521,121 @@ export async function approveGoodNews(gnId, awards = []) {
   if (insertResult.error) throw insertResult.error;
 
   cacheInvalidate('stats');
+}
+
+export async function rejectGoodNews(gnId) {
+  const { error } = await supabase.from('good_news').update({ status: 'Rejected' }).eq('id', gnId);
+  if (error) throw error;
+  cacheInvalidate('stats');
+}
+
+// Returns approved + rejected nominations (for the "already reviewed" section).
+export async function getReviewedGoodNews() {
+  const [{ data: rows, error: e1 }, { data: awards, error: e2 }] = await Promise.all([
+    supabase
+      .from('good_news')
+      .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status')
+      .in('status', ['Approved', 'Rejected'])
+      .order('timestamp', { ascending: false }),
+    supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+
+  const awardsByGnId = {};
+  for (const a of (awards ?? [])) {
+    if (!awardsByGnId[a.good_news_id]) awardsByGnId[a.good_news_id] = [];
+    awardsByGnId[a.good_news_id].push(a);
+  }
+  return (rows ?? []).map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] }));
+}
+
+// Re-approve: delete old award rows and insert new ones (updates who gets pts).
+export async function reapproveGoodNews(gnId, awards = []) {
+  if (!gnId || !awards.length) throw new Error('gnId and at least one award required');
+  const awardRows = awards.map(a => ({
+    good_news_id:   gnId,
+    recipient_name: a.recipientName,
+    recipient_dept: a.recipientDept ?? null,
+    pts:            a.pts ?? 3,
+  }));
+  const [delResult, insResult, updResult] = await Promise.all([
+    supabase.from('good_news_awards').delete().eq('good_news_id', gnId),
+    supabase.from('good_news_awards').insert(awardRows),
+    supabase.from('good_news').update({ status: 'Approved' }).eq('id', gnId),
+  ]);
+  if (delResult.error) throw delResult.error;
+  if (insResult.error) throw insResult.error;
+  if (updResult.error) throw updResult.error;
+  cacheInvalidate('stats');
+}
+
+// Un-reject: flip a rejected nomination back to Pending so it can be re-reviewed.
+export async function unRejectGoodNews(gnId) {
+  const { error } = await supabase.from('good_news').update({ status: 'Pending' }).eq('id', gnId);
+  if (error) throw error;
+}
+
+// Returns all data the leadership dashboard needs in one call.
+export async function getFullDashboardStats() {
+  const { sorted, deptStatsMap, userWeekMap, deptWeekRate, weekNow, launchWeek } = await buildStatsCache();
+
+  const totalUsers         = sorted.length;
+  const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
+  const totalPoints        = sorted.reduce((s, u) => s + u.totalPoints, 0);
+  const goalsSet           = sorted.filter(u => u.goal).length;
+
+  const users = sorted.map(u => ({
+    realName:            u.realName,
+    department:          u.department,
+    secondaryDepartment: u.secondaryDepartment,
+    goal:                u.goal,
+    plantStage:          u.plantStage,
+    progressPct:         u.progressPct,
+    streak:              u.streak,
+    submittedThisWeek:   u.submittedThisWeek,
+    totalPoints:         u.totalPoints,
+    consecutiveMisses:   u.consecutiveMisses,
+    rank:                u.rank,
+    weekHistory:         userWeekMap[u.realName.toLowerCase().trim()] ?? {},
+  }));
+
+  const depts = Object.values(deptStatsMap).map(d => {
+    const tw = deptWeekRate[d.department]?.[weekNow] ?? { submitted: 0, total: d.count };
+    return {
+      ...d,
+      thisWeekSubmitted: tw.submitted,
+      thisWeekTotal:     tw.total,
+      thisWeekRate:      tw.total ? Math.round(tw.submitted / tw.total * 100) : 0,
+    };
+  }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
+
+  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, submittedThisWeek, totalPoints, goalsSet, users, depts };
+}
+
+export async function getRawStatsCache() {
+  return buildStatsCache();
+}
+
+// Returns submissions for a given Q2 week number (excused absences excluded).
+export async function getReflectionsForWeek(weekNum) {
+  // Q2 starts 2026-03-30 00:00 SGT = 2026-03-29 16:00 UTC
+  const Q2_EPOCH_UTC = Date.UTC(2026, 2, 29, 16, 0, 0);
+  const DAY_MS       = 86400000;
+  const startUTC     = Q2_EPOCH_UTC + (weekNum - 1) * 7 * DAY_MS;
+  const endUTC       = startUTC + 7 * DAY_MS - 1;
+  const toSGTDate    = ms => new Date(ms + 8 * 3600000).toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from('submissions')
+    .select('real_name, department, date, time, q1, q2, q3')
+    .gte('date', toSGTDate(startUTC))
+    .lte('date', toSGTDate(endUTC))
+    .neq('q1', '[Excused absence]')
+    .order('department')
+    .order('real_name');
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nomineeDept, message, weekNum) {

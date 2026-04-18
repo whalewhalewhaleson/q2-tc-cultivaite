@@ -1359,31 +1359,119 @@ cron.schedule('0 2 * * 1', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
-// HTTP server — serves the leadership dashboard at GET /
-// Railway exposes PORT automatically; set DASHBOARD_URL in .env to the Railway URL
+// HTTP server — serves the leadership dashboard + JSON API
+// Railway exposes PORT automatically.
 // ---------------------------------------------------------------------------
 
-const PORT = process.env.PORT ?? 3000;
-const DASHBOARD_FILE = path.join(__dirname, '..', 'TC_CultivAIte_Dashboard.html');
+const PORT           = process.env.PORT ?? 3000;
+const DASHBOARD_FILE = path.join(__dirname, 'dashboard.html');
 
-http.createServer((req, res) => {
-  if (req.method === 'GET' && (req.url === '/' || req.url === '/dashboard')) {
-    fs.readFile(DASHBOARD_FILE, 'utf8', (err, data) => {
-      if (err) {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Dashboard file not found.');
-        return;
-      }
-      // Inject Supabase credentials at serve time so they never sit in the HTML file
-      const html = data
-        .replace('__SUPABASE_URL__', process.env.SUPABASE_URL ?? '')
-        .replace('__SUPABASE_ANON_KEY__', process.env.SUPABASE_ANON_KEY ?? '');
+function parseBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(body || '{}')); } catch { resolve({}); }
+    });
+    req.on('error', reject);
+  });
+}
+
+function jsonRes(res, data, status = 200) {
+  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(data));
+}
+
+http.createServer(async (req, res) => {
+  const url_  = new URL(req.url, `http://localhost`);
+  const route = url_.pathname;
+
+  // Serve dashboard HTML
+  if (req.method === 'GET' && (route === '/' || route === '/dashboard')) {
+    fs.readFile(DASHBOARD_FILE, 'utf8', (err, html) => {
+      if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(html);
     });
-  } else {
-    res.writeHead(404, { 'Content-Type': 'text/plain' });
-    res.end('Not found.');
+    return;
+  }
+
+  if (!route.startsWith('/api/')) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
+  }
+
+  try {
+    // GET /api/stats
+    if (req.method === 'GET' && route === '/api/stats') {
+      return jsonRes(res, await sheets.getFullDashboardStats());
+    }
+
+    // GET /api/good-news/pending
+    if (req.method === 'GET' && route === '/api/good-news/pending') {
+      return jsonRes(res, await sheets.getPendingGoodNews());
+    }
+
+    // GET /api/good-news/reviewed  — approved + rejected rows for the edit-after-approval flow
+    if (req.method === 'GET' && route === '/api/good-news/reviewed') {
+      return jsonRes(res, await sheets.getReviewedGoodNews());
+    }
+
+    // POST /api/good-news/:id/approve
+    const approveM = route.match(/^\/api\/good-news\/(\d+)\/approve$/);
+    if (req.method === 'POST' && approveM) {
+      const body = await parseBody(req);
+      await sheets.approveGoodNews(parseInt(approveM[1]), body.awards ?? []);
+      return jsonRes(res, { ok: true });
+    }
+
+    // POST /api/good-news/:id/reject
+    const rejectM = route.match(/^\/api\/good-news\/(\d+)\/reject$/);
+    if (req.method === 'POST' && rejectM) {
+      await sheets.rejectGoodNews(parseInt(rejectM[1]));
+      return jsonRes(res, { ok: true });
+    }
+
+    // POST /api/good-news/:id/re-approve  — change awards on an already-approved row
+    const reapproveM = route.match(/^\/api\/good-news\/(\d+)\/re-approve$/);
+    if (req.method === 'POST' && reapproveM) {
+      const body = await parseBody(req);
+      await sheets.reapproveGoodNews(parseInt(reapproveM[1]), body.awards ?? []);
+      return jsonRes(res, { ok: true });
+    }
+
+    // POST /api/good-news/:id/un-reject  — flip a rejected row back to pending
+    const unRejectM = route.match(/^\/api\/good-news\/(\d+)\/un-reject$/);
+    if (req.method === 'POST' && unRejectM) {
+      await sheets.unRejectGoodNews(parseInt(unRejectM[1]));
+      return jsonRes(res, { ok: true });
+    }
+
+    // GET /api/reflections?week=N
+    if (req.method === 'GET' && route === '/api/reflections') {
+      const weekNum = parseInt(url_.searchParams.get('week') ?? '1');
+      const [subs, { statsMap }] = await Promise.all([
+        sheets.getReflectionsForWeek(weekNum),
+        sheets.getRawStatsCache(),
+      ]);
+      const enriched = subs.map(s => {
+        const stat = statsMap[(s.real_name ?? '').toLowerCase().trim()] ?? {};
+        return { ...s, plantStage: stat.plantStage ?? '🌱', totalPoints: stat.totalPoints ?? 0, goal: stat.goal ?? null };
+      });
+      return jsonRes(res, enriched);
+    }
+
+    // GET /api/person/:name
+    const personM = route.match(/^\/api\/person\/(.+)$/);
+    if (req.method === 'GET' && personM) {
+      const subs = await sheets.getSubmissionsForUser(decodeURIComponent(personM[1]), 13);
+      return jsonRes(res, subs);
+    }
+
+    res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
+  } catch (err) {
+    console.error('API error:', err.message);
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: err.message }));
   }
 }).listen(PORT, () => {
   console.log(`🌐 Dashboard server running on port ${PORT}`);
