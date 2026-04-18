@@ -104,15 +104,17 @@ async function buildStatsCache() {
   if (cached) return cached;
 
   // Fetch all data in parallel
-  const [{ data: allSubs }, { data: approvedNews }, { data: allUsers }] = await Promise.all([
+  const [{ data: allSubs }, { data: approvedNews }, { data: gnAwards }, { data: allUsers }] = await Promise.all([
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
-    supabase.from('good_news').select('*').eq('status', 'Approved'),
+    supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee').eq('status', 'Approved'),
+    supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
     supabase.from('users').select('real_name, department, secondary_department'),
   ]);
 
-  const subs     = allSubs     ?? [];
+  const subs     = allSubs      ?? [];
   const news     = approvedNews ?? [];
-  const users    = allUsers    ?? [];
+  const awards   = gnAwards     ?? [];
+  const users    = allUsers     ?? [];
 
   const weekNow    = currentWeekNumber();
   const launchWeek = dateToWeekNumber(LAUNCH_DATE);
@@ -170,13 +172,23 @@ async function buildStatsCache() {
     }
   }
 
-  // Good news pts: nominator +pts_sharer, nominee +pts_nominee
-  const goodNewsBonus = {}; // lc_name → extra pts
+  // Good news pts: nominator always gets pts_sharer.
+  // Recipients come from good_news_awards (new); falls back to legacy nominee_name
+  // for approved rows that pre-date the awards table.
+  const goodNewsBonus  = {}; // lc_name → extra pts
+  const gnWithAwards   = new Set(awards.map(a => a.good_news_id));
   for (const gn of news) {
-    const nom  = (gn.nominator_name ?? '').toLowerCase().trim();
-    const nomi = (gn.nominee_name   ?? '').toLowerCase().trim();
-    goodNewsBonus[nom]  = (goodNewsBonus[nom]  ?? 0) + (gn.pts_sharer  ?? 5);
-    goodNewsBonus[nomi] = (goodNewsBonus[nomi] ?? 0) + (gn.pts_nominee ?? 3);
+    const nom = (gn.nominator_name ?? '').toLowerCase().trim();
+    goodNewsBonus[nom] = (goodNewsBonus[nom] ?? 0) + (gn.pts_sharer ?? 5);
+    // Legacy fallback: row approved before awards table existed
+    if (!gnWithAwards.has(gn.id) && gn.nominee_name) {
+      const nomi = gn.nominee_name.toLowerCase().trim();
+      goodNewsBonus[nomi] = (goodNewsBonus[nomi] ?? 0) + (gn.pts_nominee ?? 3);
+    }
+  }
+  for (const award of awards) {
+    const recipient = (award.recipient_name ?? '').toLowerCase().trim();
+    goodNewsBonus[recipient] = (goodNewsBonus[recipient] ?? 0) + (award.pts ?? 3);
   }
 
   // Calculate per-user stats
@@ -473,6 +485,41 @@ export async function logSkip(realName, department, weekNumber) {
     q2:         '[Excused absence]',
     q3:         '',
   });
+}
+
+// Returns all pending Good News nominations for the dashboard approval flow.
+export async function getPendingGoodNews() {
+  const { data, error } = await supabase
+    .from('good_news')
+    .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer')
+    .eq('status', 'Pending')
+    .order('timestamp', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Approve a Good News nomination and record who gets pts.
+// awards: [{ recipientName, recipientDept, pts }]  (1 or more)
+// The nominator's pts_sharer is fixed on the good_news row and applied in buildStatsCache.
+export async function approveGoodNews(gnId, awards = []) {
+  if (!gnId || !awards.length) throw new Error('gnId and at least one award required');
+
+  const awardRows = awards.map(a => ({
+    good_news_id:   gnId,
+    recipient_name: a.recipientName,
+    recipient_dept: a.recipientDept ?? null,
+    pts:            a.pts ?? 3,
+  }));
+
+  const [updateResult, insertResult] = await Promise.all([
+    supabase.from('good_news').update({ status: 'Approved' }).eq('id', gnId),
+    supabase.from('good_news_awards').insert(awardRows),
+  ]);
+
+  if (updateResult.error) throw updateResult.error;
+  if (insertResult.error) throw insertResult.error;
+
+  cacheInvalidate('stats');
 }
 
 export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nomineeDept, message, weekNum) {
