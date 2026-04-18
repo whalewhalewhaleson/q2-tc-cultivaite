@@ -1251,7 +1251,9 @@ bot.command('help', async (ctx) => {
     msg +=
       `\n${bold('Admin')}\n` +
       `/skipweek — 🗓 Excuse a user for a week\n` +
-      `/testnudge — 🔔 Preview the Monday nudge message\n`;
+      `/testnudge — 🔔 Preview the Monday nudge message\n` +
+      `/broadcast — 📣 Send a message to all or one user\n` +
+      `/dashboard — 📊 Live stats summary \\+ dashboard link\n`;
   }
 
   msg += `\n${italic('Reflect weekly. Grow together.')}`;
