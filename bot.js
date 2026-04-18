@@ -837,24 +837,42 @@ bot.command('testnudge', async (ctx) => {
       return;
     }
 
-    const chatId = ctx.from?.id;
-    const username = ctx.from?.username?.toLowerCase();
-    const user = await lookupUser(chatId, username);
+    const arg = ctx.message?.text?.split(' ')[1]?.replace(/^@/, '').toLowerCase();
 
-    if (!user?.realName) {
-      await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
-      return;
+    let targetChatId, targetDisplayName;
+
+    if (arg) {
+      // Look up specified user by username
+      const allUsers = await sheets.getAllUsersWithChatId();
+      const match = allUsers.find(u => u.username?.toLowerCase() === arg);
+      if (!match) {
+        await ctx.reply(`Couldn't find @${arg} in the system\\.`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = match.chatId;
+      targetDisplayName = match.nickname ?? match.realName;
+    } else {
+      // Default: send to self
+      const chatId = ctx.from?.id;
+      const username = ctx.from?.username?.toLowerCase();
+      const user = await lookupUser(chatId, username);
+      if (!user?.realName) {
+        await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = chatId;
+      targetDisplayName = await getDisplayName(user.realName);
     }
 
-    const displayName = await getDisplayName(user.realName);
-
-    await ctx.reply(
-      `Hey ${e(displayName)}\\! Quick check\\-in — have you reflected this week? 🌱\n\n` +
-      `Two minutes\\. That's all it takes\\. Consistency is what builds identity\\.\n\n` +
-      `Don't break the streak — future you will thank you\\.\n` +
-      `/reflect`,
+    await bot.api.sendMessage(
+      targetChatId,
+      `Hey ${e(targetDisplayName)}\\! /reflect on the past week yet\\? Take a break to water your plant\\! 🌱🌊`,
       { parse_mode: 'MarkdownV2' }
     );
+
+    if (arg) {
+      await ctx.reply(`Nudge sent to @${arg} ✅`);
+    }
   } catch (err) {
     console.error('/testnudge error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
