@@ -2,7 +2,13 @@ import 'dotenv/config';
 import { Bot, session } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // ---------------------------------------------------------------------------
 // MarkdownV2 helpers
@@ -148,6 +154,14 @@ function isAdmin(ctx) {
     .map(id => id.trim())
     .filter(Boolean);
   return adminIds.includes(String(ctx.from?.id ?? ''));
+}
+
+function isLeadershipOrAdmin(ctx) {
+  const allIds = [
+    ...(process.env.ADMIN_CHAT_IDS ?? '').split(','),
+    ...(process.env.LEADERSHIP_CHAT_IDS ?? '').split(','),
+  ].map(id => id.trim()).filter(Boolean);
+  return allIds.includes(String(ctx.from?.id ?? ''));
 }
 
 // ---------------------------------------------------------------------------
@@ -848,6 +862,142 @@ bot.command('testnudge', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /broadcast — admin only, send a message to all registered users (or one person)
+//
+// Usage:
+//   /broadcast all <message>     — sends to everyone registered
+//   /broadcast me <message>      — sends only to yourself (test before bulk)
+//   /broadcast <Name> <message>  — sends to one person by real name
+// ---------------------------------------------------------------------------
+
+bot.command('broadcast', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply('Sorry, this command is only available to admins.');
+      return;
+    }
+
+    const args = (ctx.message?.text ?? '').slice('/broadcast'.length).trim();
+    if (!args) {
+      await ctx.reply(
+        'Usage:\n' +
+        '/broadcast all <message> — send to everyone\n' +
+        '/broadcast me <message> — send to yourself (test)\n' +
+        '/broadcast <Name> <message> — send to one person'
+      );
+      return;
+    }
+
+    const spaceIdx = args.indexOf(' ');
+    const firstWord = spaceIdx === -1 ? args : args.slice(0, spaceIdx);
+    const rest = spaceIdx === -1 ? '' : args.slice(spaceIdx + 1).trim();
+
+    // /broadcast me <message>
+    if (firstWord.toLowerCase() === 'me') {
+      if (!rest) { await ctx.reply('Please include a message after "me".'); return; }
+      await bot.api.sendMessage(ctx.from.id, rest);
+      await ctx.reply('✅ Sent to you.');
+      return;
+    }
+
+    // /broadcast all <message>
+    if (firstWord.toLowerCase() === 'all') {
+      if (!rest) { await ctx.reply('Please include a message after "all".'); return; }
+      const users = await sheets.getAllUsersWithChatId();
+      let sent = 0, failed = 0;
+      for (const { realName, chatId } of users) {
+        try {
+          await bot.api.sendMessage(chatId, rest);
+          sent++;
+        } catch (err) {
+          console.error(`[Broadcast] Failed to send to ${realName}:`, err.message);
+          failed++;
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      await ctx.reply(`✅ Broadcast complete — sent to ${sent} user${sent !== 1 ? 's' : ''}${failed ? `, ${failed} failed` : ''}.`);
+      return;
+    }
+
+    // /broadcast <Name> <message> — try matching 3, 2, or 1 words as a real name
+    const words = args.split(' ');
+    let targetUser = null;
+    let msgStart = 0;
+    for (let n = Math.min(3, words.length - 1); n >= 1; n--) {
+      const candidate = words.slice(0, n).join(' ');
+      const found = await sheets.getUserByRealName(candidate);
+      if (found?.chatId) {
+        targetUser = found;
+        msgStart = n;
+        break;
+      }
+    }
+    if (!targetUser) {
+      await ctx.reply(`Couldn't find that person in the system. Check the spelling matches their real name, or use /broadcast all or /broadcast me.`);
+      return;
+    }
+    const message = words.slice(msgStart).join(' ').trim();
+    if (!message) { await ctx.reply('Please include a message after the name.'); return; }
+    await bot.api.sendMessage(targetUser.chatId, message);
+    await ctx.reply(`✅ Sent to ${targetUser.realName}.`);
+  } catch (err) {
+    console.error('/broadcast error:', err);
+    await ctx.reply('Something went wrong. Try again or check the server logs.');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /dashboard — admin + leadership, get live stats summary + dashboard link
+// ---------------------------------------------------------------------------
+
+const Q2_START_MS = new Date('2026-03-30T00:00:00+08:00').getTime();
+
+function currentQ2Week() {
+  return Math.min(13, Math.max(1, Math.floor((Date.now() - Q2_START_MS) / (7 * 86400000)) + 1));
+}
+
+bot.command('dashboard', async (ctx) => {
+  try {
+    if (!isLeadershipOrAdmin(ctx)) {
+      await ctx.reply('Sorry, this command is only available to the leadership team.');
+      return;
+    }
+
+    const [registeredUsers, deptStats] = await Promise.all([
+      sheets.getAllUsersWithChatId(),
+      sheets.getAllDeptStats(),
+    ]);
+
+    // Get submission stats (all hit the same 30s cache after first call)
+    const allStats = await Promise.all(
+      registeredUsers.map(u => sheets.getStatsForUser(u.realName))
+    );
+    const validStats = allStats.filter(Boolean);
+    const submittedCount = validStats.filter(s => s.submittedThisWeek).length;
+    const totalCount = validStats.length;
+    const rateThisWeek = totalCount ? Math.round((submittedCount / totalCount) * 100) : 0;
+
+    const topDept = deptStats
+      .sort((a, b) => b.avgPoints - a.avgPoints)[0];
+
+    const weekNum = currentQ2Week();
+    const onTrack = rateThisWeek >= 90 ? '✅ On track' : rateThisWeek >= 70 ? '⚠️ Behind' : '❌ Needs attention';
+    const dashUrl = process.env.DASHBOARD_URL ?? 'Not configured — set DASHBOARD_URL in .env';
+
+    await ctx.reply(
+      `📊 TC CultivAIte Dashboard — Week ${weekNum} of 13\n\n` +
+      `This week: ${rateThisWeek}% submitted (${submittedCount}/${totalCount})\n` +
+      `Top dept: ${topDept?.department ?? 'N/A'} 🥇 (${topDept?.avgPoints ?? 0} avg pts)\n` +
+      `Target 90%: ${onTrack}\n\n` +
+      `👉 Full dashboard: ${dashUrl}`
+    );
+  } catch (err) {
+    console.error('/dashboard error:', err);
+    await ctx.reply('Something went wrong fetching stats. Try again in a moment.');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /mystats
 // ---------------------------------------------------------------------------
 
@@ -1183,6 +1333,37 @@ cron.schedule('0 2 * * 1', async () => {
     console.error('[Cron] Nudge error:', err);
   }
 }, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// HTTP server — serves the leadership dashboard at GET /
+// Railway exposes PORT automatically; set DASHBOARD_URL in .env to the Railway URL
+// ---------------------------------------------------------------------------
+
+const PORT = process.env.PORT ?? 3000;
+const DASHBOARD_FILE = path.join(__dirname, '..', 'TC_CultivAIte_Dashboard.html');
+
+http.createServer((req, res) => {
+  if (req.method === 'GET' && (req.url === '/' || req.url === '/dashboard')) {
+    fs.readFile(DASHBOARD_FILE, 'utf8', (err, data) => {
+      if (err) {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Dashboard file not found.');
+        return;
+      }
+      // Inject Supabase credentials at serve time so they never sit in the HTML file
+      const html = data
+        .replace('__SUPABASE_URL__', process.env.SUPABASE_URL ?? '')
+        .replace('__SUPABASE_ANON_KEY__', process.env.SUPABASE_ANON_KEY ?? '');
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    });
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not found.');
+  }
+}).listen(PORT, () => {
+  console.log(`🌐 Dashboard server running on port ${PORT}`);
+});
 
 // ---------------------------------------------------------------------------
 // Start polling (must be last)
