@@ -1272,9 +1272,9 @@ bot.command('help', async (ctx) => {
       `/testnudge — 🔔 Preview the Monday nudge message\n` +
       `  • /testnudge wilson — send nudge preview to a specific person\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
-      `  • /broadcast me <msg\\> — test send to yourself\n` +
-      `  • /broadcast all <msg\\> — send to everyone\n` +
-      `  • /broadcast <Name\\> <msg\\> — send to one person\n` +
+      `  • /broadcast me \\<msg\\> — test send to yourself\n` +
+      `  • /broadcast all \\<msg\\> — send to everyone\n` +
+      `  • /broadcast \\<Name\\> \\<msg\\> — send to one person\n` +
       `/dashboard — 📊 Live stats summary \\+ dashboard link\n`;
   }
 

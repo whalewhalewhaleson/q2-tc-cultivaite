@@ -249,6 +249,8 @@ function miniBar(pct) {
   return `<div style="display:flex;align-items:center"><div class="mini-bar-track"><div class="mini-bar-fill ${cls}" style="width:${pct}%"></div></div><span class="pct-text" style="${rateTextClass(pct)}">${pct}%</span></div>`;
 }
 function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escBr(s) { return esc(s).replace(/\n/g, '<br>'); }
+function jAttr(s) { return JSON.stringify(String(s ?? '')).replace(/"/g, '&quot;'); }
 
 // ── State ──────────────────────────────────────────────────────────────────
 let _stats      = null;
@@ -431,7 +433,6 @@ function renderRankings() {
     const q2rate = d.targetSubmissions ? Math.round(d.totalSubmissions / d.targetSubmissions * 100) : 0;
     const streak = d.deptStreak ? `${d.deptStreak} wk 🔥` : '—';
     return `<tr>
-      ${rankBadge(i+1) ? `<td>${rankBadge(i+1)}</td>` : ''}
       <td>${rankBadge(i+1)}</td>
       <td><div class="cell-name">${esc(d.department)}</div>${i===0?'<div class="cell-sub">🥇 Leading this week</div>':''}</td>
       <td style="text-align:center">${d.count}</td>
@@ -456,7 +457,7 @@ function renderRankings() {
       : '—';
     return `<tr style="${!u.submittedThisWeek && u.totalPoints === 0 ? 'opacity:0.55' : ''}">
       <td>${rankBadgeHtml}</td>
-      <td><span class="name-link" onclick="openDrawer(${JSON.stringify(esc(u.realName))})">${esc(u.realName)}</span></td>
+      <td><span class="name-link" onclick="openDrawer(${jAttr(u.realName)})">${esc(u.realName)}</span></td>
       <td><span style="font-size:11px;color:#9aa0a6">${esc(u.department)}</span></td>
       <td style="text-align:center;font-size:18px">${ds}</td>
       <td style="text-align:center;font-weight:700;${u.totalPoints >= 86?'color:#137333':''}">${u.totalPoints}</td>
@@ -553,7 +554,7 @@ function renderReflections() {
       return `<div class="reflection-card">
         <div class="ref-top">
           <div>
-            <div class="ref-name"><span class="name-link" onclick="openDrawer(${JSON.stringify(esc(r.real_name))})">${esc(r.real_name)}</span></div>
+            <div class="ref-name"><span class="name-link" onclick="openDrawer(${jAttr(r.real_name)})">${esc(r.real_name)}</span></div>
             <div class="ref-dept-tag">${esc(dept)} · ${ds} ${stageName} · ${u.totalPoints ?? 0} pts</div>
           </div>
           <div class="ref-date">${esc(formattedDate)}</div>
@@ -561,11 +562,11 @@ function renderReflections() {
         ${r.goal ? `<div class="ref-goal-inline"><div class="ref-goal-label">🎯 Q2 Goal</div>"${esc(r.goal)}"</div>` : ''}
         <div class="ref-q">
           <div class="ref-q-label q1">Q1 — TC Value</div>
-          <div class="ref-q-text">"${esc(r.q1)}"</div>
+          <div class="ref-q-text">"${escBr(r.q1)}"</div>
         </div>
         ${r.q2 ? `<div class="ref-q">
           <div class="ref-q-label q2">Q2 — Role Performance</div>
-          <div class="ref-q-text">"${esc(r.q2)}"</div>
+          <div class="ref-q-text">"${escBr(r.q2)}"</div>
         </div>` : ''}
       </div>`;
     }).join('');
@@ -988,8 +989,8 @@ async function openDrawer(name) {
         </div>
         <div class="drawer-week-body">
           <div class="drawer-q-label q1">Q1 — TC Value</div>
-          <div class="drawer-q-text">"${esc(s.q1)}"</div>
-          ${s.q2 ? `<div class="drawer-q-label q2">Q2 — Role Performance</div><div class="drawer-q-text">"${esc(s.q2)}"</div>` : ''}
+          <div class="drawer-q-text">"${escBr(s.q1)}"</div>
+          ${s.q2 ? `<div class="drawer-q-label q2">Q2 — Role Performance</div><div class="drawer-q-text">"${escBr(s.q2)}"</div>` : ''}
         </div>
       </div>`;
     }).join('');
