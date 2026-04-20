@@ -46,8 +46,8 @@
   .bar-fill { height: 14px; border-radius: 8px; }
   .bar-green { background: linear-gradient(90deg, #34a853, #137333); }
   .bar-amber { background: linear-gradient(90deg, #f9ab00, #e37400); }
-  .target-marker { position: absolute; top: -5px; height: 24px; width: 2px; background: #202124; left: 90%; }
-  .target-marker-label { position: absolute; top: -20px; font-size: 10px; font-weight: 700; color: #202124; transform: translateX(-50%); white-space: nowrap; left: 90%; }
+  .target-marker { position: absolute; top: -5px; height: 24px; width: 2px; background: #202124; left: 80%; }
+  .target-marker-label { position: absolute; top: -20px; font-size: 10px; font-weight: 700; color: #202124; transform: translateX(-50%); white-space: nowrap; left: 80%; }
   .bar-meta { display: flex; gap: 20px; font-size: 12px; color: #5f6368; flex-wrap: wrap; }
   .data-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e8eaed; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
   .data-table th { background: #f8f9fa; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: #5f6368; padding: 10px 14px; text-align: left; border-bottom: 1px solid #e8eaed; }
@@ -223,18 +223,18 @@ function weekNumFromDate(dateStr) {
 }
 
 function rateClass(pct) {
-  if (pct >= 90) return 'fill-green';
+  if (pct >= 80) return 'fill-green';
   if (pct >= 60) return 'fill-amber';
   return 'fill-red';
 }
 function rateTextClass(pct) {
-  if (pct >= 90) return 'color:#137333';
+  if (pct >= 80) return 'color:#137333';
   if (pct >= 60) return 'color:#e37400';
   return 'color:#c5221f';
 }
 function statusPill(pct) {
   if (pct >= 100) return '<span class="status-pill pill-complete">✅ Complete</span>';
-  if (pct >= 90)  return '<span class="status-pill pill-ontrack">On Track</span>';
+  if (pct >= 80)  return '<span class="status-pill pill-ontrack">On Track</span>';
   if (pct >= 60)  return '<span class="status-pill pill-behind">Needs Push</span>';
   return '<span class="status-pill pill-atrisk">At Risk</span>';
 }
@@ -329,7 +329,7 @@ function renderOverview() {
   if (!_stats) return;
   const s = _stats;
   const subPct = s.totalUsers ? Math.round(s.submittedThisWeek / s.totalUsers * 100) : 0;
-  const pctCls = subPct >= 90 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red';
+  const pctCls = subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red';
   const barCls = subPct >= 60 ? 'bar-green' : 'bar-amber';
 
   // Not submitted this week — group by dept
@@ -370,8 +370,8 @@ function renderOverview() {
       </div>
       <div class="kpi-card green">
         <div class="kpi-label">🌱 Registered</div>
-        <div class="kpi-value">${s.totalUsers}</div>
-        <div class="kpi-sub">participants onboarded</div>
+        <div class="kpi-value">${s.onboarded} / ${s.totalUsers}</div>
+        <div class="kpi-sub">have started the bot</div>
       </div>
       <div class="kpi-card teal">
         <div class="kpi-label">🔥 Total Pts</div>
@@ -385,7 +385,7 @@ function renderOverview() {
       </div>
     </div>
 
-    <div class="section-header"><span class="section-title">🎯 Q2 Target — 90% Submissions by End of Quarter</span></div>
+    <div class="section-header"><span class="section-title">🎯 Q2 Target — 80% Submissions by End of Quarter</span></div>
     <div class="target-bar-card">
       <div class="target-bar-top">
         <div class="target-label">Company Submission Rate — Week ${s.weekNow}</div>
@@ -394,13 +394,13 @@ function renderOverview() {
       <div class="bar-track">
         <div class="bar-fill ${barCls}" style="width:${Math.min(subPct,100)}%"></div>
         <div class="target-marker"></div>
-        <div class="target-marker-label">Target 90%</div>
+        <div class="target-marker-label">Target 80%</div>
       </div>
       <div class="bar-meta">
         <span>✅ <strong>${s.submittedThisWeek}</strong> submitted</span>
         <span>⏳ <strong>${s.totalUsers - s.submittedThisWeek}</strong> yet to submit</span>
         <span>👥 <strong>${s.totalUsers}</strong> registered</span>
-        ${subPct < 90 ? `<span>⚠️ Need <strong>${Math.max(0, Math.ceil(s.totalUsers*0.9)-s.submittedThisWeek)}</strong> more to hit target</span>` : '<span>✅ On target!</span>'}
+        ${subPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, Math.ceil(s.totalUsers*0.8)-s.submittedThisWeek)}</strong> more to hit target</span>` : '<span>✅ On target!</span>'}
       </div>
     </div>
 

@@ -584,6 +584,8 @@ export async function getFullDashboardStats() {
   const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
   const totalPoints        = sorted.reduce((s, u) => s + u.totalPoints, 0);
   const goalsSet           = sorted.filter(u => u.goal).length;
+  const usersRows          = await getUsersRows();
+  const onboarded          = usersRows.filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
 
   const users = sorted.map(u => ({
     realName:            u.realName,
@@ -610,7 +612,7 @@ export async function getFullDashboardStats() {
     };
   }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
 
-  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, submittedThisWeek, totalPoints, goalsSet, users, depts };
+  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts };
 }
 
 export async function getRawStatsCache() {
