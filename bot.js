@@ -47,7 +47,7 @@ const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 
 function getWeekNumber() {
-  const start = new Date('2026-03-30T00:00:00+08:00');
+  const start = new Date('2026-04-20T00:00:00+08:00');
   const daysSince = Math.floor((Date.now() - start.getTime()) / 86400000);
   return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
 }
@@ -968,7 +968,7 @@ bot.command('broadcast', async (ctx) => {
 // /dashboard — admin + leadership, get live stats summary + dashboard link
 // ---------------------------------------------------------------------------
 
-const Q2_START_MS = new Date('2026-03-30T00:00:00+08:00').getTime();
+const Q2_START_MS = new Date('2026-04-20T00:00:00+08:00').getTime();
 
 function currentQ2Week() {
   return Math.min(13, Math.max(1, Math.floor((Date.now() - Q2_START_MS) / (7 * 86400000)) + 1));
@@ -1333,6 +1333,10 @@ bot.catch((err) => {
 // ---------------------------------------------------------------------------
 
 cron.schedule('0 2 * * 1', async () => {
+  if (currentQ2Week() === 1) {
+    console.log('[Cron] Skipping nudge — Week 1 launch week.');
+    return;
+  }
   console.log('[Cron] Running Monday nudge...');
   try {
     const users = await sheets.getAllUsersWithChatId();
