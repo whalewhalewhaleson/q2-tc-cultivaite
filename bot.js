@@ -324,8 +324,9 @@ async function reflectConversation(conversation, ctx) {
 
   if (!existingGoal) {
     await ctx.reply(
-      `Hey ${e(displayName)} 👋 ${bold(`Week ${weekNum} / 13`)}\n\n` +
-      `Before we start — ${bold("What kind of person do you want to be by the end of Q2?")} ${italic("I'll show it to you every time you reflect. Change it anytime with /setgoal.")}`,
+      `Hey ${e(displayName)} 🐳 👋 One thing before we start —\n\n` +
+      `${bold("Who do you want to be by the end of Q2?")} 🌱\n\n` +
+      `${italic("Just type it out! I'll bring it up every time you reflect to keep you on track. (Change it anytime with /setgoal.)")}`,
       { parse_mode: 'MarkdownV2' }
     );
     const goalCtx = await waitForText(conversation, ctx);
