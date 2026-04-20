@@ -642,9 +642,24 @@ function gnCard(gn, status) {
   const dateLabel  = gn.timestamp ? gn.timestamp.slice(0,10) : '';
   const nominator  = esc(gn.nominator_name ?? '');
   const nominatorD = esc(gn.nominator_dept ?? '');
-  const nominee    = esc(gn.nominee_name ?? '');
-  const nomineeD   = esc(gn.nominee_dept ?? '');
-  const msg        = escBr(gn.message ?? '');
+
+  // Clean up dirty entries where the nominee field contains the full story
+  let rawNominee = gn.nominee_name ?? '';
+  let rawMsg     = gn.message ?? '';
+  if (rawNominee.length > 35) {
+    const nameMatch = rawNominee.match(/^([^!.]+)[!.]/);
+    if (nameMatch) {
+      const extracted = nameMatch[1].trim();
+      if (!rawMsg || rawMsg === 'nil' || rawMsg.startsWith('[explained above]')) {
+        rawMsg = rawNominee.replace(/^[^!.]+[!.]\s*/, '');
+      }
+      rawNominee = extracted;
+    }
+  }
+
+  const nominee  = esc(rawNominee);
+  const nomineeD = esc(gn.nominee_dept ?? '');
+  const msg      = escBr(rawMsg === 'nil' ? '' : rawMsg);
   const gnId       = gn.id;
 
   let chipHtml, actionsHtml, cardClass;
@@ -689,7 +704,7 @@ function gnCard(gn, status) {
         ${chipHtml}
         <span style="font-size:11px;color:#9aa0a6">${weekLabel}${weekLabel&&dateLabel?' · ':''}${dateLabel}</span>
       </div>
-      <div class="gn-msg">Nominated <span class="gn-nominee">${nominee}${nomineeD?' ('+nomineeD+')':''}</span> — "${msg}"</div>
+      <div class="gn-msg">Nominated <span class="gn-nominee">${nominee}${nomineeD && nomineeD !== 'Unknown' ? ' ('+nomineeD+')':''}</span>${msg ? ` — "${msg}"` : ''}</div>
       <div class="gn-from">By <span class="gn-nominator">${nominator}${nominatorD?' ('+nominatorD+')':''}</span></div>
       <div class="gn-actions" id="gna-${gnId}">${actionsHtml}</div>
     </div>

@@ -374,30 +374,29 @@ async function reflectConversation(conversation, ctx) {
   // --- Step 6b: Optional Q3 — Good News ---
   let nomineeName = null;
   let nomineeDept = null;
-  await ctx.reply(
-    `${bold('Q3 (Optional): Any good news to share about someone this week? ⭐️')}\n` +
-    `${italic("(Type out their name or type skip if you don't have any!)")}`,
-    { parse_mode: 'MarkdownV2' }
-  );
-  const nomineeCtx = await waitForText(conversation, ctx);
-  if (!nomineeCtx) return;
-  nomineeName = nomineeCtx.message.text.trim();
-
   let hasGoodNews = false;
   let q3Raw = '';
 
-  if (nomineeName.toLowerCase() !== 'skip') {
-    await ctx.reply(
-      `${bold('Q3: What did they do? Both your dept and theirs earn bonus pts — share away!')}`,
-      { parse_mode: 'MarkdownV2' }
-    );
+  await ctx.reply(
+    `${bold('Q3 (Optional): Any good news about someone this week? ⭐️')}\n` +
+    `${italic('Share their name and what they did — e.g. "Thai Team — prepared fun Songkran props for everyone!" Or type skip.')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+  const q3Ctx = await waitForText(conversation, ctx);
+  if (!q3Ctx) return;
+  const q3Input = q3Ctx.message.text.trim();
 
-    const q3Ctx = await waitForText(conversation, ctx);
-    if (!q3Ctx) return;
-    q3Raw = q3Ctx.message.text.trim();
+  if (q3Input.toLowerCase() !== 'skip') {
+    const sepIdx = q3Input.indexOf(' — ');
+    if (sepIdx !== -1) {
+      nomineeName = q3Input.slice(0, sepIdx).trim();
+      q3Raw = q3Input.slice(sepIdx + 3).trim();
+    } else {
+      nomineeName = 'Unknown';
+      q3Raw = q3Input;
+    }
     hasGoodNews = q3Raw.length > 0;
-
-    if (hasGoodNews) {
+    if (hasGoodNews && nomineeName !== 'Unknown') {
       const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
       nomineeDept = nomineeUser?.department ?? 'Unknown';
     }
