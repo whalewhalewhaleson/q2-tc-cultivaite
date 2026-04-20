@@ -644,7 +644,7 @@ function gnCard(gn, status) {
   const nominatorD = esc(gn.nominator_dept ?? '');
   const nominee    = esc(gn.nominee_name ?? '');
   const nomineeD   = esc(gn.nominee_dept ?? '');
-  const msg        = esc(gn.message ?? '');
+  const msg        = escBr(gn.message ?? '');
   const gnId       = gn.id;
 
   let chipHtml, actionsHtml, cardClass;
