@@ -866,7 +866,7 @@ bot.command('testnudge', async (ctx) => {
 
     await bot.api.sendMessage(
       targetChatId,
-      `Hey ${e(targetDisplayName)}\\! /reflect on the past week yet\\? Take a break to water your plant\\! 🌱🌊`,
+      `Hey ${e(targetDisplayName)}\\! /reflect on the past week yet\\? Deadline is today at 4PM\\! 🌱🌊`,
       { parse_mode: 'MarkdownV2' }
     );
 
@@ -1347,7 +1347,7 @@ cron.schedule('0 2 * * 1', async () => {
           const displayName = nickname ?? realName;
           await bot.api.sendMessage(
             chatId,
-            `Hey ${e(displayName)}\\! /reflect on the past week yet\\? Take a break to water your plant\\! 🌱🌊`,
+            `Hey ${e(displayName)}\\! /reflect on the past week yet\\? Deadline is today at 4PM\\! 🌱🌊`,
             { parse_mode: 'MarkdownV2' }
           );
           await new Promise(r => setTimeout(r, 200));

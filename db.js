@@ -27,7 +27,7 @@ function getSGTDatetime() {
 // ---------------------------------------------------------------------------
 
 const Q2_START    = new Date('2026-03-30T00:00:00+08:00');
-const LAUNCH_DATE = '2026-04-17'; // Week bot went live — misses only counted from here
+const LAUNCH_DATE = '2026-04-27'; // Points count from Week 5 (Apr 27); Week 4 is soft launch
 
 function dateToWeekNumber(dateStr) {
   // dateStr is YYYY-MM-DD (SGT)
