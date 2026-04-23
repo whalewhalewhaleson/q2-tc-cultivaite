@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { Bot, session } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
+import crypto from 'crypto';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -1367,8 +1368,118 @@ cron.schedule('0 2 * * 1', async () => {
 // Railway exposes PORT automatically.
 // ---------------------------------------------------------------------------
 
-const PORT           = process.env.PORT ?? 3000;
-const DASHBOARD_FILE = path.join(__dirname, 'dashboard.html');
+const PORT            = process.env.PORT ?? 3000;
+const DASHBOARD_FILE  = path.join(__dirname, 'dashboard.html');
+const COOKIE_SECRET   = process.env.COOKIE_SECRET;
+const AUTH_COOKIE     = 'dash_session';
+const BOT_USERNAME    = 'TC_CultivAIte_Bot';
+
+if (!COOKIE_SECRET) {
+  console.warn('⚠️  COOKIE_SECRET not set — dashboard auth disabled. Set it in .env / Railway env.');
+}
+
+function getAllowedIds() {
+  return [
+    ...(process.env.ADMIN_CHAT_IDS ?? '').split(','),
+    ...(process.env.LEADERSHIP_CHAT_IDS ?? '').split(','),
+  ].map(id => id.trim()).filter(Boolean);
+}
+
+function verifyTelegramLogin(params) {
+  const { hash, ...data } = params;
+  if (!hash) return false;
+  const secret = crypto.createHash('sha256').update(process.env.BOT_TOKEN).digest();
+  const checkString = Object.keys(data).sort().map(k => `${k}=${data[k]}`).join('\n');
+  const hmac = crypto.createHmac('sha256', secret).update(checkString).digest('hex');
+  if (hmac !== hash) return false;
+  const authDate = parseInt(data.auth_date ?? '0');
+  if (Date.now() / 1000 - authDate > 300) return false;
+  return true;
+}
+
+function signCookie(userId, firstName) {
+  const payload = JSON.stringify({ id: userId, name: firstName, ts: Date.now() });
+  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
+  return `${Buffer.from(payload).toString('base64')}.${sig}`;
+}
+
+function verifyCookie(raw) {
+  if (!raw || !COOKIE_SECRET) return null;
+  const [b64, sig] = raw.split('.');
+  if (!b64 || !sig) return null;
+  try {
+    const payload = Buffer.from(b64, 'base64').toString();
+    const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
+    if (sig !== expected) return null;
+    const data = JSON.parse(payload);
+    if (Date.now() - data.ts > 7 * 24 * 60 * 60 * 1000) return null;
+    return data;
+  } catch { return null; }
+}
+
+function getCookie(req, name) {
+  const raw = req.headers.cookie ?? '';
+  const m = raw.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function getSessionUser(req) {
+  return verifyCookie(getCookie(req, AUTH_COOKIE));
+}
+
+function loginPage() {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CultivAIte Dashboard — Login</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: linear-gradient(135deg, #e8f5e9 0%, #fff8e1 100%);
+         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .card { text-align: center; background: #fff; padding: 3rem 2.5rem; border-radius: 1rem;
+          box-shadow: 0 4px 24px rgba(0,0,0,.08); max-width: 380px; width: 90%; }
+  .card h1 { font-size: 1.4rem; margin-bottom: .5rem; color: #2e7d32; }
+  .card p { color: #666; margin-bottom: 1.5rem; font-size: .95rem; }
+  .card .emoji { font-size: 3rem; margin-bottom: 1rem; }
+  #tg-widget { min-height: 46px; }
+</style>
+</head><body>
+<div class="card">
+  <div class="emoji">🌱</div>
+  <h1>CultivAIte Dashboard</h1>
+  <p>Log in with Telegram to continue</p>
+  <div id="tg-widget">
+    <script async src="https://telegram.org/js/telegram-widget.js?22"
+      data-telegram-login="${BOT_USERNAME}"
+      data-size="large"
+      data-auth-url="/auth/telegram"
+      data-request-access="write"></script>
+  </div>
+</div>
+</body></html>`;
+}
+
+function unauthorizedPage() {
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Unauthorized</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+         background: #fafafa; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .card { text-align: center; padding: 3rem 2.5rem; }
+  .card h1 { font-size: 1.3rem; color: #c62828; margin-bottom: .5rem; }
+  .card p { color: #666; font-size: .95rem; }
+</style>
+</head><body>
+<div class="card">
+  <h1>Not authorized</h1>
+  <p>Your Telegram account isn't in the leadership list.<br>Ask Wilson to add your ID.</p>
+</div>
+</body></html>`;
+}
 
 function parseBody(req) {
   return new Promise((resolve, reject) => {
@@ -1390,8 +1501,45 @@ http.createServer(async (req, res) => {
   const url_  = new URL(req.url, `http://localhost`);
   const route = url_.pathname;
 
+  // Telegram Login Widget callback
+  if (req.method === 'GET' && route === '/auth/telegram') {
+    const params = Object.fromEntries(url_.searchParams.entries());
+    if (!verifyTelegramLogin(params)) {
+      res.writeHead(403, { 'Content-Type': 'text/html' });
+      res.end('<h3>Login verification failed. <a href="/">Try again</a></h3>');
+      return;
+    }
+    if (!getAllowedIds().includes(String(params.id))) {
+      res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(unauthorizedPage());
+      return;
+    }
+    const cookie = signCookie(params.id, params.first_name ?? 'User');
+    res.writeHead(302, {
+      'Location': '/dashboard',
+      'Set-Cookie': `${AUTH_COOKIE}=${encodeURIComponent(cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`,
+    });
+    res.end();
+    return;
+  }
+
+  // Logout
+  if (req.method === 'GET' && route === '/logout') {
+    res.writeHead(302, {
+      'Location': '/',
+      'Set-Cookie': `${AUTH_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0`,
+    });
+    res.end();
+    return;
+  }
+
   // Serve dashboard HTML
   if (req.method === 'GET' && (route === '/' || route === '/dashboard')) {
+    if (!getSessionUser(req)) {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(loginPage());
+      return;
+    }
     fs.readFile(DASHBOARD_FILE, 'utf8', (err, html) => {
       if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return; }
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
@@ -1402,6 +1550,12 @@ http.createServer(async (req, res) => {
 
   if (!route.startsWith('/api/')) {
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
+  }
+
+  if (!getSessionUser(req)) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
+    return;
   }
 
   try {
