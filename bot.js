@@ -584,6 +584,10 @@ async function editReflectionConversation(conversation, ctx) {
 // Bot setup
 // ---------------------------------------------------------------------------
 
+if (!process.env.BOT_TOKEN?.match(/^\d+:[A-Za-z0-9_-]{25,}$/)) {
+  throw new Error('BOT_TOKEN is missing or malformed — check your .env');
+}
+
 const bot = new Bot(process.env.BOT_TOKEN);
 
 bot.use(session({ initial: () => ({}) }));
@@ -1627,9 +1631,9 @@ http.createServer(async (req, res) => {
 
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');
   } catch (err) {
-    console.error('API error:', err.message);
+    console.error('API error:', err);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: err.message }));
+    res.end(JSON.stringify({ error: 'Internal server error' }));
   }
 }).listen(PORT, () => {
   console.log(`🌐 Dashboard server running on port ${PORT}`);
