@@ -108,13 +108,13 @@ async function buildStatsCache() {
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
     supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee').eq('status', 'Approved'),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
-    supabase.from('users').select('real_name, department, secondary_department, goal, nickname'),
+    supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active'),
   ]);
 
   const subs     = allSubs      ?? [];
   const news     = approvedNews ?? [];
   const awards   = gnAwards     ?? [];
-  const users    = allUsers     ?? [];
+  const users    = (allUsers ?? []).filter(u => u.active !== false);
 
   const weekNow    = currentWeekNumber();
   const launchWeek = dateToWeekNumber(LAUNCH_DATE);
@@ -360,7 +360,7 @@ export async function getGoal(realName) {
 export async function getAllUsersWithChatId() {
   const rows = await getUsersRows();
   return rows
-    .filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
+    .filter(r => r.active !== false && r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
     .map(r => ({
       realName: r.real_name,
       chatId:   String(r.chat_id),
@@ -584,7 +584,7 @@ export async function getFullDashboardStats() {
   const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
   const totalPoints        = sorted.reduce((s, u) => s + u.totalPoints, 0);
   const goalsSet           = sorted.filter(u => u.goal).length;
-  const usersRows          = await getUsersRows();
+  const usersRows          = (await getUsersRows()).filter(r => r.active !== false);
   const onboarded          = usersRows.filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
   const notRegistered      = usersRows
     .filter(r => !r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
