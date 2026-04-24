@@ -586,6 +586,9 @@ export async function getFullDashboardStats() {
   const goalsSet           = sorted.filter(u => u.goal).length;
   const usersRows          = await getUsersRows();
   const onboarded          = usersRows.filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
+  const notRegistered      = usersRows
+    .filter(r => !r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
+    .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown' }));
 
   const users = sorted.map(u => ({
     realName:            u.realName,
@@ -612,7 +615,7 @@ export async function getFullDashboardStats() {
     };
   }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
 
-  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts };
+  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts, notRegistered };
 }
 
 export async function getRawStatsCache() {
