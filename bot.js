@@ -1620,6 +1620,15 @@ http.createServer(async (req, res) => {
       return jsonRes(res, enriched);
     }
 
+    // POST /api/user/:name/active  — toggle active status
+    const activeM = route.match(/^\/api\/user\/(.+)\/active$/);
+    if (req.method === 'POST' && activeM) {
+      const body = await parseBody(req);
+      const { active } = body;
+      await sheets.setActive(decodeURIComponent(activeM[1]), active);
+      return jsonRes(res, { ok: true });
+    }
+
     // GET /api/person/:name
     const personM = route.match(/^\/api\/person\/(.+)$/);
     if (req.method === 'GET' && personM) {

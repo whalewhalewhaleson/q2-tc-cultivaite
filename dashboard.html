@@ -244,6 +244,7 @@
       <div class="drawer-stat"><div class="drawer-stat-val" id="drawerStreak">—</div><div class="drawer-stat-lbl">Streak</div></div>
       <div class="drawer-stat"><div class="drawer-stat-val" id="drawerStage">🌱</div><div class="drawer-stat-lbl">Stage</div></div>
     </div>
+    <div id="drawerActiveToggle" style="margin-top:14px"></div>
   </div>
   <div class="drawer-body">
     <div id="drawerGoal"></div>
@@ -1120,6 +1121,17 @@ async function openDrawer(name) {
     goalEl.innerHTML = `<div class="drawer-no-goal">No Q2 goal set yet — prompt them to use /setgoal in the bot.</div>`;
   }
 
+  document.getElementById('drawerActiveToggle').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f7f5;border-radius:10px;padding:10px 14px">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#1a2e1a">Active status</div>
+        <div style="font-size:11px;color:#8a9a8a">Inactive members are hidden from all stats</div>
+      </div>
+      <button id="drawerActiveBtn" onclick="toggleActive('${esc(u.realName).replace(/'/g, "\\'")}')"
+        style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:inherit;
+        background:#d9f0e0;border:1px solid #40916c;color:#1b5e3b">Active</button>
+    </div>`;
+
   document.getElementById('drawerReflections').innerHTML = '<div style="color:#8a9a8a;font-size:13px">Loading…</div>';
   document.getElementById('drawerOverlay').classList.add('open');
   document.getElementById('profileDrawer').classList.add('open');
@@ -1148,6 +1160,28 @@ async function openDrawer(name) {
     }).join('');
   } catch (e) {
     document.getElementById('drawerReflections').innerHTML = '<div style="color:#c5221f;font-size:13px">Failed to load reflections.</div>';
+  }
+}
+
+async function toggleActive(name) {
+  const btn = document.getElementById('drawerActiveBtn');
+  if (!btn) return;
+  const action = btn.textContent.trim() === 'Active' ? 'deactivate' : 'reactivate';
+  if (!confirm(`${action === 'deactivate' ? 'Deactivate' : 'Reactivate'} ${name}? They will be ${action === 'deactivate' ? 'hidden from' : 'restored to'} all stats.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await fetch(`/api/user/${encodeURIComponent(name)}/active`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ active: action === 'reactivate' }),
+    });
+    closeDrawer();
+    await refresh();
+  } catch (e) {
+    alert('Error: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = action === 'deactivate' ? 'Active' : 'Inactive';
   }
 }
 

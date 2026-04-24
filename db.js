@@ -390,6 +390,13 @@ export async function setGoal(realName, goal) {
   cacheInvalidate('users');
 }
 
+export async function setActive(realName, active) {
+  if (!realName) return;
+  await supabase.from('users').update({ active: !!active }).eq('real_name', realName);
+  cacheInvalidate('users');
+  cacheInvalidate('stats');
+}
+
 // ---------------------------------------------------------------------------
 // Stats — live calculation via cache
 // ---------------------------------------------------------------------------
