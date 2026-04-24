@@ -48,7 +48,7 @@ const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 
 function getWeekNumber() {
-  const start = new Date('2026-04-20T00:00:00+08:00');
+  const start = new Date('2026-03-30T00:00:00+08:00');
   const daysSince = Math.floor((Date.now() - start.getTime()) / 86400000);
   return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
 }
