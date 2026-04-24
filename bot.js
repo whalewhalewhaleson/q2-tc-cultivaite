@@ -973,10 +973,8 @@ bot.command('broadcast', async (ctx) => {
 // /dashboard — admin + leadership, get live stats summary + dashboard link
 // ---------------------------------------------------------------------------
 
-const Q2_START_MS = new Date('2026-04-20T00:00:00+08:00').getTime();
-
 function currentQ2Week() {
-  return Math.min(13, Math.max(1, Math.floor((Date.now() - Q2_START_MS) / (7 * 86400000)) + 1));
+  return getWeekNumber();
 }
 
 bot.command('dashboard', async (ctx) => {
