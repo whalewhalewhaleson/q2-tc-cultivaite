@@ -46,6 +46,7 @@ const STAGE_NAMES = {
 const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 // Points lower-bound per stage (mirrors apps-script.gs CONFIG.STAGE_THRESHOLDS)
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
+const shoutedDepts = new Set();
 
 function getWeekNumber() {
   const start = new Date('2026-03-30T00:00:00+08:00');
@@ -119,6 +120,34 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
 async function getDisplayName(realName) {
   const nick = await sheets.getNickname(realName);
   return nick ?? realName;
+}
+
+async function broadcastDeptShoutout(department) {
+  if (shoutedDepts.has(department)) return;
+  shoutedDepts.add(department);
+
+  const rawCache = await sheets.getRawStatsCache();
+  const deptMembers = rawCache.sorted.filter(s => s.department === department);
+  const memberNames = await Promise.all(
+    deptMembers.map(async m => {
+      const nick = await sheets.getNickname(m.realName);
+      return nick ?? m.realName;
+    })
+  );
+  const nameList = memberNames.join(', ');
+
+  const msg = `🎉 ${e(department)}'s at 100% this week\\! ${e(nameList)} — what a team 🌿💧`;
+  console.log(`[Shoutout] ${department} hit 100% — broadcasting to all users.`);
+
+  const allUsers = await sheets.getAllUsersWithChatId();
+  for (const { chatId } of allUsers) {
+    try {
+      await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+      await new Promise(r => setTimeout(r, 200));
+    } catch (err) {
+      console.error(`[Shoutout] Failed to send to ${chatId}:`, err.message);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -417,6 +446,20 @@ async function reflectConversation(conversation, ctx) {
   // --- Step 8: Re-read stats (instant — calculated live from Supabase) ---
   const statsAfter = await conversation.external(() => sheets.getStatsForUser(user.realName));
 
+  // --- Contextual celebration data ---
+  const userRank = statsAfter?.rank ?? 999;
+  const rawCache = await conversation.external(() => sheets.getRawStatsCache());
+  const weekNow = rawCache.weekNow;
+  const deptsToCheck = [user.department, user.secondaryDepartment].filter(Boolean);
+  let completedDept = null;
+  for (const dept of deptsToCheck) {
+    const rate = rawCache.deptWeekRate[dept]?.[weekNow];
+    if (rate && rate.total > 0 && rate.submitted === rate.total && !shoutedDepts.has(dept)) {
+      completedDept = dept;
+      break;
+    }
+  }
+
   const newStage          = statsAfter?.plantStage        ?? stage;
   const newPct            = statsAfter?.progressPct       ?? pct;
   const newStreak         = statsAfter?.streak            ?? streak;
@@ -425,6 +468,27 @@ async function reflectConversation(conversation, ctx) {
   const ptsGained         = newPoints - totalPoints;
   const levelledUp = statsAfter &&
     HEALTHY_STAGES.indexOf(newStage) > HEALTHY_STAGES.indexOf(stage);
+
+  let celebrationLine = '';
+  if (!alreadySubmitted) {
+    if (levelledUp) {
+      if (userRank <= 3) {
+        celebrationLine = `\n\nYou're currently \\#${userRank} in the company 👀 Tap /leaderboard to see who's around you\\!`;
+      } else if (completedDept) {
+        celebrationLine = `\n\nYou just made it 100% for ${e(completedDept)}\\! 🎉`;
+      } else {
+        celebrationLine = `\n\nTap /mystats to see your full progress 🌱`;
+      }
+    } else if (userRank <= 3) {
+      celebrationLine = `\n\nYou're currently \\#${userRank} in the company 👀 Tap /leaderboard to see who's around you\\!`;
+    } else if (newStreak > 0 && newStreak % 5 === 0) {
+      celebrationLine = `\n\n${e(String(newStreak))} weeks straight 🔥 Tap /mystats to see your streak\\!`;
+    } else if (completedDept) {
+      celebrationLine = `\n\nYou just made it 100% for ${e(completedDept)}\\! 🎉`;
+    } else {
+      celebrationLine = `\n\nWanna see how you're tracking\\? Tap /mystats or check out /leaderboard 🌱`;
+    }
+  }
 
   // --- Step 9: Confirmation ---
   if (alreadySubmitted) {
@@ -447,6 +511,7 @@ async function reflectConversation(conversation, ctx) {
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
+    msg += celebrationLine;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else {
     let msg = `💧 ${bold('Plant watered!')}\n\n`;
@@ -458,7 +523,12 @@ async function reflectConversation(conversation, ctx) {
     if (hasGoodNews && nomineeName) {
       msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
+    msg += celebrationLine;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  }
+
+  if (completedDept && !alreadySubmitted) {
+    conversation.external(() => broadcastDeptShoutout(completedDept));
   }
 }
 
@@ -1340,6 +1410,7 @@ cron.schedule('0 2 * * 1', async () => {
     console.log('[Cron] Skipping nudge — Week 1 launch week.');
     return;
   }
+  shoutedDepts.clear();
   console.log('[Cron] Running Monday nudge...');
   try {
     const users = await sheets.getAllUsersWithChatId();
@@ -1348,11 +1419,20 @@ cron.schedule('0 2 * * 1', async () => {
         const stats = await sheets.getStatsForUser(realName);
         if (stats && stats.submittedThisWeek === false) {
           const displayName = nickname ?? realName;
-          await bot.api.sendMessage(
-            chatId,
-            `Hey ${e(displayName)}\\! /reflect on the past week yet\\? Deadline is today at 4PM\\! 🌱🌊`,
-            { parse_mode: 'MarkdownV2' }
-          );
+          const { nextEmoji, ptsNeeded } = getNextStageInfo(stats.plantStage, stats.totalPoints);
+
+          let nudgeMsg;
+          if (stats.consecutiveMisses >= 1) {
+            nudgeMsg = `Hey ${e(displayName)}\\! Your plant's looking a bit dry 🍂 — /reflect today to bring it back\\! Deadline 4PM\\.`;
+          } else if (nextEmoji && ptsNeeded > 0 && ptsNeeded <= 10) {
+            nudgeMsg = `Hey ${e(displayName)}\\! You're just ${e(String(ptsNeeded))} pts from reaching ${nextEmoji} — /reflect to keep growing\\! Deadline 4PM\\.`;
+          } else if (stats.streak >= 2) {
+            nudgeMsg = `Hey ${e(displayName)}\\! You're on a ${e(String(stats.streak))}\\-week streak 🔥 — /reflect today to keep it alive\\! Deadline 4PM\\.`;
+          } else {
+            nudgeMsg = `Hey ${e(displayName)}\\! Your ${stats.plantStage} is waiting for water — /reflect on your week\\! Deadline 4PM\\.`;
+          }
+
+          await bot.api.sendMessage(chatId, nudgeMsg, { parse_mode: 'MarkdownV2' });
           await new Promise(r => setTimeout(r, 200));
         }
       } catch (userErr) {
@@ -1362,6 +1442,63 @@ cron.schedule('0 2 * * 1', async () => {
     console.log('[Cron] Monday nudge complete.');
   } catch (err) {
     console.error('[Cron] Nudge error:', err);
+  }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// Friday recap cron — 3:30 PM SGT = 07:30 UTC, every Friday
+// ---------------------------------------------------------------------------
+
+cron.schedule('30 7 * * 5', async () => {
+  const week = currentQ2Week();
+  if (week < 1 || week > 13) {
+    console.log('[Cron] Skipping Friday recap — outside Q2 window.');
+    return;
+  }
+  console.log('[Cron] Running Friday recap...');
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    const allStats = await sheets.getAllUserStats();
+    const totalUsers = allStats.length;
+
+    for (const { realName, chatId, nickname } of users) {
+      try {
+        const stats = await sheets.getStatsForUser(realName);
+        if (!stats) continue;
+
+        const displayName = nickname ?? realName;
+        const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
+        const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
+
+        let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
+
+        if (stats.consecutiveMisses >= 1) {
+          msg += `🍂 Your plant could use some water — /reflect is always open\n`;
+        } else {
+          msg += `${displayStage} ${e(stageName)} · ${e(String(stats.totalPoints))} pts\n`;
+        }
+
+        if (stats.streak > 0 && stats.consecutiveMisses === 0) {
+          msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
+        }
+
+        if (stats.rank <= 3) {
+          msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))} 👑\n`;
+        } else {
+          msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))}\n`;
+        }
+
+        msg += `\n→ /mystats · /leaderboard · /department`;
+
+        await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+        await new Promise(r => setTimeout(r, 200));
+      } catch (userErr) {
+        console.error(`[Cron] Failed Friday recap for ${realName}:`, userErr.message);
+      }
+    }
+    console.log('[Cron] Friday recap complete.');
+  } catch (err) {
+    console.error('[Cron] Friday recap error:', err);
   }
 }, { timezone: 'UTC' });
 

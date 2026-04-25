@@ -362,9 +362,10 @@ export async function getAllUsersWithChatId() {
   return rows
     .filter(r => r.active !== false && r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
     .map(r => ({
-      realName: r.real_name,
-      chatId:   String(r.chat_id),
-      nickname: r.nickname ?? null,
+      realName:   r.real_name,
+      chatId:     String(r.chat_id),
+      nickname:   r.nickname ?? null,
+      department: r.department ?? null,
     }));
 }
 

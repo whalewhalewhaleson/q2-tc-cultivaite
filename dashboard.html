@@ -9,7 +9,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: #f0f2f0; font-size: 13px; color: #1a2e1a; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; background: linear-gradient(145deg, #e8efe8 0%, #dce5dc 40%, #d0ddd2 70%, #c8d8cc 100%); font-size: 13px; color: #1a2e1a; min-height: 100vh; position: relative; }
+  body::before { content: ''; position: fixed; top: 0; left: 0; width: 100%; height: 100%; filter: url(#grain); opacity: 0.04; pointer-events: none; z-index: 0; }
 
   /* ── Top bar ─────────────────────────────────────────── */
   .top-bar { background: linear-gradient(135deg, #1b4332 0%, #2d6a4f 60%, #40916c 100%); padding: 14px 24px; display: flex; align-items: center; gap: 14px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 12px rgba(27,67,50,0.25); }
@@ -38,13 +39,13 @@
   .search-empty { padding: 14px; text-align: center; font-size: 12px; color: #8a9a8a; }
 
   /* ── Tab bar ──────────────────────────────────────────── */
-  .tab-bar { background: white; border-bottom: 2px solid #e4e8e4; display: flex; padding: 0 24px; gap: 0; overflow-x: auto; }
+  .tab-bar { background: white; border-bottom: 2px solid #e4e8e4; display: flex; padding: 0 24px; gap: 0; overflow-x: auto; position: relative; z-index: 50; }
   .tab { padding: 12px 22px; font-size: 13px; cursor: pointer; color: #6b7c6b; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; font-weight: 600; transition: all 0.2s; }
   .tab.active { color: #2d6a4f; border-bottom-color: #2d6a4f; }
   .tab:hover:not(.active) { color: #1a2e1a; background: #f5f7f5; }
 
   /* ── Sheet panels ────────────────────────────────────── */
-  .sheet-panel { display: none; padding: 28px 28px 80px; max-width: 1280px; margin: 0 auto; }
+  .sheet-panel { display: none; padding: 28px 28px 80px; max-width: 1280px; margin: 0 auto; position: relative; z-index: 1; }
   .sheet-panel.active { display: block; }
 
   /* ── KPI cards ───────────────────────────────────────── */
@@ -223,6 +224,13 @@
 </style>
 </head>
 <body>
+
+<svg style="position:absolute;width:0;height:0">
+  <filter id="grain">
+    <feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/>
+    <feColorMatrix type="saturate" values="0"/>
+  </filter>
+</svg>
 
 <div class="top-bar">
   <div class="logo">🌲</div>
