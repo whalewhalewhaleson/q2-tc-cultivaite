@@ -22,6 +22,21 @@
   .refresh-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; color: white; transition: all 0.2s; font-family: inherit; }
   .refresh-btn:hover { background: rgba(255,255,255,0.28); }
 
+  /* ── Search ──────────────────────────────────────────── */
+  .search-wrap { position: relative; }
+  .search-input { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 7px 14px 7px 32px; font-size: 13px; font-family: inherit; color: white; outline: none; width: 200px; transition: all 0.2s; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='rgba(255,255,255,0.6)' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85zm-5.242.156a5 5 0 1 1 0-10 5 5 0 0 1 0 10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: 10px center; }
+  .search-input::placeholder { color: rgba(255,255,255,0.5); }
+  .search-input:focus { background: rgba(255,255,255,0.25); border-color: rgba(255,255,255,0.4); width: 260px; }
+  .search-results { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: white; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.18); max-height: 320px; overflow-y: auto; display: none; z-index: 300; min-width: 280px; }
+  .search-results.open { display: block; }
+  .search-item { padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: background 0.1s; border-bottom: 1px solid #f0f2f0; }
+  .search-item:last-child { border-bottom: none; }
+  .search-item:hover { background: #f5f7f5; }
+  .search-item-name { font-size: 13px; font-weight: 700; color: #1a2e1a; }
+  .search-item-meta { font-size: 11px; color: #8a9a8a; }
+  .search-item-badge { font-size: 10px; font-weight: 700; border-radius: 8px; padding: 2px 8px; flex-shrink: 0; }
+  .search-empty { padding: 14px; text-align: center; font-size: 12px; color: #8a9a8a; }
+
   /* ── Tab bar ──────────────────────────────────────────── */
   .tab-bar { background: white; border-bottom: 2px solid #e4e8e4; display: flex; padding: 0 24px; gap: 0; overflow-x: auto; }
   .tab { padding: 12px 22px; font-size: 13px; cursor: pointer; color: #6b7c6b; border-bottom: 3px solid transparent; margin-bottom: -2px; white-space: nowrap; font-weight: 600; transition: all 0.2s; }
@@ -214,6 +229,11 @@
   <div><div class="doc-title">TC CultivAIte</div></div>
   <div class="doc-badge">Q2 2026 · Leadership View</div>
   <div class="top-bar-right">
+    <div class="search-wrap">
+      <input type="text" class="search-input" id="searchInput" placeholder="Search members…" autocomplete="off"
+        oninput="onSearch(this.value)" onfocus="onSearch(this.value)" />
+      <div class="search-results" id="searchResults"></div>
+    </div>
     <span class="week-chip" id="week-chip">—</span>
     <span class="updated-at" id="updated-at">Loading…</span>
     <button class="refresh-btn" onclick="refresh()">⟳ Refresh</button>
@@ -1102,25 +1122,36 @@ function cancelReviewedEdit(gnId) {
 
 // ── Person drawer ──────────────────────────────────────────────────────────
 async function openDrawer(name) {
-  const u = (_stats?.users ?? []).find(u => u.realName === name);
+  const active = (_stats?.users ?? []).find(u => u.realName === name);
+  const inactive = (_stats?.inactiveUsers ?? []).find(u => u.realName === name);
+  const u = active || inactive;
   if (!u) return;
 
-  const ds = displayStage(u.plantStage, u.consecutiveMisses);
-  const stageName = STAGE_NAMES[u.plantStage] ?? 'Seedling';
+  const isActive = !!active;
+  const ds = isActive ? displayStage(u.plantStage, u.consecutiveMisses) : '—';
+  const stageName = isActive ? (STAGE_NAMES[u.plantStage] ?? 'Seedling') : 'Inactive';
 
   document.getElementById('drawerName').textContent  = u.realName;
-  document.getElementById('drawerMeta').textContent  = `${u.department} · ${ds} ${stageName} · ${u.totalPoints} pts · ${u.streak} wk streak`;
-  document.getElementById('drawerPts').textContent   = u.totalPoints;
-  document.getElementById('drawerStreak').textContent = `${u.streak} wk`;
-  document.getElementById('drawerStage').textContent = ds;
+  document.getElementById('drawerMeta').textContent  = isActive
+    ? `${u.department} · ${ds} ${stageName} · ${u.totalPoints} pts · ${u.streak} wk streak`
+    : `${u.department} · Inactive`;
+  document.getElementById('drawerPts').textContent   = isActive ? u.totalPoints : '—';
+  document.getElementById('drawerStreak').textContent = isActive ? `${u.streak} wk` : '—';
+  document.getElementById('drawerStage').textContent = isActive ? ds : '—';
 
   const goalEl = document.getElementById('drawerGoal');
-  if (u.goal) {
+  if (!isActive) {
+    goalEl.innerHTML = `<div style="background:#f0f2f0;border-left:4px solid #8a9a8a;border-radius:10px;padding:14px 18px;margin-bottom:22px;font-size:13px;color:#6b7c6b">This member is inactive and excluded from stats.</div>`;
+  } else if (u.goal) {
     goalEl.innerHTML = `<div class="drawer-goal-box"><div class="drawer-goal-label">🎯 Q2 Goal</div><div class="drawer-goal-text">"${esc(u.goal)}"</div></div>`;
   } else {
     goalEl.innerHTML = `<div class="drawer-no-goal">No Q2 goal set yet — prompt them to use /setgoal in the bot.</div>`;
   }
 
+  const btnStyle = isActive
+    ? 'background:#d9f0e0;border:1px solid #40916c;color:#1b5e3b'
+    : 'background:#fce8e6;border:1px solid #ea4335;color:#c5221f';
+  const btnLabel = isActive ? 'Active' : 'Inactive';
   document.getElementById('drawerActiveToggle').innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f7f5;border-radius:10px;padding:10px 14px">
       <div>
@@ -1129,7 +1160,7 @@ async function openDrawer(name) {
       </div>
       <button id="drawerActiveBtn" onclick="toggleActive('${esc(u.realName).replace(/'/g, "\\'")}')"
         style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:inherit;
-        background:#d9f0e0;border:1px solid #40916c;color:#1b5e3b">Active</button>
+        ${btnStyle}">${btnLabel}</button>
     </div>`;
 
   document.getElementById('drawerReflections').innerHTML = '<div style="color:#8a9a8a;font-size:13px">Loading…</div>';
@@ -1163,6 +1194,54 @@ async function openDrawer(name) {
   }
 }
 
+// ── Search ────────────────────────────────────────────────────────────────
+function onSearch(q) {
+  const el = document.getElementById('searchResults');
+  if (!q || q.length < 1 || !_stats) { el.classList.remove('open'); return; }
+  const needle = q.toLowerCase().trim();
+
+  const activeMatches = (_stats.users ?? [])
+    .filter(u => u.realName.toLowerCase().includes(needle) || (u.department ?? '').toLowerCase().includes(needle))
+    .slice(0, 8)
+    .map(u => ({ name: u.realName, dept: u.department, active: true, pts: u.totalPoints, stage: displayStage(u.plantStage, u.consecutiveMisses) }));
+
+  const inactiveMatches = (_stats.inactiveUsers ?? [])
+    .filter(u => u.realName.toLowerCase().includes(needle) || (u.department ?? '').toLowerCase().includes(needle))
+    .slice(0, 4)
+    .map(u => ({ name: u.realName, dept: u.department, active: false, pts: null, stage: null }));
+
+  const results = [...activeMatches, ...inactiveMatches];
+  if (!results.length) {
+    el.innerHTML = '<div class="search-empty">No members found</div>';
+    el.classList.add('open');
+    return;
+  }
+
+  el.innerHTML = results.map(r => {
+    const badge = r.active
+      ? `<span class="search-item-badge" style="background:#d9f0e0;color:#1b5e3b">${r.stage} ${r.pts} pts</span>`
+      : `<span class="search-item-badge" style="background:#f0f2f0;color:#8a9a8a">Inactive</span>`;
+    return `<div class="search-item" onclick="openDrawer(${jAttr(r.name)});closeSearch()">
+      <div style="flex:1">
+        <div class="search-item-name">${esc(r.name)}</div>
+        <div class="search-item-meta">${esc(r.dept)}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join('');
+  el.classList.add('open');
+}
+
+function closeSearch() {
+  document.getElementById('searchResults').classList.remove('open');
+  document.getElementById('searchInput').value = '';
+}
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.search-wrap')) closeSearch();
+});
+
+// ── Active toggle ─────────────────────────────────────────────────────────
 async function toggleActive(name) {
   const btn = document.getElementById('drawerActiveBtn');
   if (!btn) return;

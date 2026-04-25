@@ -591,11 +591,15 @@ export async function getFullDashboardStats() {
   const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
   const totalPoints        = sorted.reduce((s, u) => s + u.totalPoints, 0);
   const goalsSet           = sorted.filter(u => u.goal).length;
-  const usersRows          = (await getUsersRows()).filter(r => r.active !== false);
+  const allUsersRows       = await getUsersRows();
+  const usersRows          = allUsersRows.filter(r => r.active !== false);
   const onboarded          = usersRows.filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
   const notRegistered      = usersRows
     .filter(r => !r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
     .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown' }));
+  const inactiveUsers      = allUsersRows
+    .filter(r => r.active === false && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
+    .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown', active: false }));
 
   const users = sorted.map(u => ({
     realName:            u.realName,
@@ -622,7 +626,7 @@ export async function getFullDashboardStats() {
     };
   }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
 
-  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts, notRegistered };
+  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts, notRegistered, inactiveUsers };
 }
 
 export async function getRawStatsCache() {
