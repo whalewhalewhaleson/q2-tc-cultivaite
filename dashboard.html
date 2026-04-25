@@ -66,7 +66,6 @@
   .section-badge { background: #e3f0e8; color: #2d6a4f; border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: 700; }
   .section-badge.green { background: #d9f0e0; color: #1b5e3b; }
   .section-badge.orange { background: #fef3d9; color: #9a5a00; }
-  .section-badge.purple { background: #f0e4f7; color: #7b1fa2; }
 
   /* ── Target bar ──────────────────────────────────────── */
   .target-bar-card { background: white; border-radius: 16px; padding: 22px 26px; border: 1px solid #dce3dc; box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(45,106,79,0.04); margin-bottom: 20px; }
@@ -152,7 +151,7 @@
   .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
   /* ── Good news cards ─────────────────────────────────── */
-  .gn-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #dce3dc; border-left: 4px solid #9c27b0; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; transition: box-shadow 0.2s; }
+  .gn-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #dce3dc; border-left: 4px solid #d4760a; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; transition: box-shadow 0.2s; }
   .gn-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
   .gn-card.approved { border-left-color: #40916c; }
   .gn-card.rejected { border-left-color: #ea4335; opacity: 0.6; }
@@ -584,7 +583,6 @@ function renderOverview() {
       <div style="font-weight:700;font-size:13px;color:#2d6a4f">🎉 Everyone has submitted this week!</div>
     </div>`}
 
-    ${buildStageDistribution(s)}
     ${buildNotRegistered(s)}
   `;
 }
@@ -870,7 +868,8 @@ function gnCard(gn, status) {
         ${chipHtml}
         <span style="font-size:11px;color:#8a9a8a">${weekLabel}${weekLabel&&dateLabel?' · ':''}${dateLabel}</span>
       </div>
-      <div class="gn-msg">Nominated <span class="gn-nominee">${nominee}${nomineeD && nomineeD !== 'Unknown' ? ' ('+nomineeD+')':''}</span>${msg ? ` — "${msg}"` : ''}</div>
+      <div class="gn-msg">${msg ? `"${msg}"` : ''}</div>
+      <div style="font-size:12px;color:#6b7c6b;margin-top:2px">About <span class="gn-nominee" style="font-weight:600;color:#1a2e1a">${nominee}${nomineeD && nomineeD !== 'Unknown' ? ' ('+nomineeD+')':''}</span></div>
       <div class="gn-from">By <span class="gn-nominator">${nominator}${nominatorD?' ('+nominatorD+')':''}</span></div>
       <div class="gn-actions" id="gna-${gnId}">${actionsHtml}</div>
     </div>
@@ -986,13 +985,39 @@ function addRecipient(gnId, name = '', dept = '', pts = 3) {
   const row = document.createElement('div');
   row.className = 'gn-recipient-row';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const uid = `gnri-${gnId}-${Date.now()}`;
   row.innerHTML = `
-    <input class="gn-edit-input" placeholder="Name" value="${esc(name)}" style="flex:1.5">
-    <input class="gn-edit-input" placeholder="Dept" value="${esc(dept)}" style="flex:1">
+    <div style="flex:1.5;position:relative">
+      <input class="gn-edit-input gn-name-input" id="${uid}" placeholder="Type a name..." value="${esc(name)}" autocomplete="off" style="width:100%">
+      <div class="gn-name-dropdown" id="${uid}-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #dce3dc;border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+    </div>
+    <input class="gn-edit-input gn-dept-input" placeholder="Dept" value="${esc(dept)}" style="flex:1" readonly>
     <input class="gn-edit-input" placeholder="+pts" value="${pts}" style="width:52px;text-align:center">
     <button onclick="this.closest('.gn-recipient-row').remove()" style="background:none;border:none;color:#c5221f;font-size:16px;cursor:pointer;padding:0 4px;line-height:1">×</button>
   `;
   container.appendChild(row);
+  const input = row.querySelector(`#${uid}`);
+  const dd = row.querySelector(`#${uid}-dd`);
+  const deptInput = row.querySelector('.gn-dept-input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !_stats) { dd.style.display = 'none'; return; }
+    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => {
+        input.value = item.dataset.name;
+        deptInput.value = item.dataset.dept;
+        dd.style.display = 'none';
+      });
+    });
+  });
+  input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
+  input.addEventListener('focus', () => { if (input.value.trim()) input.dispatchEvent(new Event('input')); });
 }
 
 function saveGNEdit(gnId) {
