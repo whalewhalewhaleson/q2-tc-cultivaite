@@ -1016,7 +1016,23 @@ function addRecipient(gnId, name = '', dept = '', pts = 3) {
     });
   });
   input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
-  input.addEventListener('focus', () => { if (input.value.trim()) input.dispatchEvent(new Event('input')); });
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
+    if (!_stats) return;
+    const all = _stats.users.slice(0, 8);
+    if (!all.length) return;
+    dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => {
+        input.value = item.dataset.name;
+        deptInput.value = item.dataset.dept;
+        dd.style.display = 'none';
+      });
+    });
+  });
 }
 
 function saveGNEdit(gnId) {
@@ -1104,13 +1120,55 @@ function addReviewedRecipient(gnId, name = '', dept = '', pts = 3) {
   const row = document.createElement('div');
   row.className = 'gn-recipient-row';
   row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const uid = `gnrri-${gnId}-${Date.now()}`;
   row.innerHTML = `
-    <input class="gn-edit-input" placeholder="Name" value="${esc(name)}" style="flex:1.5">
-    <input class="gn-edit-input" placeholder="Dept" value="${esc(dept)}" style="flex:1">
+    <div style="flex:1.5;position:relative">
+      <input class="gn-edit-input gn-name-input" id="${uid}" placeholder="Type a name..." value="${esc(name)}" autocomplete="off" style="width:100%">
+      <div class="gn-name-dropdown" id="${uid}-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #dce3dc;border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+    </div>
+    <input class="gn-edit-input gn-dept-input" placeholder="Dept" value="${esc(dept)}" style="flex:1" readonly>
     <input class="gn-edit-input" placeholder="+pts" value="${pts}" style="width:52px;text-align:center">
     <button onclick="this.closest('.gn-recipient-row').remove()" style="background:none;border:none;color:#c5221f;font-size:16px;cursor:pointer;padding:0 4px;line-height:1">×</button>
   `;
   container.appendChild(row);
+  const input = row.querySelector(`#${uid}`);
+  const dd = row.querySelector(`#${uid}-dd`);
+  const deptInput = row.querySelector('.gn-dept-input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !_stats) { dd.style.display = 'none'; return; }
+    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => {
+        input.value = item.dataset.name;
+        deptInput.value = item.dataset.dept;
+        dd.style.display = 'none';
+      });
+    });
+  });
+  input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
+  input.addEventListener('focus', () => {
+    if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
+    if (!_stats) return;
+    const all = _stats.users.slice(0, 8);
+    if (!all.length) return;
+    dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => {
+        input.value = item.dataset.name;
+        deptInput.value = item.dataset.dept;
+        dd.style.display = 'none';
+      });
+    });
+  });
 }
 
 async function saveReviewedEdit(gnId) {
