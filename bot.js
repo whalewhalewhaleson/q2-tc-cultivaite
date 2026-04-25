@@ -939,17 +939,137 @@ bot.command('testnudge', async (ctx) => {
       targetDisplayName = await getDisplayName(user.realName);
     }
 
-    await bot.api.sendMessage(
-      targetChatId,
-      `Hey ${e(targetDisplayName)}\\! /reflect on the past week yet\\? Deadline is today at 4PM\\! 🌱🌊`,
-      { parse_mode: 'MarkdownV2' }
-    );
+    const targetUser = arg
+      ? (await sheets.getAllUsersWithChatId()).find(u => u.realName?.toLowerCase().includes(arg))
+      : { realName: (await lookupUser(ctx.from?.id, ctx.from?.username?.toLowerCase()))?.realName };
+    const stats = targetUser?.realName ? await sheets.getStatsForUser(targetUser.realName) : null;
+
+    let nudgeMsg;
+    if (stats) {
+      const dn = e(targetDisplayName);
+      const { nextEmoji, ptsNeeded } = getNextStageInfo(stats.plantStage, stats.totalPoints);
+      if (stats.consecutiveMisses >= 1) {
+        nudgeMsg = `Hey ${dn}\\! Your plant's looking a bit dry 🍂 — /reflect today to bring it back\\! Deadline 4PM\\.`;
+      } else if (nextEmoji && ptsNeeded > 0 && ptsNeeded <= 10) {
+        nudgeMsg = `Hey ${dn}\\! You're just ${e(String(ptsNeeded))} pts from reaching ${nextEmoji} — /reflect to keep growing\\! Deadline 4PM\\.`;
+      } else if (stats.streak >= 2) {
+        nudgeMsg = `Hey ${dn}\\! You're on a ${e(String(stats.streak))}\\-week streak 🔥 — /reflect today to keep it alive\\! Deadline 4PM\\.`;
+      } else {
+        nudgeMsg = `Hey ${dn}\\! Your ${stats.plantStage} is waiting for water — /reflect on your week\\! Deadline 4PM\\.`;
+      }
+    } else {
+      nudgeMsg = `Hey ${e(targetDisplayName)}\\! /reflect on the past week yet\\? Deadline is today at 4PM\\! 🌱🌊`;
+    }
+
+    await bot.api.sendMessage(targetChatId, nudgeMsg, { parse_mode: 'MarkdownV2' });
 
     if (arg) {
       await ctx.reply(`Nudge sent to ${targetDisplayName} ✅`);
     }
   } catch (err) {
     console.error('/testnudge error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /testrecap — admin only, sends the Friday recap message to yourself
+// ---------------------------------------------------------------------------
+
+bot.command('testrecap', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const user = await lookupUser(chatId, username);
+    if (!user?.realName) {
+      await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const stats = await sheets.getStatsForUser(user.realName);
+    if (!stats) { await ctx.reply('No stats found.'); return; }
+
+    const allStats = await sheets.getAllUserStats();
+    const totalUsers = allStats.length;
+    const week = currentQ2Week();
+    const displayName = await getDisplayName(user.realName);
+    const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
+    const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
+
+    let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
+
+    if (stats.consecutiveMisses >= 1) {
+      msg += `🍂 Your plant could use some water — /reflect is always open\n`;
+    } else {
+      msg += `${displayStage} ${e(stageName)} · ${e(String(stats.totalPoints))} pts\n`;
+    }
+
+    if (stats.streak > 0 && stats.consecutiveMisses === 0) {
+      msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
+    }
+
+    if (stats.rank <= 3) {
+      msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))} 👑\n`;
+    } else {
+      msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))}\n`;
+    }
+
+    msg += `\n→ /mystats · /leaderboard · /department`;
+
+    await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/testrecap error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /testshoutout — admin only, sends a dept 100% shoutout to yourself
+// Usage: /testshoutout [Department Name]
+// ---------------------------------------------------------------------------
+
+bot.command('testshoutout', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const chatId = ctx.from?.id;
+    const username = ctx.from?.username?.toLowerCase();
+    const user = await lookupUser(chatId, username);
+    if (!user?.realName) {
+      await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const dept = ctx.message?.text?.split(' ').slice(1).join(' ').trim() || user.department;
+    if (!dept) { await ctx.reply('No department found.'); return; }
+
+    const rawCache = await sheets.getRawStatsCache();
+    const deptMembers = rawCache.sorted.filter(s => s.department === dept);
+    if (!deptMembers.length) {
+      await ctx.reply(`No members found for "${dept}".`);
+      return;
+    }
+
+    const memberNames = await Promise.all(
+      deptMembers.map(async m => {
+        const nick = await sheets.getNickname(m.realName);
+        return nick ?? m.realName;
+      })
+    );
+    const nameList = memberNames.join(', ');
+
+    const msg = `🎉 ${e(dept)}'s at 100% this week\\! ${e(nameList)} — what a team 🌿💧`;
+    await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/testshoutout error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
@@ -1344,6 +1464,9 @@ bot.command('help', async (ctx) => {
       `/skipweek — 🗓 Excuse a user for a week\n` +
       `/testnudge — 🔔 Preview the Monday nudge message\n` +
       `  • /testnudge wilson — send nudge preview to a specific person\n` +
+      `/testrecap — 📊 Preview the Friday recap message\n` +
+      `/testshoutout — 🎉 Preview dept 100% shoutout\n` +
+      `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
       `  • /broadcast me \\<msg\\> — test send to yourself\n` +
       `  • /broadcast all \\<msg\\> — send to everyone\n` +
