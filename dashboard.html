@@ -869,7 +869,6 @@ function gnCard(gn, status) {
         <span style="font-size:11px;color:#8a9a8a">${weekLabel}${weekLabel&&dateLabel?' · ':''}${dateLabel}</span>
       </div>
       <div class="gn-msg">${msg ? `"${msg}"` : ''}</div>
-      <div style="font-size:12px;color:#6b7c6b;margin-top:2px">About <span class="gn-nominee" style="font-weight:600;color:#1a2e1a">${nominee}${nomineeD && nomineeD !== 'Unknown' ? ' ('+nomineeD+')':''}</span></div>
       <div class="gn-from">By <span class="gn-nominator">${nominator}${nominatorD?' ('+nominatorD+')':''}</span></div>
       <div class="gn-actions" id="gna-${gnId}">${actionsHtml}</div>
     </div>
