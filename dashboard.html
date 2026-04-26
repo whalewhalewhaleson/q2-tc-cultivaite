@@ -191,6 +191,18 @@
   .gn-edit-input { border: 1px solid #cdd5cd; border-radius: 8px; padding: 7px 12px; font-size: 13px; font-family: inherit; color: #1a2e1a; background: white; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
   .gn-edit-input:focus { border-color: #2d6a4f; box-shadow: 0 0 0 3px rgba(45,106,79,0.12); }
 
+  /* ── Dept drill-down ─────────────────────────────────── */
+  .dept-link { cursor: pointer; text-decoration: underline dotted #aaa; }
+  .dept-link:hover { color: #2d6a4f; }
+  .dept-member-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f0f2f0; }
+  .dept-member-row:last-child { border-bottom: none; }
+  .dept-member-row.not-submitted { opacity: 0.55; }
+  .dept-member-name { flex: 1; font-weight: 600; font-size: 14px; color: #1a2e1a; cursor: pointer; }
+  .dept-member-name:hover { text-decoration: underline; color: #2d6a4f; }
+  .dept-member-pts { font-size: 13px; font-weight: 700; color: #2d6a4f; }
+  .dept-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: #aaa; margin: 16px 0 8px; }
+  .dept-inactive-list { font-size: 12px; color: #aaa; line-height: 1.8; }
+
   /* ── Person drawer ───────────────────────────────────── */
   .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); backdrop-filter: blur(2px); z-index: 200; display: none; }
   .drawer-overlay.open { display: block; }
@@ -248,9 +260,9 @@
 </div>
 
 <div class="tab-bar">
-  <div class="tab active" onclick="switchTab('overview',this)">📊 Overview</div>
-  <div class="tab" onclick="switchTab('rankings',this)">🏆 Rankings</div>
-  <div class="tab" onclick="switchTab('reflections',this)">💬 Reflections &amp; Goals</div>
+  <div class="tab active" onclick="switchTab('overview',this)">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('rankings',this)">🏆 Leaderboard</div>
+  <div class="tab" onclick="switchTab('reflections',this)">💬 Reflections</div>
   <div class="tab" id="tab-goodnews" onclick="switchTab('goodnews',this)">🌟 Good News</div>
 </div>
 
@@ -598,7 +610,7 @@ function renderRankings() {
     const streak = d.deptStreak ? `${d.deptStreak} wk 🔥` : '—';
     return `<tr>
       <td>${rankBadge(i+1)}</td>
-      <td><div class="cell-name">${esc(d.department)}</div>${i===0?'<div class="cell-sub">🥇 Leading this week</div>':''}</td>
+      <td><div class="cell-name dept-link" onclick="openDeptDrawer(${jAttr(d.department)})">${esc(d.department)}</div>${i===0?'<div class="cell-sub">🥇 Leading this week</div>':''}</td>
       <td style="text-align:center">${d.count}</td>
       <td>${miniBar(d.thisWeekRate)}</td>
       <td style="text-align:center;font-weight:700;${rateTextClass(q2rate)}">${q2rate}%</td>
@@ -1210,6 +1222,60 @@ function cancelReviewedEdit(gnId) {
   card.classList.remove('editing');
 }
 
+// ── Dept drawer ────────────────────────────────────────────────────────────
+function openDeptDrawer(deptName) {
+  if (!_stats) return;
+  const dept = _stats.depts.find(d => d.department === deptName);
+  if (!dept) return;
+
+  const activeMembers = (_stats.users ?? []).filter(u => u.department === deptName);
+  const inactiveMembers = (_stats.inactiveUsers ?? []).filter(u => u.department === deptName);
+
+  const submitted = activeMembers.filter(u => u.submittedThisWeek);
+  const notSubmitted = activeMembers.filter(u => !u.submittedThisWeek);
+  const q2rate = dept.targetSubmissions ? Math.round(dept.totalSubmissions / dept.targetSubmissions * 100) : 0;
+  const streak = dept.deptStreak ? `${dept.deptStreak} wk 🔥` : '—';
+
+  const memberRow = (u, dimmed) => `
+    <div class="dept-member-row${dimmed ? ' not-submitted' : ''}">
+      <span style="font-size:18px">${displayStage(u.plantStage, u.consecutiveMisses)}</span>
+      <span class="dept-member-name" onclick="closeDrawer();setTimeout(()=>openDrawer(${jAttr(u.realName)}),150)">${esc(u.realName)}</span>
+      <span class="dept-member-pts">${u.totalPoints} pts</span>
+      <span style="font-size:16px">${dimmed ? '❌' : '✅'}</span>
+    </div>`;
+
+  const submittedHtml = submitted.sort((a,b) => b.totalPoints - a.totalPoints).map(u => memberRow(u, false)).join('');
+  const notSubmittedHtml = notSubmitted.sort((a,b) => b.totalPoints - a.totalPoints).map(u => memberRow(u, true)).join('');
+  const inactiveHtml = inactiveMembers.length
+    ? `<div class="dept-section-label">Inactive (${inactiveMembers.length})</div>
+       <div class="dept-inactive-list">${inactiveMembers.map(u => esc(u.realName)).join(', ')}</div>`
+    : '';
+
+  document.getElementById('drawerName').textContent = deptName;
+  document.getElementById('drawerMeta').textContent = `${activeMembers.length} active member${activeMembers.length !== 1 ? 's' : ''} · ${dept.gardenStage} Garden`;
+  const ptsEl = document.getElementById('drawerPts');
+  ptsEl.textContent = `${q2rate}%`; ptsEl.nextElementSibling.textContent = 'Q2 Rate';
+  const streakEl = document.getElementById('drawerStreak');
+  streakEl.textContent = streak; streakEl.nextElementSibling.textContent = 'Streak';
+  const stageEl = document.getElementById('drawerStage');
+  stageEl.textContent = dept.avgPoints; stageEl.nextElementSibling.textContent = 'Avg Pts';
+  document.getElementById('drawerActiveToggle').innerHTML = '';
+
+  document.getElementById('drawerGoal').innerHTML = `
+    <div style="background:#edf7ef;border-radius:10px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;color:#2d6a4f;font-weight:600">This week</span>
+      <span style="font-size:18px;font-weight:800;color:#1a2e1a">${submitted.length} / ${activeMembers.length} submitted</span>
+    </div>`;
+
+  document.getElementById('drawerReflections').innerHTML = `
+    ${submitted.length > 0 ? `<div class="dept-section-label">Submitted ✅ (${submitted.length})</div>${submittedHtml}` : ''}
+    ${notSubmitted.length > 0 ? `<div class="dept-section-label">Not yet ❌ (${notSubmitted.length})</div>${notSubmittedHtml}` : ''}
+    ${inactiveHtml}`;
+
+  document.getElementById('drawerOverlay').classList.add('open');
+  document.getElementById('profileDrawer').classList.add('open');
+}
+
 // ── Person drawer ──────────────────────────────────────────────────────────
 async function openDrawer(name) {
   const active = (_stats?.users ?? []).find(u => u.realName === name);
@@ -1225,9 +1291,12 @@ async function openDrawer(name) {
   document.getElementById('drawerMeta').textContent  = isActive
     ? `${u.department} · ${ds} ${stageName} · ${u.totalPoints} pts · ${u.streak} wk streak`
     : `${u.department} · Inactive`;
-  document.getElementById('drawerPts').textContent   = isActive ? u.totalPoints : '—';
-  document.getElementById('drawerStreak').textContent = isActive ? `${u.streak} wk` : '—';
-  document.getElementById('drawerStage').textContent = isActive ? ds : '—';
+  const _ptsEl = document.getElementById('drawerPts');
+  _ptsEl.textContent = isActive ? u.totalPoints : '—'; _ptsEl.nextElementSibling.textContent = 'Points';
+  const _streakEl = document.getElementById('drawerStreak');
+  _streakEl.textContent = isActive ? `${u.streak} wk` : '—'; _streakEl.nextElementSibling.textContent = 'Streak';
+  const _stageEl = document.getElementById('drawerStage');
+  _stageEl.textContent = isActive ? ds : '—'; _stageEl.nextElementSibling.textContent = 'Stage';
 
   const goalEl = document.getElementById('drawerGoal');
   if (!isActive) {
