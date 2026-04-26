@@ -324,7 +324,8 @@
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const STAGE_NAMES = { '🌱':'Seedling','🌿':'Sprout','🌳':'Sapling','🌼':'Flowering','🍎':'Fruiting','🍂':'Dying','🥀':'Dead' };
-const Q2_START_SGT = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
+const Q2_START_SGT  = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT — used for currentWeek logic
+const Q2_START_MN   = new Date('2026-03-30T00:00:00+08:00'); // Mon midnight — used for display labelling
 const WEEK_MS_D = 7 * 24 * 60 * 60 * 1000;
 
 function displayStage(stage, misses) {
@@ -333,12 +334,18 @@ function displayStage(stage, misses) {
   return stage;
 }
 
+// Display label only — uses midnight anchor so Mon dates stay in the same calendar week
 function weekNumFromDate(dateStr) {
-  // Noon SGT proxy: Mon dates land in the closing week
-  const d = new Date(dateStr + 'T12:00:00+08:00');
-  const ms = d.getTime() - Q2_START_SGT.getTime();
-  if (ms < 0) return 1;
-  return Math.min(Math.max(Math.floor(ms / WEEK_MS_D) + 1, 1), 13);
+  const d = new Date(dateStr + 'T00:00:00+08:00');
+  const days = Math.floor((d.getTime() - Q2_START_MN.getTime()) / 86400000);
+  return Math.min(Math.max(Math.ceil((days + 1) / 7), 1), 13);
+}
+
+// Derive week number from a stored timestamp string e.g. "2026-04-20 8:30 PM"
+function weekNumFromTimestamp(ts) {
+  if (!ts) return null;
+  const dateStr = String(ts).slice(0, 10); // "YYYY-MM-DD"
+  return weekNumFromDate(dateStr);
 }
 
 function rateClass(pct) {
@@ -1515,7 +1522,7 @@ async function openDrawer(name) {
     const sharedHtml = gnShared.length
       ? gnShared.map(g => gnCard('#fffef5', '#fef08a', `
           <div style="font-size:11px;font-weight:700;color:#854d0e;margin-bottom:4px">
-            ${statusBadge(g.status)} Wk ${g.week_number} · +${g.pts_sharer ?? 5} pts
+            ${statusBadge(g.status)} Wk ${weekNumFromTimestamp(g.timestamp) ?? g.week_number} · +${g.pts_sharer ?? 5} pts
           </div>
           <div style="font-size:12px;color:#1a2e1a;line-height:1.5">"${escBr(g.message)}"</div>`
         )).join('')
@@ -1527,7 +1534,7 @@ async function openDrawer(name) {
             ?? (g.pts_nominee ?? 3);
           return gnCard('#f0faf5', '#b7e4c7', `
             <div style="font-size:11px;font-weight:700;color:#1b5e3b;margin-bottom:4px">
-              From: ${esc(g.nominator_name ?? '')} · Wk ${g.week_number} · +${pts} pts
+              From: ${esc(g.nominator_name ?? '')} · Wk ${weekNumFromTimestamp(g.timestamp) ?? g.week_number} · +${pts} pts
             </div>
             <div style="font-size:12px;color:#1a2e1a;line-height:1.5">"${escBr(g.message)}"</div>`);
         }).join('')
