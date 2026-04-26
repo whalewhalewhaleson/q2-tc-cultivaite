@@ -411,7 +411,7 @@ async function reflectConversation(conversation, ctx) {
   const q3Keyboard = new InlineKeyboard().text('Skip ⏭️', 'q3_skip');
   await ctx.reply(
     `${bold('Q3 (Optional): Any good news about someone this week? ⭐️')}\n` +
-    `${italic('Share their name and what they did — e.g. "Thai Team — prepared fun Songkran props for everyone!"')}`,
+    `${italic('Share their name and what they did.')}`,
     { parse_mode: 'MarkdownV2', reply_markup: q3Keyboard }
   );
   const q3Event = await conversation.waitFor(['message:text', 'callback_query:data']);
