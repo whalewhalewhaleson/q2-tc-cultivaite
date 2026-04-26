@@ -27,7 +27,7 @@ function getSGTDatetime() {
 // ---------------------------------------------------------------------------
 
 const Q2_START    = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
-const LAUNCH_DATE = '2026-04-20'; // Points count from Week 4 (Apr 20); early reflections count
+const LAUNCH_DATE = '2026-04-21'; // Points count from Week 4 (Apr 20 4pm); Apr 20 noon-proxy lands in wk3, so use Apr 21
 const WEEK_MS     = 7 * 24 * 60 * 60 * 1000;
 
 function dateToWeekNumber(dateStr) {

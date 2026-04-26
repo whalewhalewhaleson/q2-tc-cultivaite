@@ -1502,6 +1502,7 @@ async function openDrawer(name) {
     const myGn = (_gnReviewed ?? []).filter(g =>
       g.status === 'Approved' &&
       ((g.nominator_name ?? '').toLowerCase().trim() === nameLc ||
+       (g.nominee_name  ?? '').toLowerCase().trim() === nameLc ||
        (g.awards ?? []).some(a => (a.recipient_name ?? '').toLowerCase().trim() === nameLc))
     );
     const gnHtml = myGn.length
