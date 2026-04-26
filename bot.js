@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Bot, session } from 'grammy';
+import { Bot, session, InlineKeyboard } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
 import crypto from 'crypto';
@@ -408,14 +408,25 @@ async function reflectConversation(conversation, ctx) {
   let hasGoodNews = false;
   let q3Raw = '';
 
+  const q3Keyboard = new InlineKeyboard().text('Skip ⏭️', 'q3_skip');
   await ctx.reply(
     `${bold('Q3 (Optional): Any good news about someone this week? ⭐️')}\n` +
-    `${italic('Share their name and what they did — e.g. "Thai Team — prepared fun Songkran props for everyone!" Or type skip.')}`,
-    { parse_mode: 'MarkdownV2' }
+    `${italic('Share their name and what they did — e.g. "Thai Team — prepared fun Songkran props for everyone!"')}`,
+    { parse_mode: 'MarkdownV2', reply_markup: q3Keyboard }
   );
-  const q3Ctx = await waitForText(conversation, ctx);
-  if (!q3Ctx) return;
-  const q3Input = q3Ctx.message.text.trim();
+  const q3Event = await conversation.waitFor(['message:text', 'callback_query:data']);
+  let q3Input;
+  if (q3Event.callbackQuery) {
+    await q3Event.answerCallbackQuery();
+    q3Input = 'skip';
+  } else {
+    const text = q3Event.message.text?.trim() ?? '';
+    if (text.startsWith('/')) {
+      await ctx.reply(`No worries\\. Come back and /reflect whenever you're ready\\. 🌱`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    q3Input = text;
+  }
 
   if (q3Input.toLowerCase() !== 'skip') {
     const sepIdx = q3Input.indexOf(' — ');
