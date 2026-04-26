@@ -231,6 +231,32 @@
 
   .loading-state { padding: 48px; text-align: center; color: #8a9a8a; font-weight: 500; }
 
+  /* Leaderboard drawer collapsible sections */
+  .lb-section { border: 1px solid #e4e8e4; border-radius: 12px; margin-bottom: 12px; overflow: hidden; }
+  .lb-section-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: linear-gradient(135deg, #f5f7f5, #eef2ee); cursor: pointer; user-select: none; font-weight: 700; font-size: 13px; color: #1a2e1a; }
+  .lb-section-chevron { font-size: 11px; color: #8a9a8a; transition: transform 0.2s; }
+  .lb-section.collapsed .lb-section-chevron { transform: rotate(-90deg); }
+  .lb-section-body { padding: 14px 16px; }
+  .lb-section.collapsed .lb-section-body { display: none; }
+  /* Week chips */
+  .lb-week-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  /* Reflection cards */
+  .lb-refl-card { background: #f5f7f5; border-radius: 10px; border: 1px solid #e4e8e4; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+  .lb-refl-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .lb-refl-hint { margin-left: auto; font-size: 10px; color: #8a9a8a; }
+  .lb-refl-q1 { font-size: 12px; color: #3c4c3c; font-style: italic; line-height: 1.6; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .lb-refl-card.expanded .lb-refl-q1 { display: block; -webkit-line-clamp: unset; }
+  .lb-refl-card.expanded .lb-refl-hint::before { content: 'Collapse ↑'; }
+  .lb-refl-card:not(.expanded) .lb-refl-hint::before { content: 'Expand ↓'; }
+  .lb-refl-q2 { font-size: 11px; color: #6b7c6b; margin-top: 4px; font-style: italic; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+  .lb-refl-card.expanded .lb-refl-q2 { display: block; -webkit-line-clamp: unset; }
+  /* Admin forms */
+  .lb-admin-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid #d4e6d4; background: #edf7ef; color: #1b5e3b; font-size: 12px; font-weight: 700; cursor: pointer; margin-right: 8px; margin-bottom: 8px; font-family: inherit; }
+  .lb-admin-btn:hover { background: #d9f0e0; }
+  .lb-admin-form { background: #f9fdf9; border: 1px solid #d4e6d4; border-radius: 8px; padding: 12px; margin-bottom: 10px; }
+  .lb-admin-select { width: 100%; padding: 7px 10px; border: 1px solid #d4e6d4; border-radius: 6px; font-size: 13px; color: #1a2e1a; background: white; font-family: inherit; }
+  .lb-admin-confirm { padding: 6px 14px; border-radius: 6px; border: 1px solid #40916c; background: #d9f0e0; color: #1b5e3b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .lb-admin-cancel { padding: 6px 14px; border-radius: 6px; border: 1px solid #e4e8e4; background: #f0f2f0; color: #6b7c6b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
   @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2,1fr); } .ref-grid { grid-template-columns: 1fr; } .drawer { width: 100%; } }
 </style>
 </head>
@@ -297,7 +323,8 @@
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
 const STAGE_NAMES = { '🌱':'Seedling','🌿':'Sprout','🌳':'Sapling','🌼':'Flowering','🍎':'Fruiting','🍂':'Dying','🥀':'Dead' };
-const Q2_START_SGT = new Date('2026-03-30T00:00:00+08:00');
+const Q2_START_SGT = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
+const WEEK_MS_D = 7 * 24 * 60 * 60 * 1000;
 
 function displayStage(stage, misses) {
   if (misses >= 2) return '🥀';
@@ -306,9 +333,11 @@ function displayStage(stage, misses) {
 }
 
 function weekNumFromDate(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  const days = Math.floor((d.getTime() - Q2_START_SGT.getTime()) / 86400000);
-  return Math.min(Math.max(Math.ceil((days + 1) / 7), 1), 13);
+  // Noon SGT proxy: Mon dates land in the closing week
+  const d = new Date(dateStr + 'T12:00:00+08:00');
+  const ms = d.getTime() - Q2_START_SGT.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / WEEK_MS_D) + 1, 1), 13);
 }
 
 function rateClass(pct) {
@@ -1311,26 +1340,89 @@ function openDeptDrawer(deptName) {
 }
 
 // ── Person drawer ──────────────────────────────────────────────────────────
+
+function drawerSection(title, content, open) {
+  const cls = open ? 'lb-section' : 'lb-section collapsed';
+  return `<div class="${cls}">
+    <div class="lb-section-header" onclick="this.parentElement.classList.toggle('collapsed')">
+      <span>${title}</span><span class="lb-section-chevron">▼</span>
+    </div>
+    <div class="lb-section-body">${content}</div>
+  </div>`;
+}
+
+function toggleAdminForm(id, _btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+async function submitExtension(name, type, weekNumber) {
+  const wk = parseInt(weekNumber);
+  if (!wk) return;
+  const label = type === 'excused' ? 'excuse' : 'grant extension for';
+  if (!confirm(`${label === 'excuse' ? 'Excuse' : 'Grant extension for'} ${name} — Week ${wk}?`)) return;
+  try {
+    await fetch('/api/extensions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ realName: name, weekNumber: wk, type }),
+    });
+    await refresh();
+    openDrawer(name);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function removeExtensionPrompt(name) {
+  const wk = parseInt(prompt(`Remove extension/excuse for ${name}. Enter week number:`));
+  if (!wk) return;
+  try {
+    await fetch('/api/extensions', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ realName: name, weekNumber: wk }),
+    });
+    await refresh();
+    openDrawer(name);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
 async function openDrawer(name) {
-  const active = (_stats?.users ?? []).find(u => u.realName === name);
+  const active   = (_stats?.users ?? []).find(u => u.realName === name);
   const inactive = (_stats?.inactiveUsers ?? []).find(u => u.realName === name);
   const u = active || inactive;
   if (!u) return;
 
-  const isActive = !!active;
-  const ds = isActive ? displayStage(u.plantStage, u.consecutiveMisses) : '—';
-  const stageName = isActive ? (STAGE_NAMES[u.plantStage] ?? 'Seedling') : 'Inactive';
+  const isActive   = !!active;
+  const ds         = isActive ? displayStage(u.plantStage, u.consecutiveMisses) : '—';
+  const stageName  = isActive ? (STAGE_NAMES[u.plantStage] ?? 'Seedling') : 'Inactive';
+  const weekNow    = _stats.weekNow;
 
-  document.getElementById('drawerName').textContent  = u.realName;
-  document.getElementById('drawerMeta').textContent  = isActive
-    ? `${u.department} · ${ds} ${stageName} · ${u.totalPoints} pts · ${u.streak} wk streak`
+  document.getElementById('drawerName').textContent = u.realName;
+  document.getElementById('drawerMeta').textContent = isActive
+    ? `${u.department} · ${ds} ${stageName} · Rank #${u.rank}`
     : `${u.department} · Inactive`;
+
   const _ptsEl = document.getElementById('drawerPts');
   _ptsEl.textContent = isActive ? u.totalPoints : '—'; _ptsEl.nextElementSibling.textContent = 'Points';
   const _streakEl = document.getElementById('drawerStreak');
-  _streakEl.textContent = isActive ? `${u.streak} wk` : '—'; _streakEl.nextElementSibling.textContent = 'Streak';
+  _streakEl.textContent = isActive ? `${u.streak}wk` : '—'; _streakEl.nextElementSibling.textContent = 'Streak';
   const _stageEl = document.getElementById('drawerStage');
   _stageEl.textContent = isActive ? ds : '—'; _stageEl.nextElementSibling.textContent = 'Stage';
+
+  const btnStyle = isActive
+    ? 'background:#d9f0e0;border:1px solid #40916c;color:#1b5e3b'
+    : 'background:#fce8e6;border:1px solid #ea4335;color:#c5221f';
+  document.getElementById('drawerActiveToggle').innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f7f5;border-radius:10px;padding:10px 14px">
+      <div>
+        <div style="font-size:12px;font-weight:700;color:#1a2e1a">Active status</div>
+        <div style="font-size:11px;color:#8a9a8a">Inactive members are hidden from all stats</div>
+      </div>
+      <button id="drawerActiveBtn" onclick="toggleActive(${jAttr(u.realName)})"
+        style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:inherit;${btnStyle}">
+        ${isActive ? 'Active' : 'Inactive'}</button>
+    </div>`;
 
   const goalEl = document.getElementById('drawerGoal');
   if (!isActive) {
@@ -1338,52 +1430,129 @@ async function openDrawer(name) {
   } else if (u.goal) {
     goalEl.innerHTML = `<div class="drawer-goal-box"><div class="drawer-goal-label">🎯 Q2 Goal</div><div class="drawer-goal-text">"${esc(u.goal)}"</div></div>`;
   } else {
-    goalEl.innerHTML = `<div class="drawer-no-goal">No Q2 goal set yet — prompt them to use /setgoal in the bot.</div>`;
+    goalEl.innerHTML = `<div class="drawer-no-goal">No Q2 goal set — prompt them to use /setgoal in the bot.</div>`;
   }
-
-  const btnStyle = isActive
-    ? 'background:#d9f0e0;border:1px solid #40916c;color:#1b5e3b'
-    : 'background:#fce8e6;border:1px solid #ea4335;color:#c5221f';
-  const btnLabel = isActive ? 'Active' : 'Inactive';
-  document.getElementById('drawerActiveToggle').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;background:#f5f7f5;border-radius:10px;padding:10px 14px">
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#1a2e1a">Active status</div>
-        <div style="font-size:11px;color:#8a9a8a">Inactive members are hidden from all stats</div>
-      </div>
-      <button id="drawerActiveBtn" onclick="toggleActive('${esc(u.realName).replace(/'/g, "\\'")}')"
-        style="padding:6px 16px;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;transition:all 0.15s;font-family:inherit;
-        ${btnStyle}">${btnLabel}</button>
-    </div>`;
 
   document.getElementById('drawerReflections').innerHTML = '<div style="color:#8a9a8a;font-size:13px">Loading…</div>';
   document.getElementById('drawerOverlay').classList.add('open');
   document.getElementById('profileDrawer').classList.add('open');
 
   try {
-    const subs = await fetch(`/api/person/${encodeURIComponent(name)}`).then(r => r.json());
-    const refEl = document.getElementById('drawerReflections');
-    if (!subs.length) {
-      refEl.innerHTML = '<div style="color:#8a9a8a;font-size:13px;padding:8px 0">No reflections submitted yet.</div>';
-      return;
-    }
-    refEl.innerHTML = subs.slice().reverse().map(s => {
-      const wk = weekNumFromDate(s.date);
-      const formatted = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
-      return `<div class="drawer-week">
-        <div class="drawer-week-header">
-          <span>Week ${wk}</span>
-          <span style="font-size:11px;color:#8a9a8a">${esc(formatted)}</span>
-        </div>
-        <div class="drawer-week-body">
-          <div class="drawer-q-label q1">Q1 — TC Value</div>
-          <div class="drawer-q-text">"${escBr(s.q1)}"</div>
-          ${s.q2 ? `<div class="drawer-q-label q2">Q2 — Role Performance</div><div class="drawer-q-text">"${escBr(s.q2)}"</div>` : ''}
-        </div>
-      </div>`;
+    const [subs, exts] = await Promise.all([
+      fetch(`/api/person/${encodeURIComponent(name)}`).then(r => r.json()),
+      fetch('/api/extensions').then(r => r.json()),
+    ]);
+
+    const nameLc  = name.toLowerCase().trim();
+    const myExts  = (exts ?? []).filter(e => (e.real_name ?? '').toLowerCase().trim() === nameLc);
+    const weekHistory = u.weekHistory ?? {};
+    const safeId  = name.replace(/[^a-zA-Z0-9]/g, '_');
+
+    // ── Section 1: Week history chips ──────────────────────────────────────
+    const CHIP = {
+      done:     { bg:'#d9f0e0', color:'#1b5e3b', lbl:'✓' },
+      excused:  { bg:'#fff3e0', color:'#e65100', lbl:'E' },
+      extended: { bg:'#e3f2fd', color:'#1565c0', lbl:'⤷' },
+      missed:   { bg:'#fce8e6', color:'#c5221f', lbl:'✗' },
+      future:   { bg:'#f0f2f0', color:'#8a9a8a', lbl:'·' },
+    };
+    const chips = Array.from({ length: 13 }, (_, i) => {
+      const wk    = i + 1;
+      const entry = weekHistory[wk];
+      const extRec = myExts.find(e => e.week_number === wk);
+      let type;
+      if (wk > weekNow) type = 'future';
+      else if (extRec?.type === 'excused' || (entry?.submitted && entry?.excused)) type = 'excused';
+      else if (extRec?.type === 'extension' || (entry?.submitted && entry?.extended)) type = 'extended';
+      else if (entry?.submitted) type = 'done';
+      else if (wk < weekNow) type = 'missed';
+      else type = 'future';
+      const c = CHIP[type];
+      return `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;min-width:30px;padding:6px 4px;border-radius:8px;background:${c.bg};color:${c.color};font-size:11px;font-weight:700">
+        <span>${c.lbl}</span><span style="font-size:9px;opacity:0.75">W${wk}</span></div>`;
     }).join('');
+    const legend = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px">
+      <span style="background:#d9f0e0;color:#1b5e3b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">✓ Done</span>
+      <span style="background:#fce8e6;color:#c5221f;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">✗ Missed</span>
+      <span style="background:#fff3e0;color:#e65100;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">E Excused</span>
+      <span style="background:#e3f2fd;color:#1565c0;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">⤷ Extended</span>
+    </div>`;
+    const weekHistoryHtml = `<div class="lb-week-chips">${chips}</div>${legend}`;
+
+    // ── Section 2: Reflections ─────────────────────────────────────────────
+    const reflHtml = subs.length
+      ? subs.slice().reverse().map(s => {
+          const wk = weekNumFromDate(s.date);
+          const fmt = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
+          return `<div class="lb-refl-card" onclick="this.classList.toggle('expanded')">
+            <div class="lb-refl-header">
+              <span style="font-size:12px;font-weight:700;color:#2d6a4f">Week ${wk}</span>
+              <span style="font-size:10px;color:#8a9a8a">${esc(fmt)}</span>
+              <span class="lb-refl-hint"></span>
+            </div>
+            <div class="lb-refl-q1">"${escBr(s.q1)}"</div>
+            ${s.q2 ? `<div class="lb-refl-q2">Role: "${escBr(s.q2)}"</div>` : ''}
+          </div>`;
+        }).join('')
+      : '<div style="color:#8a9a8a;font-size:13px;padding:8px 0">No reflections submitted yet.</div>';
+
+    // ── Section 3: Good News ───────────────────────────────────────────────
+    const myGn = (_gnReviewed ?? []).filter(g =>
+      g.status === 'Approved' &&
+      ((g.nominator_name ?? '').toLowerCase().trim() === nameLc ||
+       (g.awards ?? []).some(a => (a.recipient_name ?? '').toLowerCase().trim() === nameLc))
+    );
+    const gnHtml = myGn.length
+      ? myGn.map(g => {
+          const isNom = (g.nominator_name ?? '').toLowerCase().trim() === nameLc;
+          const pts   = isNom ? (g.pts_sharer ?? 5)
+            : ((g.awards ?? []).find(a => (a.recipient_name ?? '').toLowerCase().trim() === nameLc)?.pts ?? 3);
+          return `<div style="background:#fffef5;border:1px solid #fef08a;border-radius:8px;padding:10px 12px;margin-bottom:8px">
+            <div style="font-size:11px;font-weight:700;color:#854d0e;margin-bottom:4px">${isNom ? '📢 Shared' : '🌟 Received'} · +${pts} pts · Wk ${g.week_number}</div>
+            <div style="font-size:12px;color:#1a2e1a;line-height:1.5">"${escBr(g.message)}"</div>
+            <div style="font-size:10px;color:#8a9a8a;margin-top:4px">${isNom ? `To: ${esc(g.nominee_name ?? '')}` : `From: ${esc(g.nominator_name ?? '')}`}</div>
+          </div>`;
+        }).join('')
+      : '<div style="color:#8a9a8a;font-size:13px;padding:8px 0">No good news nominations yet.</div>';
+
+    // ── Section 4: Admin ───────────────────────────────────────────────────
+    const weekOpts = Array.from({ length: weekNow }, (_, i) => weekNow - i)
+      .map(w => `<option value="${w}">Week ${w}</option>`).join('');
+    const extListHtml = myExts.length
+      ? `<div style="margin-top:10px;font-size:11px;color:#6b7c6b;background:#f5f7f5;border-radius:6px;padding:8px 10px">
+          Current overrides: ${myExts.map(e => `Wk ${e.week_number} (${e.type})`).join(', ')}
+          <a href="#" onclick="removeExtensionPrompt(${jAttr(name)});return false" style="color:#c5221f;font-weight:700;margin-left:6px">Remove…</a>
+        </div>`
+      : '';
+    const adminHtml = `
+      <button class="lb-admin-btn" onclick="toggleAdminForm('ext-${safeId}',this)">🕐 Grant Extension</button>
+      <div id="ext-${safeId}" class="lb-admin-form" style="display:none">
+        <div style="font-size:11px;font-weight:700;color:#1a2e1a;margin-bottom:6px">Grant extension — week submitted in W+1 counts for W</div>
+        <select id="ext-wk-${safeId}" class="lb-admin-select">${weekOpts}</select>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="lb-admin-confirm" onclick="submitExtension(${jAttr(name)},'extension',document.getElementById('ext-wk-${safeId}').value)">Confirm</button>
+          <button class="lb-admin-cancel" onclick="toggleAdminForm('ext-${safeId}',null)">Cancel</button>
+        </div>
+      </div>
+      <button class="lb-admin-btn" onclick="toggleAdminForm('exc-${safeId}',this)">🟠 Excuse Week</button>
+      <div id="exc-${safeId}" class="lb-admin-form" style="display:none">
+        <div style="font-size:11px;font-weight:700;color:#1a2e1a;margin-bottom:6px">Excuse absence — streak preserved, no points earned</div>
+        <select id="exc-wk-${safeId}" class="lb-admin-select">${weekOpts}</select>
+        <div style="display:flex;gap:6px;margin-top:8px">
+          <button class="lb-admin-confirm" onclick="submitExtension(${jAttr(name)},'excused',document.getElementById('exc-wk-${safeId}').value)">Confirm</button>
+          <button class="lb-admin-cancel" onclick="toggleAdminForm('exc-${safeId}',null)">Cancel</button>
+        </div>
+      </div>
+      ${extListHtml}`;
+
+    document.getElementById('drawerReflections').innerHTML =
+      drawerSection('📅 Week History', weekHistoryHtml, true) +
+      drawerSection('📝 Reflections', reflHtml, true) +
+      drawerSection('🌟 Good News', gnHtml, false) +
+      drawerSection('⚙️ Admin Controls', adminHtml, false);
+
   } catch (e) {
-    document.getElementById('drawerReflections').innerHTML = '<div style="color:#c5221f;font-size:13px">Failed to load reflections.</div>';
+    document.getElementById('drawerReflections').innerHTML = '<div style="color:#c5221f;font-size:13px">Failed to load data.</div>';
   }
 }
 

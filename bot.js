@@ -49,9 +49,10 @@ const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 const shoutedDepts = new Set();
 
 function getWeekNumber() {
-  const start = new Date('2026-03-30T00:00:00+08:00');
-  const daysSince = Math.floor((Date.now() - start.getTime()) / 86400000);
-  return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
+  const start = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
+  const ms = Date.now() - start.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1, 1), 13);
 }
 
 // Progress bar using filled ● and empty ○, wrapped in monospace
@@ -1905,6 +1906,30 @@ http.createServer(async (req, res) => {
     if (req.method === 'GET' && personM) {
       const subs = await sheets.getSubmissionsForUser(decodeURIComponent(personM[1]), 13);
       return jsonRes(res, subs);
+    }
+
+    // GET /api/extensions
+    if (req.method === 'GET' && route === '/api/extensions') {
+      const exts = await sheets.listExtensions();
+      return jsonRes(res, exts);
+    }
+
+    // POST /api/extensions  — body: { realName, weekNumber, type }
+    if (req.method === 'POST' && route === '/api/extensions') {
+      const body = await parseBody(req);
+      const { realName, weekNumber, type } = body;
+      if (!realName || !weekNumber) { res.writeHead(400); return res.end('Missing realName or weekNumber'); }
+      await sheets.grantExtension(realName, weekNumber, type ?? 'extension');
+      return jsonRes(res, { ok: true });
+    }
+
+    // DELETE /api/extensions  — body: { realName, weekNumber }
+    if (req.method === 'DELETE' && route === '/api/extensions') {
+      const body = await parseBody(req);
+      const { realName, weekNumber } = body;
+      if (!realName || !weekNumber) { res.writeHead(400); return res.end('Missing realName or weekNumber'); }
+      await sheets.removeExtension(realName, weekNumber);
+      return jsonRes(res, { ok: true });
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found');

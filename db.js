@@ -26,19 +26,22 @@ function getSGTDatetime() {
 // Week number (mirrors bot.js getWeekNumber, but applied to a date string)
 // ---------------------------------------------------------------------------
 
-const Q2_START    = new Date('2026-03-30T00:00:00+08:00');
+const Q2_START    = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
 const LAUNCH_DATE = '2026-04-20'; // Points count from Week 4 (Apr 20); early reflections count
+const WEEK_MS     = 7 * 24 * 60 * 60 * 1000;
 
 function dateToWeekNumber(dateStr) {
-  // dateStr is YYYY-MM-DD (SGT)
-  const d = new Date(dateStr + 'T00:00:00+08:00');
-  const daysSince = Math.floor((d.getTime() - Q2_START.getTime()) / 86400000);
-  return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
+  // Noon SGT proxy: Mon dates land in the closing week (safely before 4pm cutoff)
+  const d = new Date(dateStr + 'T12:00:00+08:00');
+  const ms = d.getTime() - Q2_START.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
 }
 
 function currentWeekNumber() {
-  const daysSince = Math.floor((Date.now() - Q2_START.getTime()) / 86400000);
-  return Math.min(Math.max(Math.ceil((daysSince + 1) / 7), 1), 13);
+  const ms = Date.now() - Q2_START.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
 }
 
 // ---------------------------------------------------------------------------
@@ -137,6 +140,25 @@ async function buildStatsCache() {
     if (!userWeekMap[name]) userWeekMap[name] = {};
     const excused = sub.q1 === '[Excused absence]';
     userWeekMap[name][wk] = { submitted: true, excused };
+  }
+
+  // Apply admin extensions/excuses (read from extensions table, mutates userWeekMap)
+  const { data: extRows } = await supabase.from('extensions').select('*');
+  for (const ext of (extRows ?? [])) {
+    const name = ext.real_name.toLowerCase().trim();
+    const wk   = ext.week_number;
+    if (ext.type === 'excused') {
+      if (!userWeekMap[name]) userWeekMap[name] = {};
+      if (!userWeekMap[name][wk]?.submitted) {
+        userWeekMap[name][wk] = { submitted: true, excused: true };
+      }
+    } else if (ext.type === 'extension') {
+      // Remap wk+1 submission → wk if user missed wk but submitted wk+1
+      if (!userWeekMap[name]?.[wk]?.submitted && userWeekMap[name]?.[wk + 1]?.submitted) {
+        userWeekMap[name][wk] = { ...userWeekMap[name][wk + 1], extended: true };
+        delete userWeekMap[name][wk + 1];
+      }
+    }
   }
 
   // Dept week submission rate: dept → weekNum → { submitted, total }
@@ -651,6 +673,31 @@ export async function getReflectionsForWeek(weekNum) {
     .neq('q1', '[Excused absence]')
     .order('department')
     .order('real_name');
+  if (error) throw error;
+  return data ?? [];
+}
+
+// ---------------------------------------------------------------------------
+// Extensions / excuses — admin overrides
+// ---------------------------------------------------------------------------
+
+export async function grantExtension(realName, weekNumber, type = 'extension') {
+  const { error } = await supabase.from('extensions')
+    .insert({ real_name: realName, week_number: weekNumber, type });
+  if (error) throw error;
+  cacheInvalidate('stats');
+}
+
+export async function removeExtension(realName, weekNumber) {
+  const { error } = await supabase.from('extensions')
+    .delete().eq('real_name', realName).eq('week_number', weekNumber);
+  if (error) throw error;
+  cacheInvalidate('stats');
+}
+
+export async function listExtensions() {
+  const { data, error } = await supabase.from('extensions')
+    .select('*').order('week_number', { ascending: false });
   if (error) throw error;
   return data ?? [];
 }
