@@ -1540,7 +1540,7 @@ bot.command('help', async (ctx) => {
       `/testnudge — 🔔 Preview the Monday nudge message\n` +
       `  • /testnudge wilson — send nudge preview to a specific person\n` +
       `/testrecap — 📊 Preview the Friday recap message\n` +
-      `/testshoutout — 🎉 Preview first-dept-100% shoutout \\(only fires once per week\\)\n` +
+      `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
       `  • /broadcast me \\<msg\\> — test send to yourself\n` +
