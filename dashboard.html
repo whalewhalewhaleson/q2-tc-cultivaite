@@ -154,11 +154,11 @@
   .ref-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
   /* ── Good news cards ─────────────────────────────────── */
-  .gn-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #dce3dc; border-left: 4px solid #d4760a; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; transition: box-shadow 0.2s; }
+  .gn-card { background: white; border-radius: 16px; padding: 18px 20px; border: 1px solid #dce3dc; box-shadow: 0 1px 4px rgba(0,0,0,0.04); margin-bottom: 12px; display: flex; gap: 14px; align-items: flex-start; transition: box-shadow 0.2s; }
   .gn-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-  .gn-card.approved { border-left-color: #40916c; }
-  .gn-card.rejected { border-left-color: #ea4335; opacity: 0.6; }
-  .gn-card.editing  { border-left-color: #1a73e8; background: #f8fbff; }
+  .gn-card.approved { border-left: 4px solid #40916c; }
+  .gn-card.rejected { border-left: 4px solid #ea4335; opacity: 0.6; }
+  .gn-card.editing  { border-left: 4px solid #1a73e8; background: #f8fbff; }
   .gn-emoji { font-size: 22px; flex-shrink: 0; }
   .gn-body { flex: 1; }
   .gn-msg { font-size: 13px; line-height: 1.7; color: #3c4c3c; }
@@ -1083,10 +1083,10 @@ function editGN(gnId) {
     </div>
   `;
   card.querySelector('.gn-body').appendChild(el);
-  addRecipient(gnId, nominee, nomineeD, 3);
+  addRecipient(gnId, nominee, nomineeD, 5);
 }
 
-function addRecipient(gnId, name = '', dept = '', pts = 3) {
+function addRecipient(gnId, name = '', dept = '', pts = 5) {
   const container = document.getElementById(`gnr-${gnId}`);
   if (!container) return;
   const row = document.createElement('div');
@@ -1127,7 +1127,7 @@ function addRecipient(gnId, name = '', dept = '', pts = 3) {
   input.addEventListener('focus', () => {
     if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
     if (!_stats) return;
-    const all = _stats.users.slice(0, 8);
+    const all = _stats.users;
     if (!all.length) return;
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1218,11 +1218,11 @@ function editGNReviewed(gnId, currentStatus) {
 
   const seed = existingAwards.length
     ? existingAwards
-    : [{ recipient_name: gn.nominee_name ?? '', recipient_dept: gn.nominee_dept ?? '', pts: 3 }];
+    : [{ recipient_name: gn.nominee_name ?? '', recipient_dept: gn.nominee_dept ?? '', pts: 5 }];
   for (const a of seed) addReviewedRecipient(gnId, a.recipient_name, a.recipient_dept, a.pts);
 }
 
-function addReviewedRecipient(gnId, name = '', dept = '', pts = 3) {
+function addReviewedRecipient(gnId, name = '', dept = '', pts = 5) {
   const container = document.getElementById(`gnrr-${gnId}`);
   if (!container) return;
   const row = document.createElement('div');
@@ -1263,7 +1263,7 @@ function addReviewedRecipient(gnId, name = '', dept = '', pts = 3) {
   input.addEventListener('focus', () => {
     if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
     if (!_stats) return;
-    const all = _stats.users.slice(0, 8);
+    const all = _stats.users;
     if (!all.length) return;
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
