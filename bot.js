@@ -1001,6 +1001,55 @@ bot.command('testnudge', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /testdeadlinenudge — admin only, sends the 4PM deadline-over message to yourself
+// ---------------------------------------------------------------------------
+
+bot.command('testdeadlinenudge', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const arg = ctx.message?.text?.split(' ')[1]?.replace(/^@/, '').toLowerCase();
+
+    let targetChatId, targetDisplayName;
+
+    if (arg) {
+      const allUsers = await sheets.getAllUsersWithChatId();
+      const match = allUsers.find(u => u.realName?.toLowerCase().includes(arg));
+      if (!match) {
+        await ctx.reply(`Couldn't find "${arg}" in the system\\.`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = match.chatId;
+      targetDisplayName = match.nickname ?? match.realName;
+    } else {
+      const chatId = ctx.from?.id;
+      const username = ctx.from?.username?.toLowerCase();
+      const user = await lookupUser(chatId, username);
+      if (!user?.realName) {
+        await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = chatId;
+      targetDisplayName = await getDisplayName(user.realName);
+    }
+
+    const dn = e(targetDisplayName);
+    const msg = `Hey ${dn}\\! This week's deadline has just passed 🌧️\n\nNo worries — you can still /reflect and earn 5 pts\\! Better late than never 🌱\n\nAny questions\\? Text @whalewhalewhalee\\.`;
+    await bot.api.sendMessage(targetChatId, msg, { parse_mode: 'MarkdownV2' });
+
+    if (arg) {
+      await ctx.reply(`Deadline nudge sent to ${targetDisplayName} ✅`);
+    }
+  } catch (err) {
+    console.error('/testdeadlinenudge error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /testrecap — admin only, sends the Friday recap message to yourself
 // ---------------------------------------------------------------------------
 
@@ -1547,8 +1596,10 @@ bot.command('help', async (ctx) => {
     msg +=
       `\n${bold('Admin')}\n` +
       `/skipweek — 🗓 Excuse a user for a week\n` +
-      `/testnudge — 🔔 Preview the Monday nudge message\n` +
-      `  • /testnudge wilson — send nudge preview to a specific person\n` +
+      `/testnudge — 🔔 Preview the Monday morning nudge\n` +
+      `  • /testnudge wilson — send to a specific person\n` +
+      `/testdeadlinenudge — ⏰ Preview the Monday 4PM deadline\\-over nudge\n` +
+      `  • /testdeadlinenudge wilson — send to a specific person\n` +
       `/testrecap — 📊 Preview the Friday recap message\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
@@ -1559,7 +1610,12 @@ bot.command('help', async (ctx) => {
       `/dashboard — 📊 Live stats summary \\+ dashboard link\n` +
       `/grantaccess \\<id\\> \\<name\\> — 🔑 Grant dashboard access\n` +
       `/revokeaccess \\<id\\> — 🚫 Revoke dashboard access\n` +
-      `/listaccess — 👥 View who has dashboard access\n`;
+      `/listaccess — 👥 View who has dashboard access\n` +
+      `\n${bold('Automations')}\n` +
+      `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
+      `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
+      `Fri 3:30PM SGT — Weekly recap to everyone\n` +
+      `On submit — Dept 100% shoutout \\(first dept to hit 100% that week\\)\n`;
   }
 
   msg += `\n${italic('Reflect weekly. Grow together.')}`;
