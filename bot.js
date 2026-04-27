@@ -48,6 +48,7 @@ const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 // Points lower-bound per stage (mirrors apps-script.gs CONFIG.STAGE_THRESHOLDS)
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 const shoutedDepts = new Set();
+let firstShoutoutFiredThisWeek = false;
 
 function getWeekNumber() {
   const start = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
@@ -128,6 +129,10 @@ async function broadcastDeptShoutout(department) {
   if (shoutedDepts.has(department)) return;
   shoutedDepts.add(department);
 
+  // Only the first dept to hit 100% each week gets a company-wide shoutout
+  if (firstShoutoutFiredThisWeek) return;
+  firstShoutoutFiredThisWeek = true;
+
   const rawCache = await sheets.getRawStatsCache();
   const deptMembers = rawCache.sorted.filter(s => s.department === department);
   const memberNames = await Promise.all(
@@ -138,8 +143,8 @@ async function broadcastDeptShoutout(department) {
   );
   const nameList = memberNames.join(', ');
 
-  const msg = `🎉 ${e(department)}'s at 100% this week\\! ${e(nameList)} — what a team 🌿💧`;
-  console.log(`[Shoutout] ${department} hit 100% — broadcasting to all users.`);
+  const msg = `🎉 ${e(department)} is the first dept to hit 100% this week\\! ${e(nameList)} — leading the way 🌿💧`;
+  console.log(`[Shoutout] ${department} is first to hit 100% — broadcasting to all users.`);
 
   const allUsers = await sheets.getAllUsersWithChatId();
   for (const { chatId } of allUsers) {
@@ -1535,7 +1540,7 @@ bot.command('help', async (ctx) => {
       `/testnudge — 🔔 Preview the Monday nudge message\n` +
       `  • /testnudge wilson — send nudge preview to a specific person\n` +
       `/testrecap — 📊 Preview the Friday recap message\n` +
-      `/testshoutout — 🎉 Preview dept 100% shoutout\n` +
+      `/testshoutout — 🎉 Preview first-dept-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
       `  • /broadcast me \\<msg\\> — test send to yourself\n` +
@@ -1607,6 +1612,7 @@ cron.schedule('0 2 * * 1', async () => {
     return;
   }
   shoutedDepts.clear();
+  firstShoutoutFiredThisWeek = false;
   console.log('[Cron] Running Monday nudge...');
   try {
     const users = await sheets.getAllUsersWithChatId();
