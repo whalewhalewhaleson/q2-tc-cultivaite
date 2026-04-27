@@ -261,7 +261,10 @@
   .lb-admin-select { width: 100%; padding: 7px 10px; border: 1px solid #d4e6d4; border-radius: 6px; font-size: 13px; color: #1a2e1a; background: white; font-family: inherit; }
   .lb-admin-confirm { padding: 6px 14px; border-radius: 6px; border: 1px solid #40916c; background: #d9f0e0; color: #1b5e3b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .lb-admin-cancel { padding: 6px 14px; border-radius: 6px; border: 1px solid #e4e8e4; background: #f0f2f0; color: #6b7c6b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
-  .ref-card-move { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e8f0e8; }
+  .ref-card-move { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e8f0e8; display: flex; flex-wrap: wrap; gap: 6px; align-items: flex-start; }
+  .late-btn { background: #fff8e1; border: 1px solid #f9a825; color: #e65100; }
+  .late-btn:hover { background: #fff3cd; }
+  .late-btn.active { background: #e65100; border-color: #e65100; color: white; }
   @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2,1fr); } .ref-grid { grid-template-columns: 1fr; } .drawer { width: 100%; } }
 </style>
 </head>
@@ -896,6 +899,7 @@ function renderReflections() {
         </div>` : ''}
         <div class="ref-card-move">
           <button class="lb-admin-btn" onclick="document.getElementById('rmf-${r.id}').style.display='flex'">Move ▾</button>
+          <button class="lb-admin-btn late-btn${r.late ? ' active' : ''}" onclick="toggleLate(${r.id},${jAttr(r.real_name)},${_reflWeek},this)">⏰ ${r.late ? 'Late (5 pts)' : 'Mark late'}</button>
           <div id="rmf-${r.id}" class="lb-admin-form" style="display:none;align-items:center;gap:6px">
             <span style="font-size:12px;color:#6b7c6b">→ Week:</span>
             <select id="rms-${r.id}" class="filter-select" style="padding:2px 6px;font-size:12px">${weekOpts}</select>
@@ -1392,8 +1396,10 @@ function openDeptDrawer(deptName) {
   const activeMembers = (_stats.users ?? []).filter(u => u.department === deptName);
   const inactiveMembers = (_stats.inactiveUsers ?? []).filter(u => u.department === deptName);
 
-  const submitted = activeMembers.filter(u => u.submittedThisWeek);
-  const notSubmitted = activeMembers.filter(u => !u.submittedThisWeek);
+  const wk = _dashWeek;
+  const isCurrent = wk === _stats.weekNow;
+  const submitted = activeMembers.filter(u => isCurrent ? u.submittedThisWeek : u.weekHistory?.[wk]?.submitted);
+  const notSubmitted = activeMembers.filter(u => isCurrent ? !u.submittedThisWeek : !u.weekHistory?.[wk]?.submitted);
   const q2rate = dept.targetSubmissions ? Math.round(dept.totalSubmissions / dept.targetSubmissions * 100) : 0;
   const streak = dept.deptStreak ? `${dept.deptStreak} wk 🔥` : '—';
 
@@ -1424,7 +1430,7 @@ function openDeptDrawer(deptName) {
 
   document.getElementById('drawerGoal').innerHTML = `
     <div style="background:#edf7ef;border-radius:10px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:13px;color:#2d6a4f;font-weight:600">This week</span>
+      <span style="font-size:13px;color:#2d6a4f;font-weight:600">${isCurrent ? 'This week' : `Week ${wk}`}</span>
       <span style="font-size:18px;font-weight:800;color:#1a2e1a">${submitted.length} / ${activeMembers.length} submitted</span>
     </div>`;
 
@@ -1469,6 +1475,19 @@ async function submitExtension(name, type, weekNumber) {
     await refresh();
     openDrawer(name);
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function toggleLate(subId, realName, weekNum, btn) {
+  btn.disabled = true;
+  try {
+    const res = await fetch('/api/late', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ realName, weekNumber: weekNum }),
+    });
+    if (!res.ok) throw new Error('Failed');
+    await refresh();
+  } catch (e) { alert('Error: ' + e.message); btn.disabled = false; }
 }
 
 async function moveSubmission(rowIndex, weekNum, name) {

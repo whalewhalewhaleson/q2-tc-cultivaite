@@ -2012,6 +2012,15 @@ http.createServer(async (req, res) => {
       return jsonRes(res, { ok: true });
     }
 
+    // POST /api/late  — body: { realName, weekNumber }  — toggle late flag
+    if (req.method === 'POST' && route === '/api/late') {
+      const body = await parseBody(req);
+      const { realName, weekNumber } = body;
+      if (!realName || !weekNumber) { res.writeHead(400); return res.end('Missing realName or weekNumber'); }
+      const result = await sheets.toggleLateSubmission(realName, parseInt(weekNumber));
+      return jsonRes(res, result);
+    }
+
     // DELETE /api/extensions  — body: { realName, weekNumber }
     if (req.method === 'DELETE' && route === '/api/extensions') {
       const body = await parseBody(req);
