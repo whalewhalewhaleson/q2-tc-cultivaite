@@ -658,8 +658,8 @@ export async function getRawStatsCache() {
 
 // Returns submissions for a given Q2 week number (excused absences excluded).
 export async function getReflectionsForWeek(weekNum) {
-  // Q2 starts 2026-03-30 00:00 SGT = 2026-03-29 16:00 UTC
-  const Q2_EPOCH_UTC = Date.UTC(2026, 2, 29, 16, 0, 0);
+  // Q2 starts 2026-03-30 16:00 SGT = 2026-03-30 08:00 UTC (4pm boundary)
+  const Q2_EPOCH_UTC = Date.UTC(2026, 2, 30, 8, 0, 0);
   const DAY_MS       = 86400000;
   const startUTC     = Q2_EPOCH_UTC + (weekNum - 1) * 7 * DAY_MS;
   const endUTC       = startUTC + 7 * DAY_MS - 1;
