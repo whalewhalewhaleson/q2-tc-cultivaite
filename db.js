@@ -717,3 +717,33 @@ export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nom
     pts_nominee:    3,
   });
 }
+
+// ---------------------------------------------------------------------------
+// Dashboard access management
+// ---------------------------------------------------------------------------
+
+export async function grantDashboardAccess(userId, name, grantedBy) {
+  const { error } = await supabase.from('dashboard_access').upsert({
+    user_id:    String(userId),
+    name,
+    granted_by: String(grantedBy),
+    created_at: new Date().toISOString(),
+  }, { onConflict: 'user_id' });
+  if (error) throw error;
+}
+
+export async function revokeDashboardAccess(userId) {
+  const { error } = await supabase.from('dashboard_access').delete().eq('user_id', String(userId));
+  if (error) throw error;
+}
+
+export async function listDashboardAccess() {
+  const { data, error } = await supabase.from('dashboard_access').select('*').order('created_at');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getDashboardAccessIds() {
+  const { data } = await supabase.from('dashboard_access').select('user_id');
+  return (data ?? []).map(r => r.user_id);
+}

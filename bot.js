@@ -8,6 +8,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
+import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1172,6 +1173,63 @@ bot.command('broadcast', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /grantaccess /revokeaccess /listaccess — admin only, manage dashboard access
+// ---------------------------------------------------------------------------
+
+bot.command('grantaccess', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  // Usage: /grantaccess 123456789 John
+  const args = (ctx.message?.text ?? '').slice('/grantaccess'.length).trim().split(/\s+/);
+  const userId = args[0];
+  const name = args.slice(1).join(' ');
+  if (!userId || !name) return ctx.reply('Usage: /grantaccess <user_id> <name>\n\nTo get someone\'s Telegram user ID, have them message @userinfobot.');
+  try {
+    await grantDashboardAccess(userId, name, String(ctx.from.id));
+    await ctx.reply(`✅ Dashboard access granted to ${name} (${userId}).`);
+  } catch (err) {
+    console.error('/grantaccess error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+bot.command('revokeaccess', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  // Usage: /revokeaccess 123456789
+  const userId = (ctx.message?.text ?? '').slice('/revokeaccess'.length).trim();
+  if (!userId) return ctx.reply('Usage: /revokeaccess <user_id>');
+  try {
+    await revokeDashboardAccess(userId);
+    await ctx.reply(`✅ Dashboard access revoked for user ${userId}.`);
+  } catch (err) {
+    console.error('/revokeaccess error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+bot.command('listaccess', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  try {
+    const rows = await listDashboardAccess();
+    const envIds = [
+      ...(process.env.ADMIN_CHAT_IDS ?? '').split(','),
+      ...(process.env.LEADERSHIP_CHAT_IDS ?? '').split(','),
+    ].map(id => id.trim()).filter(Boolean);
+
+    let msg = '*Dashboard Access List*\n\n';
+    if (envIds.length) msg += `_Env vars (edit in Railway):_\n${envIds.map(id => `• ${id}`).join('\n')}\n\n`;
+    if (rows.length) {
+      msg += `_Granted via bot:_\n${rows.map(r => `• ${r.name} (${r.user_id})`).join('\n')}`;
+    } else {
+      msg += '_No users granted via bot yet\\._';
+    }
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/listaccess error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /dashboard — admin + leadership, get live stats summary + dashboard link
 // ---------------------------------------------------------------------------
 
@@ -1652,11 +1710,13 @@ if (!COOKIE_SECRET) {
   console.warn('⚠️  COOKIE_SECRET not set — dashboard auth disabled. Set it in .env / Railway env.');
 }
 
-function getAllowedIds() {
-  return [
+async function getAllowedIds() {
+  const envIds = [
     ...(process.env.ADMIN_CHAT_IDS ?? '').split(','),
     ...(process.env.LEADERSHIP_CHAT_IDS ?? '').split(','),
   ].map(id => id.trim()).filter(Boolean);
+  const dbIds = await getDashboardAccessIds().catch(() => []);
+  return [...new Set([...envIds, ...dbIds])];
 }
 
 function verifyTelegramLogin(params) {
@@ -1783,7 +1843,7 @@ http.createServer(async (req, res) => {
       res.end('<h3>Login verification failed. <a href="/">Try again</a></h3>');
       return;
     }
-    if (!getAllowedIds().includes(String(params.id))) {
+    if (!(await getAllowedIds()).includes(String(params.id))) {
       res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(unauthorizedPage());
       return;
