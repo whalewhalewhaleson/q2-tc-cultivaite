@@ -807,3 +807,65 @@ export async function getDashboardAccessIds() {
   const { data } = await supabase.from('dashboard_access').select('user_id');
   return (data ?? []).map(r => r.user_id);
 }
+
+// ---------------------------------------------------------------------------
+// Manager access management
+// ---------------------------------------------------------------------------
+
+export async function getManager(telegramId) {
+  const { data } = await supabase.from('managers').select('*').eq('telegram_id', String(telegramId)).maybeSingle();
+  return data ?? null;
+}
+
+export async function addManager(telegramId, realName, dept) {
+  const { error } = await supabase.from('managers').upsert({
+    telegram_id: String(telegramId),
+    real_name:   realName,
+    department:  dept,
+  }, { onConflict: 'telegram_id' });
+  if (error) throw error;
+}
+
+export async function removeManager(telegramId) {
+  const { error } = await supabase.from('managers').delete().eq('telegram_id', String(telegramId));
+  if (error) throw error;
+}
+
+export async function listManagers() {
+  const { data, error } = await supabase.from('managers').select('*').order('created_at');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getGoodNewsByDept(dept) {
+  const [
+    { data: pending, error: e1 },
+    { data: reviewed, error: e2 },
+    { data: awards, error: e3 },
+  ] = await Promise.all([
+    supabase.from('good_news')
+      .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer')
+      .eq('status', 'Pending')
+      .or(`nominator_dept.eq.${dept},nominee_dept.eq.${dept}`)
+      .order('timestamp', { ascending: true }),
+    supabase.from('good_news')
+      .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status')
+      .in('status', ['Approved', 'Rejected'])
+      .or(`nominator_dept.eq.${dept},nominee_dept.eq.${dept}`)
+      .order('timestamp', { ascending: false }),
+    supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
+  ]);
+  if (e1) throw e1;
+  if (e2) throw e2;
+  if (e3) throw e3;
+
+  const awardsByGnId = {};
+  for (const a of (awards ?? [])) {
+    if (!awardsByGnId[a.good_news_id]) awardsByGnId[a.good_news_id] = [];
+    awardsByGnId[a.good_news_id].push(a);
+  }
+  return {
+    pending:  pending ?? [],
+    reviewed: (reviewed ?? []).map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] })),
+  };
+}

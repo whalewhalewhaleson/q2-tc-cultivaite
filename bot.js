@@ -8,7 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
-import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds } from './db.js';
+import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
+         getManager, addManager, removeManager, listManagers, getGoodNewsByDept } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1340,6 +1341,54 @@ bot.command('listaccess', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /grantmanager /revokemanager /listmanagers — admin only, manage manager access
+// ---------------------------------------------------------------------------
+
+bot.command('grantmanager', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  // Usage: /grantmanager <user_id> <DEPT> <Real Name>
+  const args = (ctx.message?.text ?? '').slice('/grantmanager'.length).trim().split(/\s+/);
+  const userId = args[0];
+  const dept   = args[1];
+  const name   = args.slice(2).join(' ');
+  if (!userId || !dept || !name) return ctx.reply('Usage: /grantmanager <user_id> <DEPT> <Real Name>\n\nExample: /grantmanager 123456789 SM Jane Doe\n\nTo get a Telegram user ID, have them message @userinfobot.');
+  try {
+    await addManager(userId, name, dept);
+    await ctx.reply(`✅ ${name} granted manager access for the ${dept} department.`);
+  } catch (err) {
+    console.error('/grantmanager error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+bot.command('revokemanager', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  // Usage: /revokemanager <user_id>
+  const userId = (ctx.message?.text ?? '').slice('/revokemanager'.length).trim();
+  if (!userId) return ctx.reply('Usage: /revokemanager <user_id>');
+  try {
+    await removeManager(userId);
+    await ctx.reply(`✅ Manager access revoked for user ${userId}.`);
+  } catch (err) {
+    console.error('/revokemanager error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+bot.command('listmanagers', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  try {
+    const rows = await listManagers();
+    if (!rows.length) return ctx.reply('No managers granted yet.');
+    const lines = rows.map(r => `• ${r.real_name.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')} \\(${r.department.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')}\\) — ${r.telegram_id}`).join('\n');
+    await ctx.reply(`*Manager Access List*\n\n${lines}`, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/listmanagers error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /dashboard — admin + leadership, get live stats summary + dashboard link
 // ---------------------------------------------------------------------------
 
@@ -1659,6 +1708,9 @@ bot.command('help', async (ctx) => {
       `/grantaccess \\<id\\> \\<name\\> — 🔑 Grant dashboard access\n` +
       `/revokeaccess \\<id\\> — 🚫 Revoke dashboard access\n` +
       `/listaccess — 👥 View who has dashboard access\n` +
+      `/grantmanager \\<id\\> \\<DEPT\\> \\<name\\> — 👔 Grant manager view for a dept\n` +
+      `/revokemanager \\<id\\> — 🚫 Revoke manager access\n` +
+      `/listmanagers — 👥 View all dept managers\n` +
       `\n${bold('Automations')}\n` +
       `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
       `Mon 3PM SGT — 1\\-hour warning to non\\-submitters\n` +
@@ -1911,8 +1963,8 @@ function verifyTelegramLogin(params) {
   return true;
 }
 
-function signCookie(userId, firstName) {
-  const payload = JSON.stringify({ id: userId, name: firstName, ts: Date.now() });
+function signCookie(userId, firstName, role = 'admin', dept = null) {
+  const payload = JSON.stringify({ id: userId, name: firstName, role, dept, ts: Date.now() });
   const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
   return `${Buffer.from(payload).toString('base64')}.${sig}`;
 }
@@ -2023,12 +2075,19 @@ http.createServer(async (req, res) => {
       res.end('<h3>Login verification failed. <a href="/">Try again</a></h3>');
       return;
     }
-    if (!(await getAllowedIds()).includes(String(params.id))) {
+    const [allowedIds, managerRecord] = await Promise.all([
+      getAllowedIds(),
+      getManager(params.id),
+    ]);
+    const isAllowedAdmin = allowedIds.includes(String(params.id));
+    if (!isAllowedAdmin && !managerRecord) {
       res.writeHead(403, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(unauthorizedPage());
       return;
     }
-    const cookie = signCookie(params.id, params.first_name ?? 'User');
+    const role   = isAllowedAdmin ? 'admin' : 'manager';
+    const dept   = isAllowedAdmin ? null : managerRecord.department;
+    const cookie = signCookie(params.id, params.first_name ?? 'User', role, dept);
     res.writeHead(302, {
       'Location': '/dashboard',
       'Set-Cookie': `${AUTH_COOKIE}=${encodeURIComponent(cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`,
@@ -2073,6 +2132,12 @@ http.createServer(async (req, res) => {
   }
 
   try {
+    // GET /api/me — returns role + dept from session cookie
+    if (req.method === 'GET' && route === '/api/me') {
+      const user = getSessionUser(req);
+      return jsonRes(res, { role: user.role ?? 'admin', dept: user.dept ?? null, name: user.name ?? '' });
+    }
+
     // GET /api/stats
     if (req.method === 'GET' && route === '/api/stats') {
       return jsonRes(res, await sheets.getFullDashboardStats());
@@ -2086,6 +2151,13 @@ http.createServer(async (req, res) => {
     // GET /api/good-news/reviewed  — approved + rejected rows for the edit-after-approval flow
     if (req.method === 'GET' && route === '/api/good-news/reviewed') {
       return jsonRes(res, await sheets.getReviewedGoodNews());
+    }
+
+    // GET /api/good-news/dept?dept=SM  — manager view: nominations involving a specific dept
+    if (req.method === 'GET' && route === '/api/good-news/dept') {
+      const dept = url_.searchParams.get('dept');
+      if (!dept) return jsonRes(res, { error: 'dept required' }, 400);
+      return jsonRes(res, await getGoodNewsByDept(dept));
     }
 
     // POST /api/good-news/:id/approve

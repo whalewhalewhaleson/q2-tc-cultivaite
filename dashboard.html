@@ -397,6 +397,8 @@ function jAttr(s) { return JSON.stringify(String(s ?? '')).replace(/"/g, '&quot;
 
 // ── State ──────────────────────────────────────────────────────────────────
 let _stats      = null;
+let _myRole     = 'admin'; // 'admin' | 'manager'
+let _myDept     = null;    // dept string for manager, null for admin
 let _gnPending  = [];
 let _gnReviewed = [];
 let _reflCache  = {};   // weekNum → array
@@ -410,34 +412,79 @@ let _dashWeek   = null;
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function init() {
   try {
-    const [stats, gn, rev] = await Promise.all([
+    // Fetch role first (fast — just reads cookie), then data in parallel
+    const me = await fetch('/api/me').then(r => r.json());
+    _myRole = me.role ?? 'admin';
+    _myDept = me.dept ?? null;
+
+    const gnUrl = _myRole === 'manager' && _myDept
+      ? `/api/good-news/dept?dept=${encodeURIComponent(_myDept)}`
+      : null;
+
+    const [stats, gnData] = await Promise.all([
       fetch('/api/stats').then(r => r.json()),
-      fetch('/api/good-news/pending').then(r => r.json()),
-      fetch('/api/good-news/reviewed').then(r => r.json()),
+      gnUrl
+        ? fetch(gnUrl).then(r => r.json())
+        : Promise.all([
+            fetch('/api/good-news/pending').then(r => r.json()),
+            fetch('/api/good-news/reviewed').then(r => r.json()),
+          ]).then(([p, v]) => ({ pending: p, reviewed: v })),
     ]);
+
     _stats      = stats;
-    _gnPending  = gn;
-    _gnReviewed = rev;
+    _gnPending  = gnData.pending ?? [];
+    _gnReviewed = gnData.reviewed ?? [];
+
     if (_reflWeek === null) _reflWeek = stats.weekNow;
     if (_rankWeek === null) _rankWeek = stats.weekNow;
     if (_dashWeek === null) _dashWeek = stats.weekNow;
 
+    // Manager: lock reflections to their dept and default to that tab
+    if (_myRole === 'manager' && _myDept) {
+      _reflDept = _myDept;
+      applyManagerUI();
+    }
+
     document.getElementById('week-chip').textContent = `Week ${stats.weekNow} / 13`;
     document.getElementById('updated-at').textContent = `Updated ${new Date().toLocaleTimeString('en-SG', {hour:'2-digit',minute:'2-digit'})}`;
     updateGNBadge();
-    renderOverview();
-    renderRankings();
-    renderGoodNews();
+
+    if (_myRole === 'manager') {
+      // Load reflections immediately as the default tab for managers
+      await loadReflections();
+      renderGoodNews();
+    } else {
+      renderOverview();
+      renderRankings();
+      renderGoodNews();
+    }
   } catch (e) {
     console.error('Init failed', e);
     document.getElementById('sheet-overview').innerHTML = `<div class="loading-state">⚠️ Failed to load data. <button class="refresh-btn" onclick="init()">Retry</button></div>`;
   }
 }
 
+function applyManagerUI() {
+  // Hide admin-only tabs
+  document.querySelectorAll('.tab').forEach(t => {
+    const name = t.getAttribute('onclick')?.match(/switchTab\('(\w+)'/)?.[1];
+    if (name === 'overview' || name === 'rankings') t.style.display = 'none';
+  });
+  // Activate reflections tab
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.sheet-panel').forEach(p => { p.classList.remove('active'); });
+  const reflTab = Array.from(document.querySelectorAll('.tab')).find(t => t.getAttribute('onclick')?.includes("'reflections'"));
+  if (reflTab) reflTab.classList.add('active');
+  document.getElementById('sheet-reflections').classList.add('active');
+  document.getElementById('sheet-overview').classList.remove('active');
+}
+
 async function refresh() {
   document.getElementById('updated-at').textContent = 'Refreshing…';
   _stats      = null;
   _reflCache  = {};
+  // Re-apply manager dept lock before re-init (role doesn't change mid-session)
+  if (_myRole === 'manager' && _myDept) _reflDept = _myDept;
   await init();
   // Re-render whichever tab is active
   const active = document.querySelector('.sheet-panel.active')?.id.replace('sheet-','');
@@ -919,7 +966,7 @@ function renderReflections() {
           <div class="ref-q-label q2">Q2 — Role Performance</div>
           <div class="ref-q-text">"${escBr(r.q2)}"</div>
         </div>` : ''}
-        <div class="ref-card-move">
+        ${_myRole !== 'manager' ? `<div class="ref-card-move">
           <button class="lb-admin-btn" onclick="document.getElementById('rmf-${r.id}').style.display='flex'">Move ▾</button>
           <button class="lb-admin-btn late-btn${r.late ? ' active' : ''}" onclick="toggleLate(${r.id},${jAttr(r.real_name)},${_reflWeek},this)">⏰ ${r.late ? 'Late (5 pts)' : 'Mark late'}</button>
           <div id="rmf-${r.id}" class="lb-admin-form" style="display:none;align-items:center;gap:6px">
@@ -928,7 +975,7 @@ function renderReflections() {
             <button class="lb-admin-confirm" onclick="moveSubmission(${r.id},parseInt(document.getElementById('rms-${r.id}').value),${jAttr(r.real_name)})">Confirm</button>
             <button class="lb-admin-cancel" onclick="document.getElementById('rmf-${r.id}').style.display='none'">Cancel</button>
           </div>
-        </div>
+        </div>` : ''}
       </div>`;
     }).join('');
     return `<div class="dept-section">
@@ -947,8 +994,8 @@ function renderReflections() {
       <button class="filter-arrow" onclick="setReflWeek(Math.max(1,_reflWeek-1))" ${_reflWeek<=1?'disabled':''}>◀</button>
       <select class="filter-select" onchange="setReflWeek(parseInt(this.value))">${weekOpts}</select>
       <button class="filter-arrow" onclick="setReflWeek(Math.min(${_stats.weekNow},_reflWeek+1))" ${_reflWeek>=_stats.weekNow?'disabled':''}>▶</button>
-      ${chips}
-      <span style="font-size:11px;color:#8a9a8a;margin-left:auto">Click a name to open full profile →</span>
+      ${_myRole !== 'manager' ? chips : `<span style="font-size:12px;font-weight:600;color:#2e7d32;background:#e8f5e9;padding:4px 10px;border-radius:20px">${esc(_myDept ?? '')}</span>`}
+      <span style="font-size:11px;color:#8a9a8a;margin-left:auto">${_myRole === 'manager' ? '👁 Read-only view' : 'Click a name to open full profile →'}</span>
     </div>
     ${sections || '<div style="color:#8a9a8a;padding:16px 0">No reflections found for this selection.</div>'}
   `;
@@ -977,22 +1024,26 @@ function renderGoodNews() {
   const approvedCards = approved.map(gn => gnCard(gn, 'approved')).join('');
   const rejectedCards = rejected.map(gn => gnCard(gn, 'rejected')).join('');
 
+  const pendingSectionTitle = _myRole === 'manager' ? '⏳ Pending' : '⏳ Pending Approval';
   document.getElementById('sheet-goodnews').innerHTML = `
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px">
-      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${total}</div><div style="font-size:11px;color:#8a9a8a">Total nominations</div></div>
-      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #fef7e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#d4760a">${_gnPending.length}</div><div style="font-size:11px;color:#8a9a8a">Pending approval</div></div>
-      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #d9f0e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${approved.length}</div><div style="font-size:11px;color:#8a9a8a">Approved (pts awarded)</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;flex:1">
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${total}</div><div style="font-size:11px;color:#8a9a8a">Total nominations</div></div>
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #fef7e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#d4760a">${_gnPending.length}</div><div style="font-size:11px;color:#8a9a8a">Pending</div></div>
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #d9f0e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${approved.length}</div><div style="font-size:11px;color:#8a9a8a">Approved</div></div>
+      </div>
+      ${_myRole === 'manager' ? '<span style="font-size:11px;color:#8a9a8a;margin-left:16px;white-space:nowrap">👁 Read-only view</span>' : ''}
     </div>
 
-    <div style="background:#fef7e0;border:1px solid #d4a017;border-radius:10px;padding:10px 16px;font-size:12px;color:#9a5a00;margin-bottom:16px">
+    ${_myRole !== 'manager' ? `<div style="background:#fef7e0;border:1px solid #d4a017;border-radius:10px;padding:10px 16px;font-size:12px;color:#9a5a00;margin-bottom:16px">
       ⚡ <strong>Approving a nomination</strong> awards pts to the nominator and your chosen recipients — pts update live.
-    </div>
+    </div>` : ''}
 
-    <div class="section-header"><span class="section-title">⏳ Pending Approval</span><span class="section-badge orange">${_gnPending.length} nomination${_gnPending.length!==1?'s':''}</span></div>
+    <div class="section-header"><span class="section-title">${pendingSectionTitle}</span><span class="section-badge orange">${_gnPending.length} nomination${_gnPending.length!==1?'s':''}</span></div>
     <div id="pending-list">${pendingCards}</div>
 
     ${approved.length || rejected.length ? `
-    <div class="section-header" style="margin-top:24px"><span class="section-title">✅ Approved</span><span class="section-badge green">${approved.length} this session</span></div>
+    <div class="section-header" style="margin-top:24px"><span class="section-title">✅ Approved</span><span class="section-badge green">${approved.length}</span></div>
     <div id="approved-list">${approvedCards}</div>
     ${rejected.length ? `
     <div class="section-header" style="margin-top:24px"><span class="section-title">✕ Rejected</span><span class="section-badge orange">${rejected.length}</span></div>
@@ -1030,7 +1081,7 @@ function gnCard(gn, status) {
   if (status === 'pending') {
     cardClass = '';
     chipHtml = '<span class="pending-chip">Pending</span>';
-    actionsHtml = `
+    actionsHtml = _myRole === 'manager' ? '' : `
       <button class="btn-approve" onclick="approveGN(${gnId},this)">✅ Approve (+${gn.pts_sharer??5} pts ${nominator})</button>
       <button class="btn-edit" onclick="editGN(${gnId})">✏️ Edit recipients</button>
       <button class="btn-reject" onclick="rejectGN(${gnId})">✕ Reject</button>
@@ -1041,15 +1092,17 @@ function gnCard(gn, status) {
     const awardsLine = gn.awards && gn.awards.length
       ? gn.awards.map(a => `<strong>${esc(a.recipient_name)}</strong> +${a.pts} pts`).join(' &nbsp;·&nbsp; ')
       : `<strong>${nominee || '(nominee)'}</strong> +3 pts (legacy)`;
-    actionsHtml = `
-      <span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>
+    actionsHtml = _myRole === 'manager'
+      ? `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>`
+      : `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>
       <button class="btn-edit" style="margin-left:8px" onclick="editGNReviewed(${gnId},'approved')">✏️ Edit</button>
     `;
   } else {
     cardClass = 'rejected';
     chipHtml = '<span class="rejected-chip">Rejected</span>';
-    actionsHtml = `
-      <span style="font-size:12px;color:#c5221f">✕ Rejected</span>
+    actionsHtml = _myRole === 'manager'
+      ? `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>`
+      : `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>
       <button class="btn-undo" style="margin-left:8px" onclick="unRejectGN(${gnId})">↩ Undo — move back to Pending</button>
     `;
   }
