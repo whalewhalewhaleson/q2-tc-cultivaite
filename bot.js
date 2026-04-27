@@ -487,18 +487,25 @@ async function reflectConversation(conversation, ctx) {
   const levelledUp = statsAfter &&
     HEALTHY_STAGES.indexOf(newStage) > HEALTHY_STAGES.indexOf(stage);
 
+  const rankTies = Object.values(rawCache.statsMap).filter(u => u.rank === userRank).length;
+  const rankMsg = userRank <= 3
+    ? (rankTies > 1
+        ? `You're currently \\#${userRank} in the company with ${e(String(rankTies - 1))} others 👀 Tap /leaderboard to see who's around you\\!`
+        : `You're currently \\#${userRank} in the company 👀 Tap /leaderboard to see who's around you\\!`)
+    : null;
+
   let celebrationLine = '';
   if (!alreadySubmitted) {
     if (levelledUp) {
       if (userRank <= 3) {
-        celebrationLine = `\n\nYou're currently \\#${userRank} in the company 👀 Tap /leaderboard to see who's around you\\!`;
+        celebrationLine = `\n\n${rankMsg}`;
       } else if (completedDept) {
         celebrationLine = `\n\nYou just made it 100% for ${e(completedDept)}\\! 🎉`;
       } else {
         celebrationLine = `\n\nTap /mystats to see your full progress 🌱`;
       }
     } else if (userRank <= 3) {
-      celebrationLine = `\n\nYou're currently \\#${userRank} in the company 👀 Tap /leaderboard to see who's around you\\!`;
+      celebrationLine = `\n\n${rankMsg}`;
     } else if (newStreak > 0 && newStreak % 5 === 0) {
       celebrationLine = `\n\n${e(String(newStreak))} weeks straight 🔥 Tap /mystats to see your streak\\!`;
     } else if (completedDept) {
@@ -512,7 +519,10 @@ async function reflectConversation(conversation, ctx) {
   if (alreadySubmitted) {
     let msg = `📝 ${bold('Reflection stored.')}\n\nYour pts for this week are already in — but this one is saved too\\. Keep the habit going\\. 🌱 See you next Monday\\.`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Your good news about ${nomineeName} has been noted — the team will review it!`)}`;
+      const goodNewsLine = nomineeName === 'Unknown'
+        ? `Good news noted — the team will review it!`
+        : `Your good news about ${nomineeName} has been noted — the team will review it!`;
+      msg += `\n\n🌟 ${italic(goodNewsLine)}`;
     }
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
   } else if (levelledUp) {
@@ -527,7 +537,7 @@ async function reflectConversation(conversation, ctx) {
     }
     msg += `⭐ ${bold(`${newPoints} pts`)} total\\. Your plant is growing — and so are you\\. ${newStage}\n\n${italic('See you Monday — your team is counting on the streak.')}`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
+      msg += `\n\n🌟 ${italic(nomineeName === 'Unknown' ? `Good news noted — the team will review it!` : `Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     msg += celebrationLine;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
@@ -539,7 +549,7 @@ async function reflectConversation(conversation, ctx) {
     }
     msg += `\n\nGood work showing up this week\\. 🌱 See you Monday — the whole team is building this together\\.`;
     if (hasGoodNews && nomineeName) {
-      msg += `\n\n🌟 ${italic(`Good news about ${nomineeName} noted — the team will review it!`)}`;
+      msg += `\n\n🌟 ${italic(nomineeName === 'Unknown' ? `Good news noted — the team will review it!` : `Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     msg += celebrationLine;
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
