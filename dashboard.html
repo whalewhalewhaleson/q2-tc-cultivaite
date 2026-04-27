@@ -288,7 +288,7 @@
 
 <div class="tab-bar">
   <div class="tab active" onclick="switchTab('overview',this)">📊 Dashboard</div>
-  <div class="tab" onclick="switchTab('rankings',this)">🏆 Leaderboard</div>
+  <div class="tab" onclick="switchTab('rankings',this)">👥 Members</div>
   <div class="tab" onclick="switchTab('reflections',this)">💬 Reflections</div>
   <div class="tab" id="tab-goodnews" onclick="switchTab('goodnews',this)">🌟 Good News</div>
 </div>
@@ -1391,6 +1391,21 @@ async function submitExtension(name, type, weekNumber) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
+async function moveSubmission(rowIndex, weekNum, name) {
+  const wk = parseInt(weekNum);
+  if (!wk) return;
+  if (!confirm(`Move submission to Week ${wk}? This changes the date in Supabase.`)) return;
+  try {
+    await fetch(`/api/submissions/${rowIndex}/week`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum: wk }),
+    });
+    await refresh();
+    openDrawer(name);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
 async function removeExtensionPrompt(name) {
   const wk = parseInt(prompt(`Remove extension/excuse for ${name}. Enter week number:`));
   if (!wk) return;
@@ -1559,22 +1574,35 @@ async function openDrawer(name) {
     // ── Section 4: Admin ───────────────────────────────────────────────────
     const weekOpts = Array.from({ length: weekNow }, (_, i) => weekNow - i)
       .map(w => `<option value="${w}">Week ${w}</option>`).join('');
-    const extListHtml = myExts.length
+    const excListHtml = myExts.filter(e => e.type === 'excused').length
       ? `<div style="margin-top:10px;font-size:11px;color:#6b7c6b;background:#f5f7f5;border-radius:6px;padding:8px 10px">
-          Current overrides: ${myExts.map(e => `Wk ${e.week_number} (${e.type})`).join(', ')}
+          Excused: ${myExts.filter(e => e.type === 'excused').map(e => `Wk ${e.week_number}`).join(', ')}
           <a href="#" onclick="removeExtensionPrompt(${jAttr(name)});return false" style="color:#c5221f;font-weight:700;margin-left:6px">Remove…</a>
         </div>`
       : '';
+    const moveSubsHtml = subs.length
+      ? subs.slice().reverse().map(s => {
+          const wk = s.weekNum ?? weekNumFromDate(s.date);
+          const fmt = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
+          const sid = `mv-${s.rowIndex}`;
+          return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">
+            <span style="font-weight:700;color:#2d6a4f;min-width:52px">Week ${wk}</span>
+            <span style="color:#6b7c6b">${esc(fmt)} · ${esc(s.time)}</span>
+            <button class="lb-admin-btn" style="margin:0;padding:3px 10px;font-size:11px" onclick="toggleAdminForm('${sid}',this)">Move ▾</button>
+            <div id="${sid}" class="lb-admin-form" style="display:none;flex:1">
+              <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <select id="${sid}-wk" class="lb-admin-select" style="margin:0">${weekOpts}</select>
+                <button class="lb-admin-confirm" style="margin:0" onclick="moveSubmission(${s.rowIndex},document.getElementById('${sid}-wk').value,${jAttr(name)})">Confirm</button>
+                <button class="lb-admin-cancel" style="margin:0" onclick="toggleAdminForm('${sid}',null)">Cancel</button>
+              </div>
+            </div>
+          </div>`;
+        }).join('')
+      : '<div style="color:#8a9a8a;font-size:12px">No submissions yet.</div>';
     const adminHtml = `
-      <button class="lb-admin-btn" onclick="toggleAdminForm('ext-${safeId}',this)">🕐 Grant Extension</button>
-      <div id="ext-${safeId}" class="lb-admin-form" style="display:none">
-        <div style="font-size:11px;font-weight:700;color:#1a2e1a;margin-bottom:6px">Grant extension — week submitted in W+1 counts for W</div>
-        <select id="ext-wk-${safeId}" class="lb-admin-select">${weekOpts}</select>
-        <div style="display:flex;gap:6px;margin-top:8px">
-          <button class="lb-admin-confirm" onclick="submitExtension(${jAttr(name)},'extension',document.getElementById('ext-wk-${safeId}').value)">Confirm</button>
-          <button class="lb-admin-cancel" onclick="toggleAdminForm('ext-${safeId}',null)">Cancel</button>
-        </div>
-      </div>
+      <div style="font-size:10px;font-weight:700;color:#1a2e1a;text-transform:uppercase;letter-spacing:0.6px;margin-bottom:8px">📋 Move Submission</div>
+      ${moveSubsHtml}
+      <div style="margin:14px 0 8px;border-top:1px solid #e4e8e4"></div>
       <button class="lb-admin-btn" onclick="toggleAdminForm('exc-${safeId}',this)">🟠 Excuse Week</button>
       <div id="exc-${safeId}" class="lb-admin-form" style="display:none">
         <div style="font-size:11px;font-weight:700;color:#1a2e1a;margin-bottom:6px">Excuse absence — streak preserved, no points earned</div>
@@ -1584,7 +1612,7 @@ async function openDrawer(name) {
           <button class="lb-admin-cancel" onclick="toggleAdminForm('exc-${safeId}',null)">Cancel</button>
         </div>
       </div>
-      ${extListHtml}`;
+      ${excListHtml}`;
 
     document.getElementById('drawerReflections').innerHTML =
       drawerSection('📅 Week History', weekHistoryHtml, true) +

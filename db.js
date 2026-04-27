@@ -697,6 +697,17 @@ export async function getReflectionsForWeek(weekNum) {
 // Extensions / excuses — admin overrides
 // ---------------------------------------------------------------------------
 
+export async function setSubmissionWeek(id, weekNum) {
+  // Wednesday noon SGT of target week — safely mid-week, never hits Monday boundary
+  const d = new Date(new Date('2026-03-30T16:00:00+08:00').getTime() + ((weekNum - 1) * 7 + 2) * 86400000);
+  const sgtDate = new Date(d.getTime() + 8 * 3600000).toISOString().slice(0, 10);
+  const { error } = await supabase.from('submissions')
+    .update({ date: sgtDate, time: '12:00 PM' })
+    .eq('id', id);
+  if (error) throw error;
+  cacheInvalidate('stats');
+}
+
 export async function grantExtension(realName, weekNumber, type = 'extension') {
   const { error } = await supabase.from('extensions')
     .insert({ real_name: realName, week_number: weekNumber, type });

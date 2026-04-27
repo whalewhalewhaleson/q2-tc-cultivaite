@@ -1992,6 +1992,16 @@ http.createServer(async (req, res) => {
       return jsonRes(res, { ok: true });
     }
 
+    // PATCH /api/submissions/:id/week  — move submission to target week
+    const subWeekM = route.match(/^\/api\/submissions\/(\d+)\/week$/);
+    if (req.method === 'PATCH' && subWeekM) {
+      const body = await parseBody(req);
+      const { weekNum } = body;
+      if (!weekNum) { res.writeHead(400); return res.end('Missing weekNum'); }
+      await sheets.setSubmissionWeek(parseInt(subWeekM[1]), parseInt(weekNum));
+      return jsonRes(res, { ok: true });
+    }
+
     // DELETE /api/extensions  — body: { realName, weekNumber }
     if (req.method === 'DELETE' && route === '/api/extensions') {
       const body = await parseBody(req);
