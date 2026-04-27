@@ -38,6 +38,21 @@ function dateToWeekNumber(dateStr) {
   return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
 }
 
+function dateTimeToWeekNumber(dateStr, timeStr) {
+  // Parse "H:MM AM/PM" from the stored time field for exact week placement
+  const match = (timeStr ?? '').match(/(\d+):(\d+)\s*(AM|PM)/i);
+  let h = 12, m = 0;
+  if (match) {
+    h = parseInt(match[1]); m = parseInt(match[2]);
+    if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+    if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+  }
+  const d = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+08:00`);
+  const ms = d.getTime() - Q2_START.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+}
+
 function currentWeekNumber() {
   const ms = Date.now() - Q2_START.getTime();
   if (ms < 0) return 1;
@@ -476,6 +491,7 @@ export async function getSubmissionsForUser(realName, limit = 5) {
     rowIndex: r.id,
     date:     r.date ?? '',
     time:     r.time ?? '',
+    weekNum:  dateTimeToWeekNumber(r.date ?? '', r.time ?? ''),
     q1:       r.q1  ?? '',
     q2:       r.q2  ?? '',
     q3:       r.q3  ?? '',

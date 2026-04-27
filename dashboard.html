@@ -344,8 +344,18 @@ function weekNumFromDate(dateStr) {
 // Derive week number from a stored timestamp string e.g. "2026-04-20 8:30 PM"
 function weekNumFromTimestamp(ts) {
   if (!ts) return null;
-  const dateStr = String(ts).slice(0, 10); // "YYYY-MM-DD"
-  return weekNumFromDate(dateStr);
+  const s = String(ts);
+  const dateStr = s.slice(0, 10);
+  const timeStr = s.slice(11); // "8:30 PM"
+  const match = timeStr.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (!match) return weekNumFromDate(dateStr);
+  let h = parseInt(match[1]), m = parseInt(match[2]);
+  if (match[3].toUpperCase() === 'PM' && h !== 12) h += 12;
+  if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
+  const d = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+08:00`);
+  const ms = d.getTime() - Q2_START_SGT.getTime();
+  if (ms < 0) return 1;
+  return Math.min(Math.max(Math.floor(ms / (7 * 86400000)) + 1, 1), 13);
 }
 
 function rateClass(pct) {
@@ -1490,7 +1500,7 @@ async function openDrawer(name) {
     // ── Section 2: Reflections ─────────────────────────────────────────────
     const reflHtml = subs.length
       ? subs.slice().reverse().map(s => {
-          const wk  = weekNumFromDate(s.date);
+          const wk  = s.weekNum ?? weekNumFromDate(s.date);
           const fmt = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
           return `<div class="lb-refl-card" onclick="this.classList.toggle('expanded')">
             <div class="lb-refl-header">
