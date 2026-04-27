@@ -1001,6 +1001,52 @@ bot.command('testnudge', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /test1hwarning — admin only, sends the 3PM 1-hour warning to yourself
+// ---------------------------------------------------------------------------
+
+bot.command('test1hwarning', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+
+    const arg = ctx.message?.text?.split(' ')[1]?.replace(/^@/, '').toLowerCase();
+    let targetChatId, targetDisplayName;
+
+    if (arg) {
+      const allUsers = await sheets.getAllUsersWithChatId();
+      const match = allUsers.find(u => u.realName?.toLowerCase().includes(arg));
+      if (!match) {
+        await ctx.reply(`Couldn't find "${arg}" in the system\\.`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = match.chatId;
+      targetDisplayName = match.nickname ?? match.realName;
+    } else {
+      const chatId = ctx.from?.id;
+      const username = ctx.from?.username?.toLowerCase();
+      const user = await lookupUser(chatId, username);
+      if (!user?.realName) {
+        await ctx.reply(`You're not in the system yet\\. Text @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+        return;
+      }
+      targetChatId = chatId;
+      targetDisplayName = await getDisplayName(user.realName);
+    }
+
+    const dn = e(targetDisplayName);
+    const msg = `Hey ${dn}\\! ⏰ 1 hour left to /reflect before the deadline\\! Don't let your streak slip 🌱`;
+    await bot.api.sendMessage(targetChatId, msg, { parse_mode: 'MarkdownV2' });
+
+    if (arg) await ctx.reply(`1h warning sent to ${targetDisplayName} ✅`);
+  } catch (err) {
+    console.error('/test1hwarning error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /testdeadlinenudge — admin only, sends the 4PM deadline-over message to yourself
 // ---------------------------------------------------------------------------
 
@@ -1598,6 +1644,8 @@ bot.command('help', async (ctx) => {
       `/skipweek — 🗓 Excuse a user for a week\n` +
       `/testnudge — 🔔 Preview the Monday morning nudge\n` +
       `  • /testnudge wilson — send to a specific person\n` +
+      `/test1hwarning — ⏳ Preview the Monday 3PM 1\\-hour warning\n` +
+      `  • /test1hwarning wilson — send to a specific person\n` +
       `/testdeadlinenudge — ⏰ Preview the Monday 4PM deadline\\-over nudge\n` +
       `  • /testdeadlinenudge wilson — send to a specific person\n` +
       `/testrecap — 📊 Preview the Friday recap message\n` +
@@ -1613,6 +1661,7 @@ bot.command('help', async (ctx) => {
       `/listaccess — 👥 View who has dashboard access\n` +
       `\n${bold('Automations')}\n` +
       `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
+      `Mon 3PM SGT — 1\\-hour warning to non\\-submitters\n` +
       `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
       `Fri 3:30PM SGT — Weekly recap to everyone\n` +
       `On submit — Dept 100% shoutout \\(first dept to hit 100% that week\\)\n`;
@@ -1710,6 +1759,34 @@ cron.schedule('0 2 * * 1', async () => {
     console.log('[Cron] Monday nudge complete.');
   } catch (err) {
     console.error('[Cron] Nudge error:', err);
+  }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// Monday 3PM 1-hour warning cron — 3:00 PM SGT = 07:00 UTC, every Monday
+// ---------------------------------------------------------------------------
+
+cron.schedule('0 7 * * 1', async () => {
+  if (currentQ2Week() === 1) return;
+  console.log('[Cron] Running 3PM 1-hour warning...');
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    for (const { realName, chatId, nickname } of users) {
+      try {
+        const stats = await sheets.getStatsForUser(realName);
+        if (stats && stats.submittedThisWeek === false) {
+          const dn = e(nickname ?? realName);
+          const msg = `Hey ${dn}\\! ⏰ 1 hour left to /reflect before the deadline\\! Don't let your streak slip 🌱`;
+          await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch (userErr) {
+        console.error(`[Cron] Failed to send 1h warning to ${realName}:`, userErr.message);
+      }
+    }
+    console.log('[Cron] 3PM 1-hour warning complete.');
+  } catch (err) {
+    console.error('[Cron] 3PM 1-hour warning error:', err);
   }
 }, { timezone: 'UTC' });
 
