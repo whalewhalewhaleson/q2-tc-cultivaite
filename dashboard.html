@@ -400,6 +400,8 @@ let _reflCache  = {};   // weekNum → array
 let _reflWeek   = 1;
 let _reflDept   = 'All';
 let _rankView   = 'depts';
+let _rankWeek   = 1;
+let _rankPage   = 1;
 let _dashWeek   = 1;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
@@ -414,6 +416,7 @@ async function init() {
     _gnPending  = gn;
     _gnReviewed = rev;
     _reflWeek   = stats.weekNow;
+    _rankWeek   = stats.weekNow;
     _dashWeek   = stats.weekNow;
 
     document.getElementById('week-chip').textContent = `Week ${stats.weekNow} / 13`;
@@ -451,10 +454,23 @@ function switchTab(name, el) {
 
 function toggleRankings(view, btn) {
   _rankView = view;
+  _rankPage = 1;
   document.getElementById('rdepts').style.display     = view === 'depts' ? 'block' : 'none';
   document.getElementById('rindividuals').style.display = view === 'individuals' ? 'block' : 'none';
   document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
+}
+
+function setRankWeek(n) {
+  if (!_stats) return;
+  _rankWeek = Math.max(_stats.launchWeek ?? 1, Math.min(_stats.weekNow, n));
+  _rankPage = 1;
+  renderRankings();
+}
+
+function setRankPage(p) {
+  _rankPage = p;
+  renderRankings();
 }
 
 // ── GN badge ──────────────────────────────────────────────────────────────
@@ -688,16 +704,46 @@ function renderOverview() {
 function renderRankings() {
   if (!_stats) return;
   const s = _stats;
+  const wk = _rankWeek;
+  const isCurrent = wk === s.weekNow;
+  const launchWk  = s.launchWeek ?? 1;
+  const weekLabel = isCurrent ? `Week ${wk} (Current)` : `Week ${wk}`;
 
-  // Dept table
-  const deptRows = s.depts.map((d, i) => {
+  // Week slider HTML (shared above both sections)
+  const weekSlider = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+      <button onclick="setRankWeek(${wk-1})" ${wk<=launchWk?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk>launchWk?'pointer':'default'};opacity:${wk>launchWk?1:0.35}">‹ Prev</button>
+      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel} / 13</span>
+      <button onclick="setRankWeek(${wk+1})" ${wk>=s.weekNow?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk<s.weekNow?'pointer':'default'};opacity:${wk<s.weekNow?1:0.35}">Next ›</button>
+      ${!isCurrent ? `<button onclick="setRankWeek(${s.weekNow})" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#2d6a4f;margin-left:4px">↩ Current</button>` : ''}
+    </div>`;
+
+  // Compute dept submission rates for selected week
+  const deptWkMap = {};
+  for (const u of s.users) {
+    const depts = [u.department, u.secondaryDepartment].filter(Boolean);
+    const submitted = isCurrent ? u.submittedThisWeek : u.weekHistory?.[wk]?.submitted;
+    for (const dept of depts) {
+      if (!deptWkMap[dept]) deptWkMap[dept] = { submitted: 0, total: 0 };
+      deptWkMap[dept].total++;
+      if (submitted) deptWkMap[dept].submitted++;
+    }
+  }
+
+  // Dept table — ranked by selected week rate
+  const deptsForWk = s.depts.map(d => {
+    const wkData = deptWkMap[d.department] ?? { submitted: 0, total: d.count };
+    return { ...d, wkRate: wkData.total ? Math.round(wkData.submitted / wkData.total * 100) : 0 };
+  }).sort((a, b) => b.wkRate - a.wkRate || b.avgPoints - a.avgPoints);
+
+  const deptRows = deptsForWk.map((d, i) => {
     const q2rate = d.targetSubmissions ? Math.round(d.totalSubmissions / d.targetSubmissions * 100) : 0;
     const streak = d.deptStreak ? `${d.deptStreak} wk 🔥` : '—';
     return `<tr>
       <td>${rankBadge(i+1)}</td>
       <td><div class="cell-name dept-link" onclick="openDeptDrawer(${jAttr(d.department)})">${esc(d.department)}</div>${i===0?'<div class="cell-sub">🥇 Leading this week</div>':''}</td>
       <td style="text-align:center">${d.count}</td>
-      <td>${miniBar(d.thisWeekRate)}</td>
+      <td>${miniBar(d.wkRate)}</td>
       <td style="text-align:center;font-weight:700;${rateTextClass(q2rate)}">${q2rate}%</td>
       <td style="text-align:center;font-weight:700">${streak}</td>
       <td style="text-align:center;font-weight:700">${d.avgPoints}</td>
@@ -705,29 +751,46 @@ function renderRankings() {
     </tr>`;
   }).join('');
 
-  // Individual mini-cards
-  const topPts   = s.users[0]?.totalPoints ?? 0;
-  const maxStreak = Math.max(...s.users.map(u => u.streak), 0);
+  // Individuals — compute week-specific submission status
+  const PAGE_SIZE = 20;
+  const usersWithWkSub = s.users.map(u => ({
+    ...u,
+    submittedWk: isCurrent ? u.submittedThisWeek : !!(u.weekHistory?.[wk]?.submitted),
+  }));
+  const totalPages = Math.max(1, Math.ceil(usersWithWkSub.length / PAGE_SIZE));
+  const page = Math.min(_rankPage, totalPages);
+  const pageUsers = usersWithWkSub.slice((page-1)*PAGE_SIZE, page*PAGE_SIZE);
 
-  // Individual table
-  const indivRows = s.users.map(u => {
+  const topPts    = s.users[0]?.totalPoints ?? 0;
+  const maxStreak = Math.max(...s.users.map(u => u.streak), 0);
+  const submittedWkCount = usersWithWkSub.filter(u => u.submittedWk).length;
+
+  const indivRows = pageUsers.map(u => {
     const ds = displayStage(u.plantStage, u.consecutiveMisses);
-    const rankBadgeHtml = rankBadge(u.rank);
     const streakDots = u.streak > 0
       ? `<span style="font-size:10px;color:#8a9a8a">${u.streak} wk 🔥</span>`
       : '—';
-    return `<tr style="${!u.submittedThisWeek && u.totalPoints === 0 ? 'opacity:0.55' : ''}">
-      <td>${rankBadgeHtml}</td>
+    return `<tr style="${!u.submittedWk && u.totalPoints === 0 ? 'opacity:0.55' : ''}">
+      <td>${rankBadge(u.rank)}</td>
       <td><span class="name-link" onclick="openDrawer(${jAttr(u.realName)})">${esc(u.realName)}</span></td>
       <td><span style="font-size:11px;color:#8a9a8a">${esc(u.department)}</span></td>
       <td style="text-align:center;font-size:18px">${ds}</td>
       <td style="text-align:center;font-weight:700;${u.totalPoints >= 86?'color:#2d6a4f':''}">${u.totalPoints}</td>
       <td style="text-align:center">${streakDots}</td>
-      <td style="text-align:center">${u.submittedThisWeek ? '<span class="sub-yes">✅</span>' : '<span class="sub-no">❌</span>'}</td>
+      <td style="text-align:center">${u.submittedWk ? '<span class="sub-yes">✅</span>' : '<span class="sub-no">❌</span>'}</td>
     </tr>`;
   }).join('');
 
+  // Pagination controls
+  const paginationHtml = totalPages > 1 ? `
+    <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end;margin-bottom:8px">
+      <button onclick="setRankPage(${page-1})" ${page<=1?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:${page>1?'pointer':'default'};opacity:${page>1?1:0.35}">‹</button>
+      <span style="font-size:12px;color:#8a9a8a;font-weight:600">Page ${page} / ${totalPages}</span>
+      <button onclick="setRankPage(${page+1})" ${page>=totalPages?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700;cursor:${page<totalPages?'pointer':'default'};opacity:${page<totalPages?1:0.35}">›</button>
+    </div>` : '';
+
   document.getElementById('sheet-rankings').innerHTML = `
+    ${weekSlider}
     <div class="toggle-bar">
       <button class="toggle-btn ${_rankView==='depts'?'active':''}" onclick="toggleRankings('depts',this)">🏢 Departments</button>
       <button class="toggle-btn ${_rankView==='individuals'?'active':''}" onclick="toggleRankings('individuals',this)">👤 Individuals</button>
@@ -737,7 +800,7 @@ function renderRankings() {
       <table class="data-table">
         <thead><tr>
           <th>Rank</th><th>Department</th><th class="center">Members</th>
-          <th>This Week</th><th class="center">Q2 Rate</th>
+          <th>${isCurrent ? 'This Week' : `Week ${wk}`}</th><th class="center">Q2 Rate</th>
           <th class="center">Streak</th><th class="center">Avg Pts</th><th class="center">Garden</th>
         </tr></thead>
         <tbody>${deptRows}</tbody>
@@ -746,20 +809,22 @@ function renderRankings() {
 
     <div id="rindividuals" style="${_rankView!=='individuals'?'display:none':''}">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a2e1a">${s.submittedThisWeek}</div><div style="font-size:11px;color:#8a9a8a">Submitted this week</div></div>
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a2e1a">${submittedWkCount}</div><div style="font-size:11px;color:#8a9a8a">Submitted ${isCurrent ? 'this week' : `Wk ${wk}`}</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${topPts}</div><div style="font-size:11px;color:#8a9a8a">Top score</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a73e8">${maxStreak}</div><div style="font-size:11px;color:#8a9a8a">Max streak (weeks)</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${_gnPending.length + _gnReviewed.filter(g=>g.status==='Approved').length}</div><div style="font-size:11px;color:#8a9a8a">Good news nominations</div></div>
       </div>
+      ${paginationHtml}
       <table class="data-table">
         <thead><tr>
           <th>Rank</th><th>Name</th><th>Dept</th>
           <th class="center">Plant</th><th class="center">Points</th>
-          <th class="center">Streak</th><th class="center">This Week</th>
+          <th class="center">Streak</th><th class="center">${isCurrent ? 'This Week' : `Wk ${wk}`}</th>
         </tr></thead>
         <tbody>${indivRows}</tbody>
       </table>
-      <div style="text-align:center;color:#8a9a8a;font-size:12px;margin-top:12px">Click any name to view their full profile and reflections</div>
+      ${paginationHtml}
+      <div style="text-align:center;color:#8a9a8a;font-size:12px;margin-top:8px">Click any name to view their full profile · ${usersWithWkSub.length} members · ${PAGE_SIZE}/page</div>
     </div>
   `;
 }
