@@ -397,12 +397,12 @@ let _stats      = null;
 let _gnPending  = [];
 let _gnReviewed = [];
 let _reflCache  = {};   // weekNum → array
-let _reflWeek   = 1;
+let _reflWeek   = null;
 let _reflDept   = 'All';
 let _rankView   = 'depts';
-let _rankWeek   = 1;
+let _rankWeek   = null;
 let _rankPage   = 1;
-let _dashWeek   = 1;
+let _dashWeek   = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function init() {
@@ -415,9 +415,9 @@ async function init() {
     _stats      = stats;
     _gnPending  = gn;
     _gnReviewed = rev;
-    _reflWeek   = stats.weekNow;
-    _rankWeek   = stats.weekNow;
-    _dashWeek   = stats.weekNow;
+    if (_reflWeek === null) _reflWeek = stats.weekNow;
+    if (_rankWeek === null) _rankWeek = stats.weekNow;
+    if (_dashWeek === null) _dashWeek = stats.weekNow;
 
     document.getElementById('week-chip').textContent = `Week ${stats.weekNow} / 13`;
     document.getElementById('updated-at').textContent = `Updated ${new Date().toLocaleTimeString('en-SG', {hour:'2-digit',minute:'2-digit'})}`;
