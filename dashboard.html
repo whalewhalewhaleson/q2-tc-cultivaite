@@ -127,6 +127,9 @@
   .filter-chip:hover { border-color: #2d6a4f; color: #2d6a4f; }
   .filter-chip.active { background: #e3f0e8; border-color: #2d6a4f; color: #2d6a4f; font-weight: 700; }
   .filter-select { background: white; border: 1px solid #cdd5cd; border-radius: 20px; padding: 6px 16px; font-size: 12px; color: #6b7c6b; font-family: inherit; font-weight: 500; }
+  .filter-arrow { background: white; border: 1px solid #cdd5cd; border-radius: 20px; padding: 4px 10px; font-size: 12px; color: #6b7c6b; cursor: pointer; font-family: inherit; transition: all 0.15s; }
+  .filter-arrow:hover:not(:disabled) { border-color: #2d6a4f; color: #2d6a4f; }
+  .filter-arrow:disabled { opacity: 0.35; cursor: default; }
 
   /* ── Dept sections ───────────────────────────────────── */
   .dept-section { margin-bottom: 30px; }
@@ -258,6 +261,7 @@
   .lb-admin-select { width: 100%; padding: 7px 10px; border: 1px solid #d4e6d4; border-radius: 6px; font-size: 13px; color: #1a2e1a; background: white; font-family: inherit; }
   .lb-admin-confirm { padding: 6px 14px; border-radius: 6px; border: 1px solid #40916c; background: #d9f0e0; color: #1b5e3b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
   .lb-admin-cancel { padding: 6px 14px; border-radius: 6px; border: 1px solid #e4e8e4; background: #f0f2f0; color: #6b7c6b; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .ref-card-move { margin-top: 10px; padding-top: 8px; border-top: 1px solid #e8f0e8; }
   @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2,1fr); } .ref-grid { grid-template-columns: 1fr; } .drawer { width: 100%; } }
 </style>
 </head>
@@ -825,6 +829,15 @@ function renderReflections() {
           <div class="ref-q-label q2">Q2 — Role Performance</div>
           <div class="ref-q-text">"${escBr(r.q2)}"</div>
         </div>` : ''}
+        <div class="ref-card-move">
+          <button class="lb-admin-btn" onclick="document.getElementById('rmf-${r.id}').style.display='flex'">Move ▾</button>
+          <div id="rmf-${r.id}" class="lb-admin-form" style="display:none;align-items:center;gap:6px">
+            <span style="font-size:12px;color:#6b7c6b">→ Week:</span>
+            <select id="rms-${r.id}" class="filter-select" style="padding:2px 6px;font-size:12px">${weekOpts}</select>
+            <button class="lb-admin-confirm" onclick="moveSubmission(${r.id},parseInt(document.getElementById('rms-${r.id}').value),${jAttr(r.real_name)})">Confirm</button>
+            <button class="lb-admin-cancel" onclick="document.getElementById('rmf-${r.id}').style.display='none'">Cancel</button>
+          </div>
+        </div>
       </div>`;
     }).join('');
     return `<div class="dept-section">
@@ -840,7 +853,9 @@ function renderReflections() {
   document.getElementById('sheet-reflections').innerHTML = `
     <div class="filter-bar">
       <span style="font-size:12px;color:#6b7c6b;font-weight:600">Week:</span>
+      <button class="filter-arrow" onclick="setReflWeek(Math.max(1,_reflWeek-1))" ${_reflWeek<=1?'disabled':''}>◀</button>
       <select class="filter-select" onchange="setReflWeek(parseInt(this.value))">${weekOpts}</select>
+      <button class="filter-arrow" onclick="setReflWeek(Math.min(${_stats.weekNow},_reflWeek+1))" ${_reflWeek>=_stats.weekNow?'disabled':''}>▶</button>
       ${chips}
       <span style="font-size:11px;color:#8a9a8a;margin-left:auto">Click a name to open full profile →</span>
     </div>

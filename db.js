@@ -683,14 +683,15 @@ export async function getReflectionsForWeek(weekNum) {
 
   const { data, error } = await supabase
     .from('submissions')
-    .select('real_name, department, date, time, q1, q2, q3')
+    .select('id, real_name, department, date, time, q1, q2, q3')
     .gte('date', toSGTDate(startUTC))
     .lte('date', toSGTDate(endUTC))
     .neq('q1', '[Excused absence]')
     .order('department')
     .order('real_name');
   if (error) throw error;
-  return data ?? [];
+  // Post-filter: boundary Monday dates appear in two weeks' date ranges — use time to assign exactly one week
+  return (data ?? []).filter(s => dateTimeToWeekNumber(s.date, s.time ?? '') === weekNum);
 }
 
 // ---------------------------------------------------------------------------
