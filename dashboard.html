@@ -417,6 +417,15 @@ async function init() {
     _myRole = me.role ?? 'admin';
     _myDept = me.dept ?? null;
 
+    // Admin preview: append ?preview=manager&dept=DEPT to simulate manager view
+    if (_myRole === 'admin') {
+      const p = new URLSearchParams(location.search);
+      if (p.get('preview') === 'manager' && p.get('dept')) {
+        _myRole = 'manager';
+        _myDept = p.get('dept');
+      }
+    }
+
     const gnUrl = _myRole === 'manager' && _myDept
       ? `/api/good-news/dept?dept=${encodeURIComponent(_myDept)}`
       : null;
@@ -941,9 +950,26 @@ function renderReflections() {
   }
 
   const userMap = {};
-  for (const u of (_stats.users ?? [])) userMap[u.realName.toLowerCase().trim()] = u;
+  const deptMembersMap = {};
+  for (const u of (_stats.users ?? [])) {
+    userMap[u.realName.toLowerCase().trim()] = u;
+    if (u.department) {
+      if (!deptMembersMap[u.department]) deptMembersMap[u.department] = [];
+      deptMembersMap[u.department].push(u.realName);
+    }
+  }
 
   const sections = Object.entries(byDept).map(([dept, rows]) => {
+    const allMembers = deptMembersMap[dept] ?? [];
+    const submittedNames = new Set(rows.map(r => r.real_name.toLowerCase().trim()));
+    const notSubmitted = allMembers.filter(n => !submittedNames.has(n.toLowerCase().trim()));
+    const total = allMembers.length || rows.length;
+    const metaText = `${rows.length}/${total} reflection${total !== 1 ? 's' : ''} this week`;
+    const missingHtml = notSubmitted.length === 0 ? '' :
+      notSubmitted.length <= 5
+        ? `<div style="flex-basis:100%;padding-left:28px;margin-top:2px;font-size:11px;color:#c0392b">❌ Not yet: ${notSubmitted.map(esc).join(', ')}</div>`
+        : `<div style="flex-basis:100%;padding-left:28px;margin-top:2px;font-size:11px;color:#c0392b"><details><summary style="cursor:pointer">❌ ${notSubmitted.length} not yet submitted — click to see</summary>${notSubmitted.map(esc).join(', ')}</details></div>`;
+
     const cards = rows.map(r => {
       const u = userMap[r.real_name.toLowerCase().trim()] ?? {};
       const ds = displayStage(u.plantStage ?? '🌱', u.consecutiveMisses ?? 0);
@@ -979,10 +1005,11 @@ function renderReflections() {
       </div>`;
     }).join('');
     return `<div class="dept-section">
-      <div class="dept-section-header">
+      <div class="dept-section-header" style="flex-wrap:wrap;gap:4px 10px">
         <span style="font-size:18px">🌿</span>
         <span class="dept-section-name">${esc(dept)}</span>
-        <span class="dept-section-meta">${rows.length} reflection${rows.length!==1?'s':''} this week</span>
+        <span class="dept-section-meta">${metaText}</span>
+        ${missingHtml}
       </div>
       <div class="ref-grid">${cards}</div>
     </div>`;

@@ -1391,6 +1391,51 @@ bot.command('listmanagers', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /testmystats — admin only, preview any user's /mystats output (useful for dual-dept LT/Core Team)
+// ---------------------------------------------------------------------------
+
+bot.command('testmystats', async (ctx) => {
+  if (!isAdmin(ctx)) return ctx.reply('Admin only.');
+  const name = (ctx.message?.text ?? '').slice('/testmystats'.length).trim();
+  if (!name) return ctx.reply('Usage: /testmystats <Real Name>\n\nExample: /testmystats Wilson Tan');
+  try {
+    const user = await getUserByRealName(name);
+    if (!user) return ctx.reply(`❌ "${name}" not found. Check the spelling matches the users table exactly.`);
+
+    const [stats, allUsers, displayName] = await Promise.all([
+      sheets.getStatsForUser(user.realName),
+      sheets.getAllUsersWithChatId(),
+      getDisplayName(user.realName),
+    ]);
+    const weekNum = getWeekNumber();
+    const totalUsers = allUsers.length;
+
+    const deptLine = [user.department, user.secondaryDepartment].filter(Boolean).join(' + ');
+    let msg = `${bold('Preview: /mystats for')} ${e(displayName)}\n${italic(deptLine)} · Week ${weekNum}\n\n`;
+
+    if (!stats) {
+      msg +=
+        `Plant ▸ 🌱 Seedling · 0 pts\n` +
+        `Next ▸ ${mono('○○○○○○○○○○')} 21 pts to 🌿\n\n` +
+        `🔥 Streak ▸ None \\(0 weeks\\)\n` +
+        `❌ Not submitted yet this week\n\n` +
+        `Ready to plant your first seed? /reflect 💧`;
+    } else {
+      msg += buildPlantCard(
+        stats.plantStage, stats.progressPct, stats.streak, stats.submittedThisWeek,
+        stats.totalPoints ?? 0, stats.consecutiveMisses ?? 0,
+        stats.rank || null, totalUsers || null
+      );
+    }
+
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/testmystats error:', err);
+    await ctx.reply('Something went wrong. Check the logs.');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /dashboard — admin + leadership, get live stats summary + dashboard link
 // ---------------------------------------------------------------------------
 
@@ -1713,6 +1758,7 @@ bot.command('help', async (ctx) => {
       `/grantmanager \\<id\\> \\<name\\> — 👔 Grant manager view \\(dept auto\\-detected\\)\n` +
       `/revokemanager \\<id\\> — 🚫 Revoke manager access\n` +
       `/listmanagers — 👥 View all dept managers\n` +
+      `/testmystats \\<name\\> — 🌿 Preview any user's /mystats \\(incl\\. dual\\-dept\\)\n` +
       `\n${bold('Automations')}\n` +
       `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
       `Mon 3PM SGT — 1\\-hour warning to non\\-submitters\n` +
