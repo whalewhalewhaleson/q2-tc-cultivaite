@@ -584,8 +584,18 @@ function renderOverview() {
   const pctCls = subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red';
   const barCls = subPct >= 60 ? 'bar-green' : 'bar-amber';
 
-  // Not submitted this week — group by dept
-  const notSub = s.users.filter(u => !isSubmitted(u));
+  // Late this week (submitted but marked late) — group by dept
+  const isLate = (u) => !!(u.weekHistory?.[wk]?.submitted && u.weekHistory?.[wk]?.late);
+  const latePeople = s.users.filter(isLate);
+  const byDeptLate = {};
+  for (const u of latePeople) {
+    const d = u.department || 'Unknown';
+    if (!byDeptLate[d]) byDeptLate[d] = [];
+    byDeptLate[d].push(u.realName);
+  }
+
+  // Not submitted this week — group by dept (excludes late)
+  const notSub = s.users.filter(u => !isSubmitted(u) && !isLate(u));
   const byDept = {};
   for (const u of notSub) {
     const d = u.department || 'Unknown';
@@ -685,6 +695,17 @@ function renderOverview() {
       </tr></thead>
       <tbody>${deptRows}</tbody>
     </table>
+
+    ${latePeople.length ? `
+    <div class="section-header"><span class="section-title">⏰ Submitted Late</span><span class="section-badge" style="background:#fff3e0;color:#e65100;border-color:#ffcc80">${latePeople.length} people · 5 pts</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      ${Object.entries(byDeptLate).map(([d, ns]) => `
+        <div style="background:white;border-radius:16px;padding:14px 18px;border:1px solid #ffe0b2">
+          <div style="font-weight:700;font-size:12px;color:#1a2e1a;margin-bottom:8px">${esc(d)} <span style="color:#8a9a8a;font-weight:500">(${ns.length})</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${ns.map(n => `<span style="background:#fff3e0;color:#e65100;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600">${esc(n)}</span>`).join('')}</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
 
     ${notSub.length ? `
     <div class="section-header"><span class="section-title">⏳ Haven't Submitted</span><span class="section-badge orange">${notSub.length} people</span></div>
