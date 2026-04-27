@@ -1216,7 +1216,7 @@ bot.command('listaccess', async (ctx) => {
     ].map(id => id.trim()).filter(Boolean);
 
     let msg = '*Dashboard Access List*\n\n';
-    if (envIds.length) msg += `_Env vars (edit in Railway):_\n${envIds.map(id => `• ${id}`).join('\n')}\n\n`;
+    if (envIds.length) msg += `_Env vars \\(edit in Railway\\):_\n${envIds.map(id => `• ${id}`).join('\n')}\n\n`;
     if (rows.length) {
       msg += `_Granted via bot:_\n${rows.map(r => `• ${r.name.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')} — ${r.user_id}`).join('\n')}`;
     } else {
