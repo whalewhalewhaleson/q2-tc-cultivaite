@@ -1442,6 +1442,15 @@ function currentQ2Week() {
 
 bot.command('dashboard', async (ctx) => {
   try {
+    const dashUrl = process.env.DASHBOARD_URL ?? 'Not configured — set DASHBOARD_URL in .env';
+
+    // Managers just get the link — they'll see their dept view after logging in
+    const managerRecord = await getManager(ctx.from?.id);
+    if (managerRecord) {
+      await ctx.reply(`📊 Your department dashboard:\n👉 ${dashUrl}`);
+      return;
+    }
+
     if (!isLeadershipOrAdmin(ctx)) {
       await ctx.reply('Sorry, this command is only available to the leadership team.');
       return;
@@ -1466,7 +1475,6 @@ bot.command('dashboard', async (ctx) => {
 
     const weekNum = currentQ2Week();
     const onTrack = rateThisWeek >= 90 ? '✅ On track' : rateThisWeek >= 70 ? '⚠️ Behind' : '❌ Needs attention';
-    const dashUrl = process.env.DASHBOARD_URL ?? 'Not configured — set DASHBOARD_URL in .env';
 
     await ctx.reply(
       `📊 TC CultivAIte Dashboard — Week ${weekNum} of 13\n\n` +
