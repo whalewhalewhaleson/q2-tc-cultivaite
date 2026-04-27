@@ -578,13 +578,14 @@ function renderOverview() {
   const isCurrent = wk === s.weekNow;
 
   // Compute submission count for the selected week from weekHistory
-  const submittedCount = s.users.filter(u => isCurrent ? u.submittedThisWeek : u.weekHistory[wk]?.submitted).length;
+  const isSubmitted = (u) => isCurrent ? u.submittedThisWeek : (u.weekHistory[wk]?.submitted && !u.weekHistory[wk]?.late);
+  const submittedCount = s.users.filter(isSubmitted).length;
   const subPct = s.totalUsers ? Math.round(submittedCount / s.totalUsers * 100) : 0;
   const pctCls = subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red';
   const barCls = subPct >= 60 ? 'bar-green' : 'bar-amber';
 
   // Not submitted this week — group by dept
-  const notSub = s.users.filter(u => isCurrent ? !u.submittedThisWeek : !u.weekHistory[wk]?.submitted);
+  const notSub = s.users.filter(u => !isSubmitted(u));
   const byDept = {};
   for (const u of notSub) {
     const d = u.department || 'Unknown';
@@ -596,7 +597,7 @@ function renderOverview() {
   const deptWkMap = {};
   for (const u of s.users) {
     const depts = [u.department, u.secondaryDepartment].filter(Boolean);
-    const submitted = isCurrent ? u.submittedThisWeek : u.weekHistory[wk]?.submitted;
+    const submitted = isSubmitted(u);
     for (const dept of depts) {
       if (!deptWkMap[dept]) deptWkMap[dept] = { submitted: 0, total: 0 };
       deptWkMap[dept].total++;
@@ -725,7 +726,7 @@ function renderRankings() {
   const deptWkMap = {};
   for (const u of s.users) {
     const depts = [u.department, u.secondaryDepartment].filter(Boolean);
-    const submitted = isCurrent ? u.submittedThisWeek : u.weekHistory?.[wk]?.submitted;
+    const submitted = isCurrent ? u.submittedThisWeek : (u.weekHistory?.[wk]?.submitted && !u.weekHistory?.[wk]?.late);
     for (const dept of depts) {
       if (!deptWkMap[dept]) deptWkMap[dept] = { submitted: 0, total: 0 };
       deptWkMap[dept].total++;
@@ -758,7 +759,7 @@ function renderRankings() {
   const PAGE_SIZE = 20;
   const usersWithWkSub = s.users.map(u => ({
     ...u,
-    submittedWk: isCurrent ? u.submittedThisWeek : !!(u.weekHistory?.[wk]?.submitted),
+    submittedWk: isCurrent ? u.submittedThisWeek : !!(u.weekHistory?.[wk]?.submitted && !u.weekHistory?.[wk]?.late),
   }));
   const totalPages = Math.max(1, Math.ceil(usersWithWkSub.length / PAGE_SIZE));
   const page = Math.min(_rankPage, totalPages);
@@ -1398,8 +1399,11 @@ function openDeptDrawer(deptName) {
 
   const wk = _dashWeek;
   const isCurrent = wk === _stats.weekNow;
-  const submitted = activeMembers.filter(u => isCurrent ? u.submittedThisWeek : u.weekHistory?.[wk]?.submitted);
-  const notSubmitted = activeMembers.filter(u => isCurrent ? !u.submittedThisWeek : !u.weekHistory?.[wk]?.submitted);
+  const isOnTime = (u) => isCurrent ? u.submittedThisWeek : (u.weekHistory?.[wk]?.submitted && !u.weekHistory?.[wk]?.late);
+  const isLate   = (u) => isCurrent ? false : (u.weekHistory?.[wk]?.submitted && !!u.weekHistory?.[wk]?.late);
+  const submitted    = activeMembers.filter(isOnTime);
+  const lateMembers  = activeMembers.filter(isLate);
+  const notSubmitted = activeMembers.filter(u => !isOnTime(u) && !isLate(u));
   const q2rate = dept.targetSubmissions ? Math.round(dept.totalSubmissions / dept.targetSubmissions * 100) : 0;
   const streak = dept.deptStreak ? `${dept.deptStreak} wk 🔥` : '—';
 
@@ -1431,11 +1435,13 @@ function openDeptDrawer(deptName) {
   document.getElementById('drawerGoal').innerHTML = `
     <div style="background:#edf7ef;border-radius:10px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
       <span style="font-size:13px;color:#2d6a4f;font-weight:600">${isCurrent ? 'This week' : `Week ${wk}`}</span>
-      <span style="font-size:18px;font-weight:800;color:#1a2e1a">${submitted.length} / ${activeMembers.length} submitted</span>
+      <span style="font-size:18px;font-weight:800;color:#1a2e1a">${submitted.length} / ${activeMembers.length} on time${lateMembers.length > 0 ? ` · ${lateMembers.length} late` : ''}</span>
     </div>`;
 
+  const lateMembersHtml = lateMembers.sort((a,b) => b.totalPoints - a.totalPoints).map(u => memberRow(u, true)).join('');
   document.getElementById('drawerReflections').innerHTML = `
-    ${submitted.length > 0 ? `<div class="dept-section-label">Submitted ✅ (${submitted.length})</div>${submittedHtml}` : ''}
+    ${submitted.length > 0 ? `<div class="dept-section-label">On time ✅ (${submitted.length})</div>${submittedHtml}` : ''}
+    ${lateMembers.length > 0 ? `<div class="dept-section-label" style="color:#e65100">Late ⏰ (${lateMembers.length}) · 5 pts</div>${lateMembersHtml}` : ''}
     ${notSubmitted.length > 0 ? `<div class="dept-section-label">Not yet ❌ (${notSubmitted.length})</div>${notSubmittedHtml}` : ''}
     ${inactiveHtml}`;
 

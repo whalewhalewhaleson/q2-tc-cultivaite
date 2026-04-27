@@ -196,7 +196,7 @@ async function buildStatsCache() {
       for (let wk = launchWeek; wk <= weekNow; wk++) {
         if (!deptWeekRate[dept][wk]) deptWeekRate[dept][wk] = { submitted: 0, total: 0 };
         deptWeekRate[dept][wk].total++;
-        if (userWeekMap[name]?.[wk]?.submitted) deptWeekRate[dept][wk].submitted++;
+        if (userWeekMap[name]?.[wk]?.submitted && !userWeekMap[name]?.[wk]?.late) deptWeekRate[dept][wk].submitted++;
       }
     }
   }
@@ -278,7 +278,7 @@ async function buildStatsCache() {
 
     totalPoints += goodNewsBonus[name] ?? 0;
 
-    const submittedThisWeek = weekMap[weekNow]?.submitted ?? false;
+    const submittedThisWeek = (weekMap[weekNow]?.submitted && !weekMap[weekNow]?.late) ?? false;
     const plantStage        = pointsToStage(totalPoints);
     const progressPct       = stageProgressPct(totalPoints);
 

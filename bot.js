@@ -1658,6 +1658,34 @@ cron.schedule('0 2 * * 1', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
+// Monday 4PM deadline cron — 4:00 PM SGT = 08:00 UTC, every Monday
+// ---------------------------------------------------------------------------
+
+cron.schedule('0 8 * * 1', async () => {
+  if (currentQ2Week() === 1) return;
+  console.log('[Cron] Running 4PM deadline nudge...');
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    for (const { realName, chatId, nickname } of users) {
+      try {
+        const stats = await sheets.getStatsForUser(realName);
+        if (stats && stats.submittedThisWeek === false) {
+          const dn = e(nickname ?? realName);
+          const msg = `Hey ${dn}\\! This week's deadline has just passed 🌧️\n\nNo worries — you can still /reflect and earn 5 pts\\! Better late than never 🌱\n\nAny questions\\? Text @whalewhalewhalee\\.`;
+          await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch (userErr) {
+        console.error(`[Cron] Failed to send deadline nudge to ${realName}:`, userErr.message);
+      }
+    }
+    console.log('[Cron] 4PM deadline nudge complete.');
+  } catch (err) {
+    console.error('[Cron] 4PM deadline nudge error:', err);
+  }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
 // Friday recap cron — 3:30 PM SGT = 07:30 UTC, every Friday
 // ---------------------------------------------------------------------------
 
