@@ -122,11 +122,12 @@ async function buildStatsCache() {
   if (cached) return cached;
 
   // Fetch all data in parallel
-  const [{ data: allSubs }, { data: approvedNews }, { data: gnAwards }, { data: allUsers }] = await Promise.all([
+  const [{ data: allSubs }, { data: approvedNews }, { data: gnAwards }, { data: allUsers }, { data: lateRows }] = await Promise.all([
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
     supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee').eq('status', 'Approved'),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
     supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active'),
+    supabase.from('late_submissions').select('real_name, week_number'),
   ]);
 
   const subs     = allSubs      ?? [];
@@ -151,7 +152,7 @@ async function buildStatsCache() {
   const userWeekMap = {}; // lc_name → Map<weekNum, { submitted, excused }>
   for (const sub of subs) {
     const name = String(sub.real_name ?? '').toLowerCase().trim();
-    const wk   = dateToWeekNumber(sub.date);
+    const wk   = dateTimeToWeekNumber(sub.date, sub.time);
     if (!userWeekMap[name]) userWeekMap[name] = {};
     const excused = sub.q1 === '[Excused absence]';
     userWeekMap[name][wk] = { submitted: true, excused };
@@ -173,6 +174,14 @@ async function buildStatsCache() {
         userWeekMap[name][wk] = { ...userWeekMap[name][wk + 1], extended: true };
         delete userWeekMap[name][wk + 1];
       }
+    }
+  }
+
+  // Mark late submissions
+  for (const lr of (lateRows ?? [])) {
+    const name = lr.real_name.toLowerCase().trim();
+    if (userWeekMap[name]?.[lr.week_number]) {
+      userWeekMap[name][lr.week_number].late = true;
     }
   }
 
@@ -244,7 +253,11 @@ async function buildStatsCache() {
       const entry = weekMap[wk];
       if (entry?.submitted) {
         consecutiveMisses = 0;
-        if (!entry.excused) {
+        if (entry.late) {
+          // Late submission: flat 5 pts, streak resets
+          currentStreak = 0;
+          totalPoints += 5;
+        } else if (!entry.excused) {
           // Base pts
           currentStreak++;
           let weekPts = 10 + (currentStreak - 1); // base 10 + streak bonus
@@ -681,17 +694,22 @@ export async function getReflectionsForWeek(weekNum) {
   const endUTC       = startUTC + 7 * DAY_MS - 1;
   const toSGTDate    = ms => new Date(ms + 8 * 3600000).toISOString().slice(0, 10);
 
-  const { data, error } = await supabase
-    .from('submissions')
-    .select('id, real_name, department, date, time, q1, q2, q3')
-    .gte('date', toSGTDate(startUTC))
-    .lte('date', toSGTDate(endUTC))
-    .neq('q1', '[Excused absence]')
-    .order('department')
-    .order('real_name');
+  const [{ data, error }, { data: lateData }] = await Promise.all([
+    supabase.from('submissions')
+      .select('id, real_name, department, date, time, q1, q2, q3')
+      .gte('date', toSGTDate(startUTC))
+      .lte('date', toSGTDate(endUTC))
+      .neq('q1', '[Excused absence]')
+      .order('department')
+      .order('real_name'),
+    supabase.from('late_submissions').select('real_name').eq('week_number', weekNum),
+  ]);
   if (error) throw error;
+  const lateSet = new Set((lateData ?? []).map(r => r.real_name.toLowerCase().trim()));
   // Post-filter: boundary Monday dates appear in two weeks' date ranges — use time to assign exactly one week
-  return (data ?? []).filter(s => dateTimeToWeekNumber(s.date, s.time ?? '') === weekNum);
+  return (data ?? [])
+    .filter(s => dateTimeToWeekNumber(s.date, s.time ?? '') === weekNum)
+    .map(s => ({ ...s, late: lateSet.has(s.real_name.toLowerCase().trim()) }));
 }
 
 // ---------------------------------------------------------------------------
@@ -721,6 +739,20 @@ export async function removeExtension(realName, weekNumber) {
     .delete().eq('real_name', realName).eq('week_number', weekNumber);
   if (error) throw error;
   cacheInvalidate('stats');
+}
+
+export async function toggleLateSubmission(realName, weekNumber) {
+  const { data } = await supabase.from('late_submissions')
+    .select('id').eq('real_name', realName).eq('week_number', weekNumber).maybeSingle();
+  if (data) {
+    const { error } = await supabase.from('late_submissions').delete().eq('id', data.id);
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from('late_submissions').insert({ real_name: realName, week_number: weekNumber });
+    if (error) throw error;
+  }
+  cacheInvalidate('stats');
+  return { late: !data };
 }
 
 export async function listExtensions() {
