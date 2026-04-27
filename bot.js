@@ -1347,14 +1347,11 @@ bot.command('listaccess', async (ctx) => {
 
 bot.command('grantmanager', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('Admin only.');
-  // Usage: /grantmanager <user_id> <Real Name>
-  const args = (ctx.message?.text ?? '').slice('/grantmanager'.length).trim().split(/\s+/);
-  const userId = args[0];
-  const name   = args.slice(1).join(' ');
-  if (!userId || !name) return ctx.reply('Usage: /grantmanager <user_id> <Real Name>\n\nExample: /grantmanager 123456789 Jane Doe\n\nTo get a Telegram user ID, have them message @userinfobot.');
+  const userId = (ctx.message?.text ?? '').slice('/grantmanager'.length).trim();
+  if (!userId) return ctx.reply('Usage: /grantmanager <user_id>\n\nExample: /grantmanager 123456789\n\nTo get a Telegram user ID, have them message @userinfobot.');
   try {
-    const user = await getUserByRealName(name);
-    if (!user) return ctx.reply(`❌ "${name}" not found in the users table. Check the spelling matches exactly.`);
+    const user = await getUserByChatId(userId);
+    if (!user) return ctx.reply(`❌ No user found with Telegram ID ${userId}. Make sure they've started the bot first.`);
     await addManager(userId, user.realName, user.department);
     await ctx.reply(`✅ ${user.realName} granted manager access for the ${user.department} department.`);
   } catch (err) {
@@ -1755,7 +1752,7 @@ bot.command('help', async (ctx) => {
       `/grantaccess \\<id\\> \\<name\\> — 🔑 Grant dashboard access\n` +
       `/revokeaccess \\<id\\> — 🚫 Revoke dashboard access\n` +
       `/listaccess — 👥 View who has dashboard access\n` +
-      `/grantmanager \\<id\\> \\<name\\> — 👔 Grant manager view \\(dept auto\\-detected\\)\n` +
+      `/grantmanager \\<id\\> — 👔 Grant manager view \\(name \\+ dept auto\\-detected\\)\n` +
       `/revokemanager \\<id\\> — 🚫 Revoke manager access\n` +
       `/listmanagers — 👥 View all dept managers\n` +
       `/testmystats \\<name\\> — 🌿 Preview any user's /mystats \\(incl\\. dual\\-dept\\)\n` +
