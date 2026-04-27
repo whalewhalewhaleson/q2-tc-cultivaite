@@ -1541,7 +1541,10 @@ bot.command('help', async (ctx) => {
       `  • /broadcast me \\<msg\\> — test send to yourself\n` +
       `  • /broadcast all \\<msg\\> — send to everyone\n` +
       `  • /broadcast \\<Name\\> \\<msg\\> — send to one person\n` +
-      `/dashboard — 📊 Live stats summary \\+ dashboard link\n`;
+      `/dashboard — 📊 Live stats summary \\+ dashboard link\n` +
+      `/grantaccess \\<id\\> \\<name\\> — 🔑 Grant dashboard access\n` +
+      `/revokeaccess \\<id\\> — 🚫 Revoke dashboard access\n` +
+      `/listaccess — 👥 View who has dashboard access\n`;
   }
 
   msg += `\n${italic('Reflect weekly. Grow together.')}`;
