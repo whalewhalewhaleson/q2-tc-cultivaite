@@ -9,7 +9,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
 import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
-         getManager, addManager, removeManager, listManagers, getGoodNewsByDept } from './db.js';
+         getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
+         getUserByRealName } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1346,15 +1347,16 @@ bot.command('listaccess', async (ctx) => {
 
 bot.command('grantmanager', async (ctx) => {
   if (!isAdmin(ctx)) return ctx.reply('Admin only.');
-  // Usage: /grantmanager <user_id> <DEPT> <Real Name>
+  // Usage: /grantmanager <user_id> <Real Name>
   const args = (ctx.message?.text ?? '').slice('/grantmanager'.length).trim().split(/\s+/);
   const userId = args[0];
-  const dept   = args[1];
-  const name   = args.slice(2).join(' ');
-  if (!userId || !dept || !name) return ctx.reply('Usage: /grantmanager <user_id> <DEPT> <Real Name>\n\nExample: /grantmanager 123456789 SM Jane Doe\n\nTo get a Telegram user ID, have them message @userinfobot.');
+  const name   = args.slice(1).join(' ');
+  if (!userId || !name) return ctx.reply('Usage: /grantmanager <user_id> <Real Name>\n\nExample: /grantmanager 123456789 Jane Doe\n\nTo get a Telegram user ID, have them message @userinfobot.');
   try {
-    await addManager(userId, name, dept);
-    await ctx.reply(`✅ ${name} granted manager access for the ${dept} department.`);
+    const user = await getUserByRealName(name);
+    if (!user) return ctx.reply(`❌ "${name}" not found in the users table. Check the spelling matches exactly.`);
+    await addManager(userId, user.realName, user.department);
+    await ctx.reply(`✅ ${user.realName} granted manager access for the ${user.department} department.`);
   } catch (err) {
     console.error('/grantmanager error:', err);
     await ctx.reply('Something went wrong. Check the logs.');
@@ -1708,7 +1710,7 @@ bot.command('help', async (ctx) => {
       `/grantaccess \\<id\\> \\<name\\> — 🔑 Grant dashboard access\n` +
       `/revokeaccess \\<id\\> — 🚫 Revoke dashboard access\n` +
       `/listaccess — 👥 View who has dashboard access\n` +
-      `/grantmanager \\<id\\> \\<DEPT\\> \\<name\\> — 👔 Grant manager view for a dept\n` +
+      `/grantmanager \\<id\\> \\<name\\> — 👔 Grant manager view \\(dept auto\\-detected\\)\n` +
       `/revokemanager \\<id\\> — 🚫 Revoke manager access\n` +
       `/listmanagers — 👥 View all dept managers\n` +
       `\n${bold('Automations')}\n` +
