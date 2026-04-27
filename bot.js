@@ -1218,7 +1218,7 @@ bot.command('listaccess', async (ctx) => {
     let msg = '*Dashboard Access List*\n\n';
     if (envIds.length) msg += `_Env vars (edit in Railway):_\n${envIds.map(id => `• ${id}`).join('\n')}\n\n`;
     if (rows.length) {
-      msg += `_Granted via bot:_\n${rows.map(r => `• ${r.name} (${r.user_id})`).join('\n')}`;
+      msg += `_Granted via bot:_\n${rows.map(r => `• ${r.name.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')} — ${r.user_id}`).join('\n')}`;
     } else {
       msg += '_No users granted via bot yet\\._';
     }
