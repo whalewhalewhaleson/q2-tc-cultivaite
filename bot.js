@@ -2199,13 +2199,13 @@ http.createServer(async (req, res) => {
 
     // GET /api/good-news/pending
     if (req.method === 'GET' && route === '/api/good-news/pending') {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       return jsonRes(res, await sheets.getPendingGoodNews());
     }
 
     // GET /api/good-news/reviewed  — approved + rejected rows for the edit-after-approval flow
     if (req.method === 'GET' && route === '/api/good-news/reviewed') {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       return jsonRes(res, await sheets.getReviewedGoodNews());
     }
 
@@ -2219,7 +2219,7 @@ http.createServer(async (req, res) => {
     // POST /api/good-news/:id/approve
     const approveM = route.match(/^\/api\/good-news\/(\d+)\/approve$/);
     if (req.method === 'POST' && approveM) {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
       await sheets.approveGoodNews(parseInt(approveM[1]), body.awards ?? []);
       return jsonRes(res, { ok: true });
@@ -2228,7 +2228,7 @@ http.createServer(async (req, res) => {
     // POST /api/good-news/:id/reject
     const rejectM = route.match(/^\/api\/good-news\/(\d+)\/reject$/);
     if (req.method === 'POST' && rejectM) {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       await sheets.rejectGoodNews(parseInt(rejectM[1]));
       return jsonRes(res, { ok: true });
     }
@@ -2236,7 +2236,7 @@ http.createServer(async (req, res) => {
     // POST /api/good-news/:id/re-approve  — change awards on an already-approved row
     const reapproveM = route.match(/^\/api\/good-news\/(\d+)\/re-approve$/);
     if (req.method === 'POST' && reapproveM) {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
       await sheets.reapproveGoodNews(parseInt(reapproveM[1]), body.awards ?? []);
       return jsonRes(res, { ok: true });
@@ -2245,7 +2245,7 @@ http.createServer(async (req, res) => {
     // POST /api/good-news/:id/un-reject  — flip a rejected row back to pending
     const unRejectM = route.match(/^\/api\/good-news\/(\d+)\/un-reject$/);
     if (req.method === 'POST' && unRejectM) {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       await sheets.unRejectGoodNews(parseInt(unRejectM[1]));
       return jsonRes(res, { ok: true });
     }
@@ -2310,7 +2310,7 @@ http.createServer(async (req, res) => {
 
     // POST /api/late  — body: { realName, weekNumber }  — toggle late flag
     if (req.method === 'POST' && route === '/api/late') {
-      if (user.role !== 'admin') return jsonRes(res, { error: 'Admin only' }, 403);
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
       const { realName, weekNumber } = body;
       if (!realName || !weekNumber) { res.writeHead(400); return res.end('Missing realName or weekNumber'); }
