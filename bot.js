@@ -2179,7 +2179,8 @@ http.createServer(async (req, res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
   }
 
-  if (!getSessionUser(req)) {
+  const user = getSessionUser(req);
+  if (!user) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
@@ -2188,7 +2189,6 @@ http.createServer(async (req, res) => {
   try {
     // GET /api/me — returns role + dept from session cookie
     if (req.method === 'GET' && route === '/api/me') {
-      const user = getSessionUser(req);
       return jsonRes(res, { role: user.role ?? 'admin', dept: user.dept ?? null, name: user.name ?? '' });
     }
 
