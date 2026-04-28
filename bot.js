@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
 import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
-         getUserByRealName } from './db.js';
+         getUserByRealName, getUserByChatId } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
