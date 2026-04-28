@@ -265,6 +265,7 @@
   .late-btn { background: #fff8e1; border: 1px solid #f9a825; color: #e65100; }
   .late-btn:hover { background: #fff3cd; }
   .late-btn.active { background: #e65100; border-color: #e65100; color: white; }
+  .late-badge { display:inline-block; font-size:11px; font-weight:700; padding:3px 8px; border-radius:6px; background:#e65100; color:#fff; }
   @media (max-width: 900px) { .kpi-row { grid-template-columns: repeat(2,1fr); } .ref-grid { grid-template-columns: 1fr; } .drawer { width: 100%; } }
 </style>
 </head>
@@ -1009,7 +1010,7 @@ function renderReflections() {
             <button class="lb-admin-confirm" onclick="moveSubmission(${r.id},parseInt(document.getElementById('rms-${r.id}').value),${jAttr(r.real_name)})">Confirm</button>
             <button class="lb-admin-cancel" onclick="document.getElementById('rmf-${r.id}').style.display='none'">Cancel</button>
           </div>
-        </div>` : ''}
+        </div>` : r.late ? `<span class="late-badge">⏰ Late</span>` : ''}
       </div>`;
     }).join('');
     return `<div class="dept-section">
