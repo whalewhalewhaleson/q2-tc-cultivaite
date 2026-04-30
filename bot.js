@@ -2288,13 +2288,11 @@ http.createServer(async (req, res) => {
 
     // GET /api/good-news/pending
     if (req.method === 'GET' && route === '/api/good-news/pending') {
-      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       return jsonRes(res, await sheets.getPendingGoodNews());
     }
 
     // GET /api/good-news/reviewed  — approved + rejected rows for the edit-after-approval flow
     if (req.method === 'GET' && route === '/api/good-news/reviewed') {
-      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       return jsonRes(res, await sheets.getReviewedGoodNews());
     }
 

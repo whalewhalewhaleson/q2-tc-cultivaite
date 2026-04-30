@@ -436,16 +436,10 @@ async function init() {
 
     const [stats, gnData] = await Promise.all([
       fetch('/api/stats').then(r => r.json()),
-      mgrDepts.length > 0
-        ? Promise.all(mgrDepts.map(d => fetch(`/api/good-news/dept?dept=${encodeURIComponent(d)}`).then(r => r.json())))
-            .then(results => ({
-              pending:  results.flatMap(r => r.pending ?? []),
-              reviewed: results.flatMap(r => r.reviewed ?? []),
-            }))
-        : Promise.all([
-            fetch('/api/good-news/pending').then(r => r.json()),
-            fetch('/api/good-news/reviewed').then(r => r.json()),
-          ]).then(([p, v]) => ({ pending: p, reviewed: v })),
+      Promise.all([
+        fetch('/api/good-news/pending').then(r => r.json()),
+        fetch('/api/good-news/reviewed').then(r => r.json()),
+      ]).then(([p, v]) => ({ pending: p, reviewed: v })),
     ]);
 
     _stats      = stats;
