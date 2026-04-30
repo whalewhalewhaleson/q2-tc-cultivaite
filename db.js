@@ -717,6 +717,13 @@ export async function getReflectionsForWeek(weekNum) {
 // ---------------------------------------------------------------------------
 
 export async function setSubmissionWeek(id, weekNum) {
+  const { data: sub, error: fetchErr } = await supabase.from('submissions')
+    .select('real_name, date').eq('id', id).maybeSingle();
+  if (fetchErr) throw fetchErr;
+  if (!sub) throw new Error('Submission not found');
+
+  const oldWeek = dateToWeekNumber(sub.date);
+
   // Wednesday noon SGT of target week — safely mid-week, never hits Monday boundary
   const d = new Date(new Date('2026-03-30T16:00:00+08:00').getTime() + ((weekNum - 1) * 7 + 2) * 86400000);
   const sgtDate = new Date(d.getTime() + 8 * 3600000).toISOString().slice(0, 10);
@@ -724,6 +731,17 @@ export async function setSubmissionWeek(id, weekNum) {
     .update({ date: sgtDate, time: '12:00 PM' })
     .eq('id', id);
   if (error) throw error;
+
+  if (oldWeek !== weekNum) {
+    const { data: lateEntry } = await supabase.from('late_submissions')
+      .select('id').eq('real_name', sub.real_name).eq('week_number', oldWeek).maybeSingle();
+    if (lateEntry) {
+      await supabase.from('late_submissions').delete().eq('id', lateEntry.id);
+      await supabase.from('late_submissions')
+        .upsert({ real_name: sub.real_name, week_number: weekNum }, { onConflict: 'real_name,week_number' });
+    }
+  }
+
   cacheInvalidate('stats');
 }
 
