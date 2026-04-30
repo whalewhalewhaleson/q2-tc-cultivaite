@@ -847,12 +847,12 @@ export async function getGoodNewsByDept(dept) {
     supabase.from('good_news')
       .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer')
       .eq('status', 'Pending')
-      .or(`nominator_dept.eq.${dept},nominee_dept.eq.${dept}`)
+      .or(`nominator_dept.eq."${dept}",nominee_dept.eq."${dept}"`)
       .order('timestamp', { ascending: true }),
     supabase.from('good_news')
       .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status')
       .in('status', ['Approved', 'Rejected'])
-      .or(`nominator_dept.eq.${dept},nominee_dept.eq.${dept}`)
+      .or(`nominator_dept.eq."${dept}",nominee_dept.eq."${dept}"`)
       .order('timestamp', { ascending: false }),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
   ]);
