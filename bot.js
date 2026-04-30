@@ -73,11 +73,17 @@ function resolveDisplayStage(plantStage, consecutiveMisses) {
   return plantStage;
 }
 
-function buildRecapMessage(displayName, week, stats, totalUsers, deptName, deptStats) {
-  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
+function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts) {
+  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n`;
+
+  if (!stats.submittedThisWeek) {
+    msg += `Haven't reflected yet\\? /reflect when you're ready\\! 🌳🍎\n`;
+  }
+
+  msg += `\n`;
 
   if (stats.consecutiveMisses >= 1) {
-    msg += `🍂 Your plant could use some water — /reflect is always open\n`;
+    msg += `🍂 Your plant could use some water\n`;
   } else {
     const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
     const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
@@ -88,20 +94,14 @@ function buildRecapMessage(displayName, week, stats, totalUsers, deptName, deptS
     msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
   }
 
-  const others = totalUsers - 1;
   if (stats.rank <= 3) {
-    msg += `📊 \\#${e(String(stats.rank))} with ${e(String(others))} others 👑\n`;
+    msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))} 👑\n`;
   } else {
-    msg += `📊 \\#${e(String(stats.rank))} with ${e(String(others))} others\n`;
+    msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))}\n`;
   }
 
-  if (deptStats && deptName) {
-    const deptStageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
-    msg += `🏡 ${e(deptName)} — ${deptStats.gardenStage} ${e(deptStageName)} · ${e(String(deptStats.avgPoints))} avg pts\n`;
-  }
-
-  if (!stats.submittedThisWeek) {
-    msg += `\nHaven't reflected yet\\? /reflect when you're ready 🌱\n`;
+  if (deptRank != null && totalDepts != null && deptAvgPts != null) {
+    msg += `🏡 \\#${e(String(deptRank))} out of ${e(String(totalDepts))} · ${e(String(deptAvgPts))} avg pts\n`;
   }
 
   msg += `\n→ /mystats · /leaderboard · /department`;
@@ -1159,9 +1159,13 @@ bot.command('testrecap', async (ctx) => {
     const totalUsers = allStats.length;
     const week = currentQ2Week();
     const displayName = await getDisplayName(user.realName);
-    const dept = user.department ?? null;
-    const deptStats = dept ? await sheets.getDeptStats(dept) : null;
-    const msg = buildRecapMessage(displayName, week, stats, totalUsers, dept, deptStats);
+    const allDepts = await sheets.getAllDeptStats();
+    const deptsSorted = [...allDepts].sort((a, b) => b.avgPoints - a.avgPoints);
+    const totalDepts = deptsSorted.length;
+    const deptKey = user.department?.toLowerCase();
+    const deptRank = deptKey ? (deptsSorted.findIndex(d => d.department.toLowerCase() === deptKey) + 1 || null) : null;
+    const deptAvgPts = deptKey ? (deptsSorted.find(d => d.department.toLowerCase() === deptKey)?.avgPoints ?? null) : null;
+    const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts);
 
     await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -1979,14 +1983,24 @@ async function runRecapBroadcast() {
     const allStats = await sheets.getAllUserStats();
     const totalUsers = allStats.length;
 
+    const allDepts = await sheets.getAllDeptStats();
+    const deptsSorted = [...allDepts].sort((a, b) => b.avgPoints - a.avgPoints);
+    const totalDepts = deptsSorted.length;
+    const deptRankMap = {};
+    for (let i = 0; i < deptsSorted.length; i++) {
+      deptRankMap[deptsSorted[i].department.toLowerCase()] = i + 1;
+    }
+
     for (const { realName, chatId, nickname, department } of users) {
       try {
         const stats = await sheets.getStatsForUser(realName);
         if (!stats) continue;
 
         const displayName = nickname ?? realName;
-        const deptStats = department ? await sheets.getDeptStats(department) : null;
-        const msg = buildRecapMessage(displayName, week, stats, totalUsers, department, deptStats);
+        const deptKey = department?.toLowerCase();
+        const deptRank = deptKey ? (deptRankMap[deptKey] ?? null) : null;
+        const deptAvgPts = deptKey ? (deptsSorted.find(d => d.department.toLowerCase() === deptKey)?.avgPoints ?? null) : null;
+        const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts);
 
         await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
         await new Promise(r => setTimeout(r, 200));
