@@ -1393,8 +1393,11 @@ bot.command('grantmanager', async (ctx) => {
   try {
     const user = await getUserByChatId(userId);
     if (!user) return ctx.reply(`❌ No user found with Telegram ID ${userId}. Make sure they've started the bot first.`);
-    await addManager(userId, user.realName, user.department);
-    await ctx.reply(`✅ ${user.realName} granted manager access for the ${user.department} department.`);
+    await addManager(userId, user.realName, user.department, user.secondaryDepartment);
+    const deptLabel = user.secondaryDepartment
+      ? `${user.department} + ${user.secondaryDepartment} departments`
+      : `${user.department} department`;
+    await ctx.reply(`✅ ${user.realName} granted manager access for the ${deptLabel}.`);
   } catch (err) {
     console.error('/grantmanager error:', err);
     await ctx.reply('Something went wrong. Check the logs.');
@@ -1420,7 +1423,11 @@ bot.command('listmanagers', async (ctx) => {
   try {
     const rows = await listManagers();
     if (!rows.length) return ctx.reply('No managers granted yet.');
-    const lines = rows.map(r => `• ${r.real_name.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')} \\(${r.department.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')}\\) — ${r.telegram_id}`).join('\n');
+    const lines = rows.map(r => {
+      const name = r.real_name.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&');
+      const depts = [r.department, r.secondary_department].filter(Boolean).map(d => d.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&')).join(' \\+ ');
+      return `• ${name} \\(${depts}\\) — ${r.telegram_id}`;
+    }).join('\n');
     await ctx.reply(`*Manager Access List*\n\n${lines}`, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/listmanagers error:', err);
@@ -2098,8 +2105,8 @@ function verifyTelegramLogin(params) {
   return true;
 }
 
-function signCookie(userId, firstName, role = 'admin', dept = null) {
-  const payload = JSON.stringify({ id: userId, name: firstName, role, dept, ts: Date.now() });
+function signCookie(userId, firstName, role = 'admin', dept = null, dept2 = null) {
+  const payload = JSON.stringify({ id: userId, name: firstName, role, dept, dept2: dept2 || null, ts: Date.now() });
   const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
   return `${Buffer.from(payload).toString('base64')}.${sig}`;
 }
@@ -2222,7 +2229,8 @@ http.createServer(async (req, res) => {
     }
     const role   = isAllowedAdmin ? 'admin' : 'manager';
     const dept   = isAllowedAdmin ? null : managerRecord.department;
-    const cookie = signCookie(params.id, params.first_name ?? 'User', role, dept);
+    const dept2  = isAllowedAdmin ? null : (managerRecord.secondary_department || null);
+    const cookie = signCookie(params.id, params.first_name ?? 'User', role, dept, dept2);
     res.writeHead(302, {
       'Location': '/dashboard',
       'Set-Cookie': `${AUTH_COOKIE}=${encodeURIComponent(cookie)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`,
@@ -2270,7 +2278,7 @@ http.createServer(async (req, res) => {
   try {
     // GET /api/me — returns role + dept from session cookie
     if (req.method === 'GET' && route === '/api/me') {
-      return jsonRes(res, { role: user.role ?? 'admin', dept: user.dept ?? null, name: user.name ?? '' });
+      return jsonRes(res, { role: user.role ?? 'admin', dept: user.dept ?? null, dept2: user.dept2 ?? null, name: user.name ?? '' });
     }
 
     // GET /api/stats
@@ -2339,7 +2347,8 @@ http.createServer(async (req, res) => {
         sheets.getRawStatsCache(),
       ]);
       if (user.role === 'manager' && user.dept) {
-        subs = subs.filter(s => s.department === user.dept);
+        const mgrDepts = [user.dept, user.dept2].filter(Boolean);
+        subs = subs.filter(s => mgrDepts.includes(s.department));
       }
       const enriched = subs.map(s => {
         const stat = statsMap[(s.real_name ?? '').toLowerCase().trim()] ?? {};

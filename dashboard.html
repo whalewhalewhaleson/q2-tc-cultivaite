@@ -400,6 +400,8 @@ function jAttr(s) { return JSON.stringify(String(s ?? '')).replace(/"/g, '&quot;
 let _stats      = null;
 let _myRole     = 'admin'; // 'admin' | 'manager'
 let _myDept     = null;    // dept string for manager, null for admin
+let _myDept2    = null;    // secondary dept for multi-dept managers
+let _mgrDepts   = [];      // [dept, dept2] for filtering
 let _gnPending  = [];
 let _gnReviewed = [];
 let _reflCache  = {};   // weekNum → array
@@ -418,24 +420,29 @@ async function init() {
     const me = await fetch('/api/me').then(r => r.json());
     _myRole = me.role ?? 'admin';
     _myDept = me.dept ?? null;
+    _myDept2 = me.dept2 ?? null;
 
-    // Admin preview: append ?preview=manager&dept=DEPT to simulate manager view
+    // Admin preview: append ?preview=manager&dept=DEPT&dept2=DEPT2 to simulate manager view
     if (_myRole === 'admin') {
       const p = new URLSearchParams(location.search);
       if (p.get('preview') === 'manager' && p.get('dept')) {
         _myRole = 'manager';
         _myDept = p.get('dept');
+        _myDept2 = p.get('dept2') || null;
       }
     }
 
-    const gnUrl = _myRole === 'manager' && _myDept
-      ? `/api/good-news/dept?dept=${encodeURIComponent(_myDept)}`
-      : null;
+    const mgrDepts = _myRole === 'manager' && _myDept
+      ? [_myDept, _myDept2].filter(Boolean) : [];
 
     const [stats, gnData] = await Promise.all([
       fetch('/api/stats').then(r => r.json()),
-      gnUrl
-        ? fetch(gnUrl).then(r => r.json())
+      mgrDepts.length > 0
+        ? Promise.all(mgrDepts.map(d => fetch(`/api/good-news/dept?dept=${encodeURIComponent(d)}`).then(r => r.json())))
+            .then(results => ({
+              pending:  results.flatMap(r => r.pending ?? []),
+              reviewed: results.flatMap(r => r.reviewed ?? []),
+            }))
         : Promise.all([
             fetch('/api/good-news/pending').then(r => r.json()),
             fetch('/api/good-news/reviewed').then(r => r.json()),
@@ -451,9 +458,10 @@ async function init() {
     if (_dashWeek === null) _dashWeek = stats.weekNow;
     if (_gnWeek   === null) _gnWeek   = stats.weekNow;
 
-    // Manager: lock reflections to their dept and default to that tab
+    // Manager: lock reflections to their dept(s) and default to that tab
     if (_myRole === 'manager' && _myDept) {
       _reflDept = _myDept;
+      _mgrDepts = [_myDept, _myDept2].filter(Boolean);
       applyManagerUI();
     }
 
@@ -496,7 +504,7 @@ async function refresh() {
   _stats      = null;
   _reflCache  = {};
   // Re-apply manager dept lock before re-init (role doesn't change mid-session)
-  if (_myRole === 'manager' && _myDept) _reflDept = _myDept;
+  if (_myRole === 'manager' && _mgrDepts.length) _reflDept = _myDept;
   await init();
   // Re-render whichever tab is active
   const active = document.querySelector('.sheet-panel.active')?.id.replace('sheet-','');
@@ -1030,7 +1038,9 @@ function renderReflections() {
       <button class="filter-arrow" onclick="setReflWeek(Math.max(1,_reflWeek-1))" ${_reflWeek<=1?'disabled':''}>◀</button>
       <select class="filter-select" onchange="setReflWeek(parseInt(this.value))">${weekOpts}</select>
       <button class="filter-arrow" onclick="setReflWeek(Math.min(${_stats.weekNow},_reflWeek+1))" ${_reflWeek>=_stats.weekNow?'disabled':''}>▶</button>
-      ${_myRole !== 'manager' ? chips : `<span style="font-size:12px;font-weight:600;color:#2e7d32;background:#e8f5e9;padding:4px 10px;border-radius:20px">${esc(_myDept ?? '')}</span>`}
+      ${_myRole !== 'manager' ? chips : (_mgrDepts.length > 1
+        ? ['All', ..._mgrDepts].map(d => `<div class="filter-chip ${d===_reflDept?'active':''}" onclick="setReflDept('${esc(d)}')">${esc(d)}</div>`).join('')
+        : `<span style="font-size:12px;font-weight:600;color:#2e7d32;background:#e8f5e9;padding:4px 10px;border-radius:20px">${esc(_myDept ?? '')}</span>`)}
       <span style="font-size:11px;color:#8a9a8a;margin-left:auto">${_myRole === 'manager' ? '👁 Read-only view' : 'Click a name to open full profile →'}</span>
     </div>
     ${sections || '<div style="color:#8a9a8a;padding:16px 0">No reflections found for this selection.</div>'}

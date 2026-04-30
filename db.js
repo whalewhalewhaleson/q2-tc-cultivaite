@@ -817,11 +817,12 @@ export async function getManager(telegramId) {
   return data ?? null;
 }
 
-export async function addManager(telegramId, realName, dept) {
+export async function addManager(telegramId, realName, dept, secondaryDept = null) {
   const { error } = await supabase.from('managers').upsert({
-    telegram_id: String(telegramId),
-    real_name:   realName,
-    department:  dept,
+    telegram_id:          String(telegramId),
+    real_name:            realName,
+    department:           dept,
+    secondary_department: secondaryDept || null,
   }, { onConflict: 'telegram_id' });
   if (error) throw error;
 }
