@@ -1495,6 +1495,9 @@ bot.command('testmystats', async (ctx) => {
         stats.totalPoints ?? 0, stats.consecutiveMisses ?? 0,
         stats.rank || null, totalUsers || null
       );
+      if (stats.weeklyBreakdown?.length) {
+        msg += buildWeeklyBreakdown(stats);
+      }
     }
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
