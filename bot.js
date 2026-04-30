@@ -155,7 +155,31 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
   return card;
 }
 
+function buildWeeklyBreakdown(stats) {
+  const STATUS_ICON = {
+    submitted: '✅', late: '⏰', extended: '📎',
+    excused: '🟡', missed: '❌', pending: '⏳',
+  };
 
+  let out = `\n\n📊 ${bold('Weekly Breakdown')}`;
+  for (const w of stats.weeklyBreakdown) {
+    const icon = STATUS_ICON[w.status] ?? '—';
+    const ptsStr = w.pts > 0 ? `${e(String(w.pts))} pts` : '—';
+    const bonus = w.dept2x ? ' ×2' : '';
+    out += `\nW${w.week} ${icon} ${ptsStr}${e(bonus)}`;
+  }
+
+  if (stats.goodNewsEvents.length > 0) {
+    out += `\n\n🗞 ${bold('Good News')}`;
+    for (const gn of stats.goodNewsEvents) {
+      const weekLabel = gn.week != null ? `W${gn.week}` : '';
+      const verb = gn.kind === 'shared' ? 'Shared' : 'Received';
+      out += `\n${e(weekLabel)} ${e(verb)} · \\+${e(String(gn.pts))} pts`;
+    }
+  }
+
+  return out;
+}
 
 // Returns nickname if set, otherwise falls back to realName
 async function getDisplayName(realName) {
@@ -1584,6 +1608,9 @@ bot.command('mystats', async (ctx) => {
         stats.totalPoints ?? 0, stats.consecutiveMisses ?? 0,
         stats.rank || null, totalUsers || null
       );
+      if (stats.weeklyBreakdown?.length) {
+        msg += buildWeeklyBreakdown(stats);
+      }
       if (!stats.submittedThisWeek) {
         msg += `\n\nYour plant is thirsty\\! 💧 /reflect to water it\\.`;
       }

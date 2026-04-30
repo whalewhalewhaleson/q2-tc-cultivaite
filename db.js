@@ -124,7 +124,7 @@ async function buildStatsCache() {
   // Fetch all data in parallel
   const [{ data: allSubs }, { data: approvedNews }, { data: gnAwards }, { data: allUsers }, { data: lateRows }] = await Promise.all([
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
-    supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee').eq('status', 'Approved'),
+    supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee, week_number').eq('status', 'Approved'),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
     supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active'),
     supabase.from('late_submissions').select('real_name, week_number'),
@@ -222,19 +222,28 @@ async function buildStatsCache() {
   // Recipients come from good_news_awards (new); falls back to legacy nominee_name
   // for approved rows that pre-date the awards table.
   const goodNewsBonus  = {}; // lc_name → extra pts
+  const goodNewsBreakdown = {}; // lc_name → [{ week, kind, pts }]
+  const gnIdToWeek = {};
   const gnWithAwards   = new Set(awards.map(a => a.good_news_id));
   for (const gn of news) {
+    gnIdToWeek[gn.id] = gn.week_number ?? null;
     const nom = (gn.nominator_name ?? '').toLowerCase().trim();
     goodNewsBonus[nom] = (goodNewsBonus[nom] ?? 0) + (gn.pts_sharer ?? 5);
+    if (!goodNewsBreakdown[nom]) goodNewsBreakdown[nom] = [];
+    goodNewsBreakdown[nom].push({ week: gn.week_number ?? null, kind: 'shared', pts: gn.pts_sharer ?? 5 });
     // Legacy fallback: row approved before awards table existed
     if (!gnWithAwards.has(gn.id) && gn.nominee_name) {
       const nomi = gn.nominee_name.toLowerCase().trim();
       goodNewsBonus[nomi] = (goodNewsBonus[nomi] ?? 0) + (gn.pts_nominee ?? 3);
+      if (!goodNewsBreakdown[nomi]) goodNewsBreakdown[nomi] = [];
+      goodNewsBreakdown[nomi].push({ week: gn.week_number ?? null, kind: 'received', pts: gn.pts_nominee ?? 3 });
     }
   }
   for (const award of awards) {
     const recipient = (award.recipient_name ?? '').toLowerCase().trim();
     goodNewsBonus[recipient] = (goodNewsBonus[recipient] ?? 0) + (award.pts ?? 3);
+    if (!goodNewsBreakdown[recipient]) goodNewsBreakdown[recipient] = [];
+    goodNewsBreakdown[recipient].push({ week: gnIdToWeek[award.good_news_id] ?? null, kind: 'received', pts: award.pts ?? 3 });
   }
 
   // Calculate per-user stats
@@ -248,32 +257,39 @@ async function buildStatsCache() {
     let streak             = 0;
     let consecutiveMisses  = 0;
     let currentStreak      = 0;
+    const weeklyBreakdown  = [];
 
     for (let wk = launchWeek; wk <= weekNow; wk++) {
       const entry = weekMap[wk];
+      let weekPts = 0;
+      let status = 'missed';
+      let dept2x = false;
+
       if (entry?.submitted) {
         consecutiveMisses = 0;
         if (entry.late) {
-          // Late submission: flat 5 pts, streak resets
           currentStreak = 0;
-          totalPoints += 5;
+          weekPts = 5;
+          status = 'late';
         } else if (!entry.excused) {
-          // Base pts
           currentStreak++;
-          let weekPts = 10 + (currentStreak - 1); // base 10 + streak bonus
-          // Dept 2× bonus: 4+ consecutive 100% weeks
-          if ((deptConsec[dept]?.[wk] ?? 0) >= 4) weekPts *= 2;
-          totalPoints += weekPts;
+          weekPts = 10 + (currentStreak - 1);
+          if ((deptConsec[dept]?.[wk] ?? 0) >= 4) { weekPts *= 2; dept2x = true; }
+          status = entry.extended ? 'extended' : 'submitted';
+        } else {
+          status = 'excused';
         }
-        // Excused: streak preserved, no pts earned
+        totalPoints += weekPts;
         streak = currentStreak;
       } else if (wk < weekNow) {
-        // Missed past week
         currentStreak = 0;
         streak        = 0;
         consecutiveMisses++;
+      } else {
+        status = 'pending';
       }
-      // Current week not yet submitted: don't penalise yet
+
+      weeklyBreakdown.push({ week: wk, status, pts: weekPts, dept2x });
     }
 
     totalPoints += goodNewsBonus[name] ?? 0;
@@ -293,6 +309,8 @@ async function buildStatsCache() {
       submittedThisWeek,
       totalPoints,
       consecutiveMisses,
+      weeklyBreakdown,
+      goodNewsEvents: goodNewsBreakdown[name] ?? [],
       rank: 0, // filled in below
     };
   }
