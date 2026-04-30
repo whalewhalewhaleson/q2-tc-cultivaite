@@ -51,6 +51,7 @@ const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
 const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
 const shoutedDepts = new Set();
 let firstShoutoutFiredThisWeek = false;
+let lastRecapWeek = 0;
 
 function getWeekNumber() {
   const start = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
@@ -70,6 +71,41 @@ function resolveDisplayStage(plantStage, consecutiveMisses) {
   if (consecutiveMisses >= 2) return '🥀';
   if (consecutiveMisses === 1) return '🍂';
   return plantStage;
+}
+
+function buildRecapMessage(displayName, week, stats, totalUsers, deptName, deptStats) {
+  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
+
+  if (stats.consecutiveMisses >= 1) {
+    msg += `🍂 Your plant could use some water — /reflect is always open\n`;
+  } else {
+    const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
+    const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
+    msg += `${displayStage} ${e(stageName)} · ${e(String(stats.totalPoints))} pts\n`;
+  }
+
+  if (stats.streak > 0 && stats.consecutiveMisses === 0) {
+    msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
+  }
+
+  const others = totalUsers - 1;
+  if (stats.rank <= 3) {
+    msg += `📊 \\#${e(String(stats.rank))} with ${e(String(others))} others 👑\n`;
+  } else {
+    msg += `📊 \\#${e(String(stats.rank))} with ${e(String(others))} others\n`;
+  }
+
+  if (deptStats && deptName) {
+    const deptStageName = STAGE_NAMES[deptStats.gardenStage] ?? 'Growing';
+    msg += `🏡 ${e(deptName)} — ${deptStats.gardenStage} ${e(deptStageName)} · ${e(String(deptStats.avgPoints))} avg pts\n`;
+  }
+
+  if (!stats.submittedThisWeek) {
+    msg += `\nHaven't reflected yet\\? /reflect when you're ready 🌱\n`;
+  }
+
+  msg += `\n→ /mystats · /leaderboard · /department`;
+  return msg;
 }
 
 // How many more pts until the next stage
@@ -1123,32 +1159,33 @@ bot.command('testrecap', async (ctx) => {
     const totalUsers = allStats.length;
     const week = currentQ2Week();
     const displayName = await getDisplayName(user.realName);
-    const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
-    const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
-
-    let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
-
-    if (stats.consecutiveMisses >= 1) {
-      msg += `🍂 Your plant could use some water — /reflect is always open\n`;
-    } else {
-      msg += `${displayStage} ${e(stageName)} · ${e(String(stats.totalPoints))} pts\n`;
-    }
-
-    if (stats.streak > 0 && stats.consecutiveMisses === 0) {
-      msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
-    }
-
-    if (stats.rank <= 3) {
-      msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))} 👑\n`;
-    } else {
-      msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))}\n`;
-    }
-
-    msg += `\n→ /mystats · /leaderboard · /department`;
+    const dept = user.department ?? null;
+    const deptStats = dept ? await sheets.getDeptStats(dept) : null;
+    const msg = buildRecapMessage(displayName, week, stats, totalUsers, dept, deptStats);
 
     await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/testrecap error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+bot.command('firerecap', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const week = currentQ2Week();
+    if (lastRecapWeek >= week) {
+      await ctx.reply(`Recap already sent for week ${e(String(week))}\\. Use /testrecap to preview without re\\-sending\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    await ctx.reply(`🚀 Firing recap to all users now\\.\\.\\.`, { parse_mode: 'MarkdownV2' });
+    await runRecapBroadcast();
+    await ctx.reply(`✅ Weekly recap sent\\!`, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/firerecap error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
@@ -1749,7 +1786,8 @@ bot.command('help', async (ctx) => {
       `  • /test1hwarning wilson — send to a specific person\n` +
       `/testdeadlinenudge — ⏰ Preview the Monday 4PM deadline\\-over nudge\n` +
       `  • /testdeadlinenudge wilson — send to a specific person\n` +
-      `/testrecap — 📊 Preview the Friday recap message\n` +
+      `/testrecap — 📊 Preview the weekly recap message\n` +
+      `/firerecap — 🚀 Send the weekly recap to everyone now\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
@@ -1769,7 +1807,8 @@ bot.command('help', async (ctx) => {
       `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
       `Mon 3PM SGT — 1\\-hour warning to non\\-submitters\n` +
       `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
-      `Fri 3:30PM SGT — Weekly recap to everyone\n` +
+      `Fri 10AM SGT — Recap reminder to admins\n` +
+      `Fri 3:30PM SGT — Weekly recap to everyone \\(skips if already sent via /firerecap\\)\n` +
       `On submit — Dept 100% shoutout \\(first dept to hit 100% that week\\)\n`;
   }
 
@@ -1925,61 +1964,89 @@ cron.schedule('0 8 * * 1', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
-// Friday recap cron — 3:30 PM SGT = 07:30 UTC, every Friday
+// Recap broadcast — shared by cron, /firerecap, and one-off triggers
 // ---------------------------------------------------------------------------
 
-cron.schedule('30 7 * * 5', async () => {
+async function runRecapBroadcast() {
   const week = currentQ2Week();
   if (week < 1 || week > 13) {
-    console.log('[Cron] Skipping Friday recap — outside Q2 window.');
+    console.log('[Recap] Skipping — outside Q2 window.');
     return;
   }
-  console.log('[Cron] Running Friday recap...');
+  console.log('[Recap] Running weekly recap...');
   try {
     const users = await sheets.getAllUsersWithChatId();
     const allStats = await sheets.getAllUserStats();
     const totalUsers = allStats.length;
 
-    for (const { realName, chatId, nickname } of users) {
+    for (const { realName, chatId, nickname, department } of users) {
       try {
         const stats = await sheets.getStatsForUser(realName);
         if (!stats) continue;
 
         const displayName = nickname ?? realName;
-        const displayStage = resolveDisplayStage(stats.plantStage, stats.consecutiveMisses);
-        const stageName = STAGE_NAMES[stats.plantStage] ?? 'Seedling';
-
-        let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n\n`;
-
-        if (stats.consecutiveMisses >= 1) {
-          msg += `🍂 Your plant could use some water — /reflect is always open\n`;
-        } else {
-          msg += `${displayStage} ${e(stageName)} · ${e(String(stats.totalPoints))} pts\n`;
-        }
-
-        if (stats.streak > 0 && stats.consecutiveMisses === 0) {
-          msg += `🔥 ${e(String(stats.streak))}\\-week streak\n`;
-        }
-
-        if (stats.rank <= 3) {
-          msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))} 👑\n`;
-        } else {
-          msg += `📊 \\#${e(String(stats.rank))} out of ${e(String(totalUsers))}\n`;
-        }
-
-        msg += `\n→ /mystats · /leaderboard · /department`;
+        const deptStats = department ? await sheets.getDeptStats(department) : null;
+        const msg = buildRecapMessage(displayName, week, stats, totalUsers, department, deptStats);
 
         await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
         await new Promise(r => setTimeout(r, 200));
       } catch (userErr) {
-        console.error(`[Cron] Failed Friday recap for ${realName}:`, userErr.message);
+        console.error(`[Recap] Failed for ${realName}:`, userErr.message);
       }
     }
-    console.log('[Cron] Friday recap complete.');
+    lastRecapWeek = week;
+    console.log('[Recap] Weekly recap complete.');
   } catch (err) {
-    console.error('[Cron] Friday recap error:', err);
+    console.error('[Recap] Error:', err);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Friday recap cron — 3:30 PM SGT = 07:30 UTC, every Friday
+// ---------------------------------------------------------------------------
+
+cron.schedule('30 7 * * 5', async () => {
+  const week = currentQ2Week();
+  if (lastRecapWeek >= week) {
+    console.log('[Cron] Skipping Friday recap — already sent this week.');
+    return;
+  }
+  await runRecapBroadcast();
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// Friday 10 AM SGT reminder — heads-up to admins before recap fires
+// ---------------------------------------------------------------------------
+
+cron.schedule('0 2 * * 5', async () => {
+  const week = currentQ2Week();
+  if (week < 1 || week > 13) return;
+  if (lastRecapWeek >= week) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  for (const adminId of adminIds) {
+    try {
+      await bot.api.sendMessage(adminId, `⏰ Heads up — the weekly recap is scheduled to fire at 3:30 PM SGT today\\.\n\nUse /firerecap to send it now, or let it fire automatically\\.`, { parse_mode: 'MarkdownV2' });
+    } catch (err) {
+      console.error(`[Cron] Failed recap reminder to admin ${adminId}:`, err.message);
+    }
   }
 }, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// One-off: fire recap today (Thursday Apr 30, 2026) at 3:30 PM SGT
+// ---------------------------------------------------------------------------
+{
+  const now = new Date();
+  const todaySGT = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
+  if (todaySGT === '2026-04-30') {
+    const target = new Date('2026-04-30T07:30:00Z');
+    const delay = target.getTime() - now.getTime();
+    if (delay > 0) {
+      console.log(`[Cron] One-off Thursday recap scheduled in ${Math.round(delay / 60000)} minutes.`);
+      setTimeout(() => runRecapBroadcast(), delay);
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // HTTP server — serves the leadership dashboard + JSON API
