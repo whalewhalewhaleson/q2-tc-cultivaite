@@ -74,13 +74,13 @@ function resolveDisplayStage(plantStage, consecutiveMisses) {
 }
 
 function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts) {
-  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱\n`;
+  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱`;
 
   if (!stats.submittedThisWeek) {
-    msg += `Haven't reflected yet\\? /reflect when you're ready\\! 🌳🍎\n`;
+    msg += ` Haven't reflected yet\\? /reflect when you're ready\\! 🌳🍎`;
   }
 
-  msg += `\n`;
+  msg += `\n\n`;
 
   if (stats.consecutiveMisses >= 1) {
     msg += `🍂 Your plant could use some water\n`;
