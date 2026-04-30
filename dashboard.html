@@ -407,7 +407,6 @@ let _gnReviewed = [];
 let _reflCache  = {};   // weekNum → array
 let _reflWeek   = null;
 let _reflDept   = 'All';
-let _gnWeek     = null;
 let _rankView   = 'depts';
 let _rankWeek   = null;
 let _rankPage   = 1;
@@ -456,7 +455,6 @@ async function init() {
     if (_reflWeek === null) _reflWeek = stats.weekNow;
     if (_rankWeek === null) _rankWeek = stats.weekNow;
     if (_dashWeek === null) _dashWeek = stats.weekNow;
-    if (_gnWeek   === null) _gnWeek   = stats.weekNow;
 
     // Manager: lock reflections to their dept(s) and default to that tab
     if (_myRole === 'manager' && _myDept) {
@@ -541,12 +539,6 @@ function setRankWeek(n) {
 function setRankPage(p) {
   _rankPage = p;
   renderRankings();
-}
-
-function setGNWeek(n) {
-  if (!_stats) return;
-  _gnWeek = Math.max(_stats.launchWeek ?? 1, Math.min(_stats.weekNow, n));
-  renderGoodNews();
 }
 
 // ── GN badge ──────────────────────────────────────────────────────────────
@@ -1060,33 +1052,18 @@ function setReflDept(d) {
 
 // ── Good News ──────────────────────────────────────────────────────────────
 function renderGoodNews() {
-  const wk = _gnWeek ?? _stats?.weekNow;
-  const isCurrent = wk === _stats?.weekNow;
-  const launchWk  = _stats?.launchWeek ?? 1;
+  const allPending  = _gnPending;
+  const allApproved = _gnReviewed.filter(g => g.status === 'Approved');
+  const allRejected = _gnReviewed.filter(g => g.status === 'Rejected');
 
-  const pendingForWk  = _gnPending.filter(g => !wk || g.week_number === wk);
-  const approvedForWk = _gnReviewed.filter(g => g.status === 'Approved' && (!wk || g.week_number === wk));
-  const rejectedForWk = _gnReviewed.filter(g => g.status === 'Rejected' && (!wk || g.week_number === wk));
+  const totalAll      = allPending.length + _gnReviewed.length;
+  const totalPending  = allPending.length;
+  const totalApproved = allApproved.length;
 
-  // Summary stats: always across all weeks
-  const totalApproved = _gnReviewed.filter(g => g.status === 'Approved').length;
-  const totalPending  = _gnPending.length;
-  const totalAll      = totalPending + _gnReviewed.length;
-
-  const pendingCards = pendingForWk.map(gn => gnCard(gn, 'pending')).join('') ||
-    (isCurrent ? '<div style="color:#8a9a8a;font-size:13px;padding:16px 0">No pending nominations.</div>' : '');
-
-  const approvedCards = approvedForWk.map(gn => gnCard(gn, 'approved')).join('');
-  const rejectedCards = rejectedForWk.map(gn => gnCard(gn, 'rejected')).join('');
-
-  const weekLabel = wk ? (isCurrent ? `Week ${wk} (Current)` : `Week ${wk}`) : '';
-  const weekSlider = wk ? `
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
-      <button onclick="setGNWeek(${wk-1})" ${wk<=launchWk?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk>launchWk?'pointer':'default'};opacity:${wk>launchWk?1:0.35}">‹ Prev</button>
-      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel} / 13</span>
-      <button onclick="setGNWeek(${wk+1})" ${wk>=(_stats?.weekNow??wk)?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk<(_stats?.weekNow??wk)?'pointer':'default'};opacity:${wk<(_stats?.weekNow??wk)?1:0.35}">Next ›</button>
-      ${!isCurrent ? `<button onclick="setGNWeek(${_stats?.weekNow})" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#2d6a4f;margin-left:4px">↩ Current</button>` : ''}
-    </div>` : '';
+  const pendingCards  = allPending.map(gn => gnCard(gn, 'pending')).join('') ||
+    '<div style="color:#8a9a8a;font-size:13px;padding:16px 0">No pending nominations.</div>';
+  const approvedCards = allApproved.map(gn => gnCard(gn, 'approved')).join('');
+  const rejectedCards = allRejected.map(gn => gnCard(gn, 'rejected')).join('');
 
   const pendingSectionTitle = _myRole === 'manager' ? '⏳ Pending' : '⏳ Pending Approval';
   document.getElementById('sheet-goodnews').innerHTML = `
@@ -1099,23 +1076,20 @@ function renderGoodNews() {
       ${_myRole === 'manager' ? '<span style="font-size:11px;color:#8a9a8a;margin-left:16px;white-space:nowrap">👁 Read-only view</span>' : ''}
     </div>
 
-    ${weekSlider}
-
-    ${isCurrent && _myRole !== 'manager' ? `<div style="background:#fef7e0;border:1px solid #d4a017;border-radius:10px;padding:10px 16px;font-size:12px;color:#9a5a00;margin-bottom:16px">
+    ${_myRole !== 'manager' ? `<div style="background:#fef7e0;border:1px solid #d4a017;border-radius:10px;padding:10px 16px;font-size:12px;color:#9a5a00;margin-bottom:16px">
       ⚡ <strong>Approving a nomination</strong> awards pts to the nominator and your chosen recipients — pts update live.
     </div>` : ''}
 
-    ${isCurrent ? `
-    <div class="section-header"><span class="section-title">${pendingSectionTitle}</span><span class="section-badge orange">${pendingForWk.length} nomination${pendingForWk.length!==1?'s':''}</span></div>
-    <div id="pending-list">${pendingCards}</div>` : ''}
+    <div class="section-header"><span class="section-title">${pendingSectionTitle}</span><span class="section-badge orange">${totalPending} nomination${totalPending!==1?'s':''}</span></div>
+    <div id="pending-list">${pendingCards}</div>
 
-    ${approvedForWk.length || rejectedForWk.length ? `
-    <div class="section-header" style="margin-top:${isCurrent?24:0}px"><span class="section-title">✅ Approved</span><span class="section-badge green">${approvedForWk.length}</span></div>
-    <div id="approved-list">${approvedCards}</div>
-    ${rejectedForWk.length ? `
-    <div class="section-header" style="margin-top:24px"><span class="section-title">✕ Rejected</span><span class="section-badge orange">${rejectedForWk.length}</span></div>
-    <div id="rejected-list">${rejectedCards}</div>` : ''}` : `
-    ${!isCurrent ? '<div style="color:#8a9a8a;font-size:13px;padding:24px 0 8px;text-align:center">No nominations for this week.</div>' : ''}`}
+    ${allApproved.length ? `
+    <div class="section-header" style="margin-top:24px"><span class="section-title">✅ Approved</span><span class="section-badge green">${allApproved.length}</span></div>
+    <div id="approved-list">${approvedCards}</div>` : ''}
+
+    ${allRejected.length ? `
+    <div class="section-header" style="margin-top:24px"><span class="section-title">✕ Rejected</span><span class="section-badge orange">${allRejected.length}</span></div>
+    <div id="rejected-list">${rejectedCards}</div>` : ''}
   `;
 }
 
