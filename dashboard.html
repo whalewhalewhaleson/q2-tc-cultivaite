@@ -649,11 +649,12 @@ function renderOverview() {
   const submittedCount = s.users.filter(isSubmitted).length;
   const subPct = s.totalUsers ? Math.round(submittedCount / s.totalUsers * 100) : 0;
 
-  // Cumulative Q2 rate: total submissions across all elapsed weeks / (users × weeks elapsed)
+  // Cumulative Q2 rate — lagged 1 week (submissions trickle in Fri–Mon)
   const launchWkOv = s.launchWeek ?? 1;
-  const weeksElapsed = Math.max(1, s.weekNow - launchWkOv + 1);
+  const cumulEndWk = Math.max(launchWkOv, s.weekNow - 1);
+  const weeksElapsed = Math.max(1, cumulEndWk - launchWkOv + 1);
   let totalSubmissions = 0;
-  for (let w = launchWkOv; w <= s.weekNow; w++) {
+  for (let w = launchWkOv; w <= cumulEndWk; w++) {
     for (const u of s.users) {
       if (u.weekHistory?.[w]?.submitted) totalSubmissions++;
     }
@@ -662,18 +663,6 @@ function renderOverview() {
   const cumulTarget = Math.ceil(s.totalUsers * weeksElapsed * 0.8);
   const pctCls = cumulPct >= 80 ? 'pct-green' : cumulPct >= 60 ? 'pct-amber' : 'pct-red';
   const barCls = cumulPct >= 60 ? 'bar-green' : 'bar-amber';
-
-  // Week-on-week cumulative progress toward 80%
-  const wowData = [];
-  let runningSubs = 0;
-  for (let w = launchWkOv; w <= s.weekNow; w++) {
-    let wkSubs = 0;
-    for (const u of s.users) { if (u.weekHistory?.[w]?.submitted) wkSubs++; }
-    runningSubs += wkSubs;
-    const elapsed = w - launchWkOv + 1;
-    const cumRate = s.totalUsers ? Math.round(runningSubs / (s.totalUsers * elapsed) * 100) : 0;
-    wowData.push({ week: w, weekSubs: wkSubs, cumRate, perWeekPct: s.totalUsers ? Math.round(wkSubs / s.totalUsers * 100) : 0 });
-  }
 
   // Late this week (submitted but marked late) — group by dept
   const isLate = (u) => !!(u.weekHistory?.[wk]?.submitted && u.weekHistory?.[wk]?.late);
@@ -763,7 +752,7 @@ function renderOverview() {
     <div class="section-header"><span class="section-title">🎯 Q2 Target — 80% Submissions Across the Quarter</span></div>
     <div class="target-bar-card">
       <div class="target-bar-top">
-        <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(s.weekNow)}</div>
+        <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(cumulEndWk)}</div>
         <div class="target-pct ${pctCls}">${cumulPct}%</div>
       </div>
       <div class="bar-track">
@@ -775,29 +764,6 @@ function renderOverview() {
         <span>✅ <strong>${totalSubmissions}</strong> total submissions</span>
         <span>📊 <strong>${s.totalUsers * weeksElapsed}</strong> possible (${s.totalUsers} × ${weeksElapsed} weeks)</span>
         ${cumulPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, cumulTarget - totalSubmissions)}</strong> more to hit 80%</span>` : '<span>✅ On target!</span>'}
-      </div>
-    </div>
-
-    <div style="background:white;border-radius:16px;padding:20px 22px;border:1px solid #dce3dc;box-shadow:0 1px 4px rgba(0,0,0,0.04);margin-top:12px">
-      <div style="font-size:12px;font-weight:700;color:#1a2e1a;margin-bottom:14px">Week-on-Week Progress</div>
-      <div style="display:flex;align-items:flex-end;gap:6px;height:100px;position:relative">
-        <div style="position:absolute;left:0;right:0;bottom:${80}px;border-top:2px dashed #a5d6a7;z-index:1"></div>
-        <div style="position:absolute;right:4px;bottom:${80 + 2}px;font-size:9px;font-weight:700;color:#2d6a4f;z-index:2">80%</div>
-        ${wowData.map(d => {
-          const h = d.cumRate;
-          const color = d.cumRate >= 80 ? '#52b788' : d.cumRate >= 60 ? '#f9c74f' : '#ea4335';
-          const delta = wowData.indexOf(d) > 0 ? d.cumRate - wowData[wowData.indexOf(d) - 1].cumRate : 0;
-          const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '';
-          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">
-            <div style="font-size:10px;font-weight:700;color:${color}">${d.cumRate}%${arrow}</div>
-            <div style="width:100%;max-width:40px;background:${color};border-radius:4px 4px 0 0;height:${h}px;transition:height 0.3s"></div>
-            <div style="font-size:9px;color:#8a9a8a;font-weight:600">W${toISOWeek(d.week)}</div>
-          </div>`;
-        }).join('')}
-      </div>
-      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:#8a9a8a">
-        <span>Bar = cumulative rate to date</span>
-        <span>Dashed line = 80% target</span>
       </div>
     </div>
 
