@@ -449,17 +449,17 @@ async function reflectConversation(conversation, ctx) {
     const reflectOpeners = [
       `Nice to see you again, ${e(displayName)}\\! 🌳🦋 Week ${toISOWeek(weekNum)}, let's go\\!\n\n` +
       `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
-      `This week, did you spot yourself or someone displaying ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\? Keep an eye out as you reflect\\! 🌱\n\n` +
+      `This week, did you spot yourself or someone displaying ${bold('Care · Leadership · Can-Do Attitude · Team')}\\? Keep an eye out as you reflect\\! 🌱\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
       `Hey there, ${e(displayName)}\\! Ready for Week ${toISOWeek(weekNum)}\\? 🌱\n\n` +
-      `Before we start — think about the past week\\. Did you or someone around you show ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\?\n\n` +
+      `Before we start — think about the past week\\. Did you or someone around you show ${bold('Care · Leadership · Can-Do Attitude · Team')}\\?\n\n` +
       `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — any progress\\?\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
       `How was your week, ${e(displayName)}\\? 😎 Week ${toISOWeek(weekNum)} — let's reflect\\.\n\n` +
       `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
-      `As you reflect, think about who stood out this week — yourself or a teammate — living out ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\. 🌱\n\n` +
+      `As you reflect, think about who stood out this week — yourself or a teammate — living out ${bold('Care · Leadership · Can-Do Attitude · Team')}\\. 🌱\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
     ];
     const opener = reflectOpeners[Math.floor(Math.random() * reflectOpeners.length)];
