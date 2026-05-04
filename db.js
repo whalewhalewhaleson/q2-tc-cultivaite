@@ -364,7 +364,7 @@ async function buildStatsCache() {
     };
   }
 
-  const result = { statsMap, deptStatsMap, sorted, userWeekMap, deptWeekRate, weekNow, launchWeek };
+  const result = { statsMap, deptStatsMap, sorted, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek };
   cacheSet('stats', result, TTL.STATS);
   return result;
 }
@@ -655,7 +655,7 @@ export async function unRejectGoodNews(gnId) {
 
 // Returns all data the leadership dashboard needs in one call.
 export async function getFullDashboardStats() {
-  const { sorted, deptStatsMap, userWeekMap, deptWeekRate, weekNow, launchWeek } = await buildStatsCache();
+  const { sorted, deptStatsMap, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek } = await buildStatsCache();
 
   const totalUsers         = sorted.length;
   const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
@@ -684,6 +684,8 @@ export async function getFullDashboardStats() {
     consecutiveMisses:   u.consecutiveMisses,
     rank:                u.rank,
     weekHistory:         userWeekMap[u.realName.toLowerCase().trim()] ?? {},
+    weeklyBreakdown:     u.weeklyBreakdown,
+    goodNewsEvents:      u.goodNewsEvents,
   }));
 
   const depts = Object.values(deptStatsMap).map(d => {
@@ -693,6 +695,7 @@ export async function getFullDashboardStats() {
       thisWeekSubmitted: tw.submitted,
       thisWeekTotal:     tw.total,
       thisWeekRate:      tw.total ? Math.round(tw.submitted / tw.total * 100) : 0,
+      streakByWeek:      deptConsec[d.department] ?? {},
     };
   }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
 
