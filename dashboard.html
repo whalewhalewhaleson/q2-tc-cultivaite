@@ -335,6 +335,8 @@ const STAGE_NAMES = { '🌱':'Seedling','🌿':'Sprout','🌳':'Sapling','🌼':
 const Q2_START_SGT  = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT — used for currentWeek logic
 const WEEK_MS_D = 7 * 24 * 60 * 60 * 1000;
 
+function toISOWeek(w) { return w + 13; }
+
 function displayStage(stage, misses) {
   if (misses >= 2) return '🥀';
   if (misses === 1) return '🍂';
@@ -463,7 +465,7 @@ async function init() {
       applyManagerUI();
     }
 
-    document.getElementById('week-chip').textContent = `Week ${stats.weekNow} / 13`;
+    document.getElementById('week-chip').textContent = `Week ${toISOWeek(stats.weekNow)}`;
     document.getElementById('updated-at').textContent = `Updated ${new Date().toLocaleTimeString('en-SG', {hour:'2-digit',minute:'2-digit'})}`;
     updateGNBadge();
 
@@ -646,8 +648,32 @@ function renderOverview() {
   const isSubmitted = (u) => isCurrent ? u.submittedThisWeek : (u.weekHistory[wk]?.submitted && !u.weekHistory[wk]?.late);
   const submittedCount = s.users.filter(isSubmitted).length;
   const subPct = s.totalUsers ? Math.round(submittedCount / s.totalUsers * 100) : 0;
-  const pctCls = subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red';
-  const barCls = subPct >= 60 ? 'bar-green' : 'bar-amber';
+
+  // Cumulative Q2 rate: total submissions across all elapsed weeks / (users × weeks elapsed)
+  const launchWkOv = s.launchWeek ?? 1;
+  const weeksElapsed = Math.max(1, s.weekNow - launchWkOv + 1);
+  let totalSubmissions = 0;
+  for (let w = launchWkOv; w <= s.weekNow; w++) {
+    for (const u of s.users) {
+      if (u.weekHistory?.[w]?.submitted) totalSubmissions++;
+    }
+  }
+  const cumulPct = s.totalUsers ? Math.round(totalSubmissions / (s.totalUsers * weeksElapsed) * 100) : 0;
+  const cumulTarget = Math.ceil(s.totalUsers * weeksElapsed * 0.8);
+  const pctCls = cumulPct >= 80 ? 'pct-green' : cumulPct >= 60 ? 'pct-amber' : 'pct-red';
+  const barCls = cumulPct >= 60 ? 'bar-green' : 'bar-amber';
+
+  // Week-on-week cumulative progress toward 80%
+  const wowData = [];
+  let runningSubs = 0;
+  for (let w = launchWkOv; w <= s.weekNow; w++) {
+    let wkSubs = 0;
+    for (const u of s.users) { if (u.weekHistory?.[w]?.submitted) wkSubs++; }
+    runningSubs += wkSubs;
+    const elapsed = w - launchWkOv + 1;
+    const cumRate = s.totalUsers ? Math.round(runningSubs / (s.totalUsers * elapsed) * 100) : 0;
+    wowData.push({ week: w, weekSubs: wkSubs, cumRate, perWeekPct: s.totalUsers ? Math.round(wkSubs / s.totalUsers * 100) : 0 });
+  }
 
   // Late this week (submitted but marked late) — group by dept
   const isLate = (u) => !!(u.weekHistory?.[wk]?.submitted && u.weekHistory?.[wk]?.late);
@@ -694,14 +720,14 @@ function renderOverview() {
       <td style="text-align:center">${statusPill(d.thisWeekRate)}</td>
     </tr>`).join('');
 
-  const weekLabel = isCurrent ? `Week ${wk} (Current)` : `Week ${wk}`;
+  const weekLabel = isCurrent ? `Week ${toISOWeek(wk)} (Current)` : `Week ${toISOWeek(wk)}`;
   const canPrev = wk > (s.launchWeek ?? 1);
   const canNext = wk < s.weekNow;
 
   document.getElementById('sheet-overview').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <button onclick="setDashWeek(${wk-1})" ${canPrev?'':'disabled'} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${canPrev?'pointer':'default'};opacity:${canPrev?1:0.35}">‹ Prev</button>
-      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel} / 13</span>
+      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel}</span>
       <button onclick="setDashWeek(${wk+1})" ${canNext?'':'disabled'} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${canNext?'pointer':'default'};opacity:${canNext?1:0.35}">Next ›</button>
       ${!isCurrent ? `<button onclick="setDashWeek(${s.weekNow})" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#2d6a4f;margin-left:4px">↩ Current week</button>` : ''}
     </div>
@@ -709,12 +735,12 @@ function renderOverview() {
     <div class="kpi-row">
       <div class="kpi-card blue">
         <div class="kpi-label">📅 Q2 Week</div>
-        <div class="kpi-value">${s.weekNow} / 13</div>
+        <div class="kpi-value">Week ${toISOWeek(s.weekNow)}</div>
         <div class="kpi-sub">Started 30 Mar 2026</div>
       </div>
       <div class="kpi-card" style="border-color:#d4a017;background:#fffef5">
-        <div class="kpi-label">📨 ${isCurrent ? 'This Week' : `Week ${wk}`}</div>
-        <div class="kpi-value ${pctCls}">${subPct}%</div>
+        <div class="kpi-label">📨 ${isCurrent ? 'This Week' : `Week ${toISOWeek(wk)}`}</div>
+        <div class="kpi-value ${subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red'}">${subPct}%</div>
         <div class="kpi-sub">${submittedCount} of ${s.totalUsers} submitted</div>
       </div>
       <div class="kpi-card green">
@@ -734,22 +760,44 @@ function renderOverview() {
       </div>
     </div>
 
-    <div class="section-header"><span class="section-title">🎯 Q2 Target — 80% Submissions by End of Quarter</span></div>
+    <div class="section-header"><span class="section-title">🎯 Q2 Target — 80% Submissions Across the Quarter</span></div>
     <div class="target-bar-card">
       <div class="target-bar-top">
-        <div class="target-label">Company Submission Rate — ${weekLabel}</div>
-        <div class="target-pct ${pctCls}">${subPct}%</div>
+        <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(s.weekNow)}</div>
+        <div class="target-pct ${pctCls}">${cumulPct}%</div>
       </div>
       <div class="bar-track">
-        <div class="bar-fill ${barCls}" style="width:${Math.min(subPct,100)}%"></div>
+        <div class="bar-fill ${barCls}" style="width:${Math.min(cumulPct,100)}%"></div>
         <div class="target-marker"></div>
         <div class="target-marker-label">Target 80%</div>
       </div>
       <div class="bar-meta">
-        <span>✅ <strong>${submittedCount}</strong> submitted</span>
-        <span>⏳ <strong>${s.totalUsers - submittedCount}</strong> yet to submit</span>
-        <span>👥 <strong>${s.totalUsers}</strong> registered</span>
-        ${subPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, Math.ceil(s.totalUsers*0.8)-submittedCount)}</strong> more to hit target</span>` : '<span>✅ On target!</span>'}
+        <span>✅ <strong>${totalSubmissions}</strong> total submissions</span>
+        <span>📊 <strong>${s.totalUsers * weeksElapsed}</strong> possible (${s.totalUsers} × ${weeksElapsed} weeks)</span>
+        ${cumulPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, cumulTarget - totalSubmissions)}</strong> more to hit 80%</span>` : '<span>✅ On target!</span>'}
+      </div>
+    </div>
+
+    <div style="background:white;border-radius:16px;padding:20px 22px;border:1px solid #dce3dc;box-shadow:0 1px 4px rgba(0,0,0,0.04);margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:#1a2e1a;margin-bottom:14px">Week-on-Week Progress</div>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:100px;position:relative">
+        <div style="position:absolute;left:0;right:0;bottom:${80}px;border-top:2px dashed #a5d6a7;z-index:1"></div>
+        <div style="position:absolute;right:4px;bottom:${80 + 2}px;font-size:9px;font-weight:700;color:#2d6a4f;z-index:2">80%</div>
+        ${wowData.map(d => {
+          const h = d.cumRate;
+          const color = d.cumRate >= 80 ? '#52b788' : d.cumRate >= 60 ? '#f9c74f' : '#ea4335';
+          const delta = wowData.indexOf(d) > 0 ? d.cumRate - wowData[wowData.indexOf(d) - 1].cumRate : 0;
+          const arrow = delta > 0 ? '↑' : delta < 0 ? '↓' : '';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">
+            <div style="font-size:10px;font-weight:700;color:${color}">${d.cumRate}%${arrow}</div>
+            <div style="width:100%;max-width:40px;background:${color};border-radius:4px 4px 0 0;height:${h}px;transition:height 0.3s"></div>
+            <div style="font-size:9px;color:#8a9a8a;font-weight:600">W${toISOWeek(d.week)}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:#8a9a8a">
+        <span>Bar = cumulative rate to date</span>
+        <span>Dashed line = 80% target</span>
       </div>
     </div>
 
@@ -797,13 +845,13 @@ function renderRankings() {
   const wk = _rankWeek;
   const isCurrent = wk === s.weekNow;
   const launchWk  = s.launchWeek ?? 1;
-  const weekLabel = isCurrent ? `Week ${wk} (Current)` : `Week ${wk}`;
+  const weekLabel = isCurrent ? `Week ${toISOWeek(wk)} (Current)` : `Week ${toISOWeek(wk)}`;
 
   // Week slider HTML (shared above both sections)
   const weekSlider = `
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
       <button onclick="setRankWeek(${wk-1})" ${wk<=launchWk?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk>launchWk?'pointer':'default'};opacity:${wk>launchWk?1:0.35}">‹ Prev</button>
-      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel} / 13</span>
+      <span style="font-weight:700;font-size:14px;color:#1a2e1a;min-width:110px;text-align:center">${weekLabel}</span>
       <button onclick="setRankWeek(${wk+1})" ${wk>=s.weekNow?'disabled':''} style="background:#f0f4f0;border:1px solid #dce3dc;border-radius:8px;padding:5px 12px;font-size:13px;font-weight:700;cursor:${wk<s.weekNow?'pointer':'default'};opacity:${wk<s.weekNow?1:0.35}">Next ›</button>
       ${!isCurrent ? `<button onclick="setRankWeek(${s.weekNow})" style="background:#e8f5e9;border:1px solid #a5d6a7;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;color:#2d6a4f;margin-left:4px">↩ Current</button>` : ''}
     </div>`;
@@ -827,14 +875,12 @@ function renderRankings() {
   }).sort((a, b) => b.wkRate - a.wkRate || b.avgPoints - a.avgPoints);
 
   const deptRows = deptsForWk.map((d, i) => {
-    const q2rate = d.targetSubmissions ? Math.round(d.totalSubmissions / d.targetSubmissions * 100) : 0;
     const streak = d.deptStreak ? `${d.deptStreak} wk 🔥` : '—';
     return `<tr>
       <td>${rankBadge(i+1)}</td>
       <td><div class="cell-name dept-link" onclick="openDeptDrawer(${jAttr(d.department)})">${esc(d.department)}</div>${i===0?'<div class="cell-sub">🥇 Leading this week</div>':''}</td>
       <td style="text-align:center">${d.count}</td>
       <td>${miniBar(d.wkRate)}</td>
-      <td style="text-align:center;font-weight:700;${rateTextClass(q2rate)}">${q2rate}%</td>
       <td style="text-align:center;font-weight:700">${streak}</td>
       <td style="text-align:center;font-weight:700">${d.avgPoints}</td>
       <td style="text-align:center;font-size:20px">${d.gardenStage}</td>
@@ -890,7 +936,7 @@ function renderRankings() {
       <table class="data-table">
         <thead><tr>
           <th>Rank</th><th>Department</th><th class="center">Members</th>
-          <th>${isCurrent ? 'This Week' : `Week ${wk}`}</th><th class="center">Q2 Rate</th>
+          <th>${isCurrent ? 'This Week' : `Week ${toISOWeek(wk)}`}</th>
           <th class="center">Streak</th><th class="center">Avg Pts</th><th class="center">Garden</th>
         </tr></thead>
         <tbody>${deptRows}</tbody>
@@ -899,7 +945,7 @@ function renderRankings() {
 
     <div id="rindividuals" style="${_rankView!=='individuals'?'display:none':''}">
       <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a2e1a">${submittedWkCount}</div><div style="font-size:11px;color:#8a9a8a">Submitted ${isCurrent ? 'this week' : `Wk ${wk}`}</div></div>
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a2e1a">${submittedWkCount}</div><div style="font-size:11px;color:#8a9a8a">Submitted ${isCurrent ? 'this week' : `W${toISOWeek(wk)}`}</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${topPts}</div><div style="font-size:11px;color:#8a9a8a">Top score</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a73e8">${maxStreak}</div><div style="font-size:11px;color:#8a9a8a">Max streak (weeks)</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${_gnPending.length + _gnReviewed.filter(g=>g.status==='Approved').length}</div><div style="font-size:11px;color:#8a9a8a">Good news nominations</div></div>
@@ -909,7 +955,7 @@ function renderRankings() {
         <thead><tr>
           <th>Rank</th><th>Name</th><th>Dept</th>
           <th class="center">Plant</th><th class="center">Points</th>
-          <th class="center">Streak</th><th class="center">${isCurrent ? 'This Week' : `Wk ${wk}`}</th>
+          <th class="center">Streak</th><th class="center">${isCurrent ? 'This Week' : `W${toISOWeek(wk)}`}</th>
         </tr></thead>
         <tbody>${indivRows}</tbody>
       </table>
@@ -941,7 +987,7 @@ function renderReflections() {
 
   // Week options
   const weekOpts = Array.from({ length: _stats.weekNow }, (_, i) => i + 1)
-    .map(w => `<option value="${w}" ${w===_reflWeek?'selected':''}>Week ${w}${w===_stats.weekNow?' (Current)':''}</option>`)
+    .map(w => `<option value="${w}" ${w===_reflWeek?'selected':''}>Week ${toISOWeek(w)}${w===_stats.weekNow?' (Current)':''}</option>`)
     .join('');
 
   // Dept chips
@@ -1094,7 +1140,7 @@ function renderGoodNews() {
 }
 
 function gnCard(gn, status) {
-  const weekLabel  = gn.week_number ? `Week ${gn.week_number}` : '';
+  const weekLabel  = gn.week_number ? `Week ${toISOWeek(gn.week_number)}` : '';
   const dateLabel  = gn.timestamp ? gn.timestamp.slice(0,10) : '';
   const nominator  = esc(gn.nominator_name ?? '');
   const nominatorD = esc(gn.nominator_dept ?? '');
@@ -1549,7 +1595,7 @@ function openDeptDrawer(deptName) {
 
   document.getElementById('drawerGoal').innerHTML = `
     <div style="background:#edf7ef;border-radius:10px;padding:12px 16px;margin-bottom:6px;display:flex;align-items:center;justify-content:space-between">
-      <span style="font-size:13px;color:#2d6a4f;font-weight:600">${isCurrent ? 'This week' : `Week ${wk}`}</span>
+      <span style="font-size:13px;color:#2d6a4f;font-weight:600">${isCurrent ? 'This week' : `Week ${toISOWeek(wk)}`}</span>
       <span style="font-size:18px;font-weight:800;color:#1a2e1a">${submitted.length} / ${activeMembers.length} on time${lateMembers.length > 0 ? ` · ${lateMembers.length} late` : ''}</span>
     </div>`;
 
@@ -1586,7 +1632,7 @@ async function submitExtension(name, type, weekNumber) {
   const wk = parseInt(weekNumber);
   if (!wk) return;
   const label = type === 'excused' ? 'excuse' : 'grant extension for';
-  if (!confirm(`${label === 'excuse' ? 'Excuse' : 'Grant extension for'} ${name} — Week ${wk}?`)) return;
+  if (!confirm(`${label === 'excuse' ? 'Excuse' : 'Grant extension for'} ${name} — Week ${toISOWeek(wk)}?`)) return;
   try {
     await fetch('/api/extensions', {
       method: 'POST',
@@ -1614,7 +1660,7 @@ async function toggleLate(subId, realName, weekNum, btn) {
 async function moveSubmission(rowIndex, weekNum, name) {
   const wk = parseInt(weekNum);
   if (!wk) return;
-  if (!confirm(`Move submission to Week ${wk}? This changes the date in Supabase.`)) return;
+  if (!confirm(`Move submission to Week ${toISOWeek(wk)}? This changes the date in Supabase.`)) return;
   try {
     await fetch(`/api/submissions/${rowIndex}/week`, {
       method: 'PATCH',
@@ -1722,7 +1768,7 @@ async function openDrawer(name) {
       else type = 'future';
       const c = CHIP[type];
       return `<div style="display:inline-flex;flex-direction:column;align-items:center;gap:2px;min-width:30px;padding:6px 4px;border-radius:8px;background:${c.bg};color:${c.color};font-size:11px;font-weight:700">
-        <span>${c.lbl}</span><span style="font-size:9px;opacity:0.75">W${wk}</span></div>`;
+        <span>${c.lbl}</span><span style="font-size:9px;opacity:0.75">W${toISOWeek(wk)}</span></div>`;
     }).join('');
     const legend = `<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:10px">
       <span style="background:#d9f0e0;color:#1b5e3b;padding:2px 6px;border-radius:4px;font-size:10px;font-weight:600">✓ Done</span>
@@ -1767,7 +1813,7 @@ async function openDrawer(name) {
     const sharedHtml = gnShared.length
       ? gnShared.map(g => gnCard('#fffef5', '#fef08a', `
           <div style="font-size:11px;font-weight:700;color:#854d0e;margin-bottom:4px">
-            ${statusBadge(g.status)} Wk ${weekNumFromTimestamp(g.timestamp) ?? g.week_number} · +${g.pts_sharer ?? 5} pts
+            ${statusBadge(g.status)} W${toISOWeek(weekNumFromTimestamp(g.timestamp) ?? g.week_number)} · +${g.pts_sharer ?? 5} pts
           </div>
           <div style="font-size:12px;color:#1a2e1a;line-height:1.5">"${escBr(g.message)}"</div>`
         )).join('')
@@ -1779,7 +1825,7 @@ async function openDrawer(name) {
             ?? (g.pts_nominee ?? 3);
           return gnCard('#f0faf5', '#b7e4c7', `
             <div style="font-size:11px;font-weight:700;color:#1b5e3b;margin-bottom:4px">
-              From: ${esc(g.nominator_name ?? '')} · Wk ${weekNumFromTimestamp(g.timestamp) ?? g.week_number} · +${pts} pts
+              From: ${esc(g.nominator_name ?? '')} · W${toISOWeek(weekNumFromTimestamp(g.timestamp) ?? g.week_number)} · +${pts} pts
             </div>
             <div style="font-size:12px;color:#1a2e1a;line-height:1.5">"${escBr(g.message)}"</div>`);
         }).join('')
@@ -1793,10 +1839,10 @@ async function openDrawer(name) {
 
     // ── Section 4: Admin ───────────────────────────────────────────────────
     const weekOpts = Array.from({ length: weekNow }, (_, i) => weekNow - i)
-      .map(w => `<option value="${w}">Week ${w}</option>`).join('');
+      .map(w => `<option value="${w}">Week ${toISOWeek(w)}</option>`).join('');
     const excListHtml = myExts.filter(e => e.type === 'excused').length
       ? `<div style="margin-top:10px;font-size:11px;color:#6b7c6b;background:#f5f7f5;border-radius:6px;padding:8px 10px">
-          Excused: ${myExts.filter(e => e.type === 'excused').map(e => `Wk ${e.week_number}`).join(', ')}
+          Excused: ${myExts.filter(e => e.type === 'excused').map(e => `W${toISOWeek(e.week_number)}`).join(', ')}
           <a href="#" onclick="removeExtensionPrompt(${jAttr(name)});return false" style="color:#c5221f;font-weight:700;margin-left:6px">Remove…</a>
         </div>`
       : '';

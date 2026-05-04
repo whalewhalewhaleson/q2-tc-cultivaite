@@ -60,6 +60,18 @@ function getWeekNumber() {
   return Math.min(Math.max(Math.floor(ms / (7 * 24 * 60 * 60 * 1000)) + 1, 1), 13);
 }
 
+function toISOWeek(w) { return w + 13; }
+function fromISOWeek(w) { return w - 13; }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
 // Progress bar using filled ● and empty ○, wrapped in monospace
 function buildProgressBar(pct) {
   const filled = Math.floor(Math.max(0, Math.min(100, pct)) / 10);
@@ -166,7 +178,7 @@ function buildWeeklyBreakdown(stats) {
     const icon = STATUS_ICON[w.status] ?? '—';
     const ptsStr = w.pts > 0 ? `${e(String(w.pts))} pts` : '—';
     const bonus = w.dept2x ? ' ×2' : '';
-    out += `\nW${w.week} ${icon} ${ptsStr}${e(bonus)}`;
+    out += `\nW${toISOWeek(w.week)} ${icon} ${ptsStr}${e(bonus)}`;
   }
 
   if (stats.goodNewsEvents.length > 0) {
@@ -435,15 +447,19 @@ async function reflectConversation(conversation, ctx) {
     await ctx.reply(`✅ ${bold('Saved.')} Let's reflect\\. 🌱`, { parse_mode: 'MarkdownV2' });
   } else {
     const reflectOpeners = [
-      `Nice to see you again, ${e(displayName)}\\! 🌳🦋 Week ${weekNum}, let's go\\!\n\n` +
-      `🎯 Your goal this quarter was: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
+      `Nice to see you again, ${e(displayName)}\\! 🌳🦋 Week ${toISOWeek(weekNum)}, let's go\\!\n\n` +
+      `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — how's it going\\?\n\n` +
+      `This week, did you spot yourself or someone displaying ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\? Keep an eye out as you reflect\\! 🌱\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
-      `Hey there, ${e(displayName)}\\! Ready for week ${weekNum}\\? 🌱\n\n` +
-      `Made any progress on your goal 🎯 ${italic(`"${existingGoal}"`)}\?\n\n` +
+      `Hey there, ${e(displayName)}\\! Ready for Week ${toISOWeek(weekNum)}\\? 🌱\n\n` +
+      `Before we start — think about the past week\\. Did you or someone around you show ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\?\n\n` +
+      `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — any progress\\?\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
 
-      `How was your week, ${e(displayName)}\\? 😎 Your 🎯 goal this quarter is: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
+      `How was your week, ${e(displayName)}\\? 😎 Week ${toISOWeek(weekNum)} — let's reflect\\.\n\n` +
+      `🎯 Your goal: ${italic(`"${existingGoal}"`)}\\ — how is it coming along\\? 💭\n\n` +
+      `As you reflect, think about who stood out this week — yourself or a teammate — living out ${bold('Care · Leadership · Can\\-Do Attitude · Team')}\\. 🌱\n\n` +
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
     ];
     const opener = reflectOpeners[Math.floor(Math.random() * reflectOpeners.length)];
@@ -479,8 +495,9 @@ async function reflectConversation(conversation, ctx) {
 
   const q3Keyboard = new InlineKeyboard().text('Skip ⏭️', 'q3_skip');
   await ctx.reply(
-    `${bold('Q3 (Optional): Any good news about someone this week? ⭐️')}\n` +
-    `${italic('Share their name and what they did.')}`,
+    `${bold('Q3 (Optional): Any good news to share? ⭐️')}\n\n` +
+    `${italic('Did someone display our core values, go the extra mile, or show great character? Tell us who and what happened — the more specific, the better\\!')}\n\n` +
+    `${italic('You can shout out more than one person\\.')}`,
     { parse_mode: 'MarkdownV2', reply_markup: q3Keyboard }
   );
   const q3Event = await conversation.waitFor(['message:text', 'callback_query:data']);
@@ -786,7 +803,7 @@ function buildDeptBlock(deptName, deptStats, memberData) {
   const deptStreak = deptStats.deptStreak ?? 0;
   const { nextEmoji, ptsNeeded } = getNextStageInfo(deptStats.gardenStage, Math.floor(avgPts));
   const gardenRow = memberData.stages.length
-    ? memberData.stages.join('')
+    ? shuffle(memberData.stages).join('')
     : '🌱 Still taking root\\.\\.\\.';
 
   let block =
@@ -902,7 +919,7 @@ bot.command('leaderboard', async (ctx) => {
     const currentUser = await lookupUser(chatId, username);
 
     const medals = ['🥇', '🥈', '🥉'];
-    const companyGarden = allStats.map(u => u.plantStage).join('');
+    const companyGarden = shuffle(allStats.map(u => u.plantStage)).join('');
 
     // Assign ranks with dense ties (1,1,2 style)
     const ranked = [];
@@ -957,15 +974,17 @@ bot.command('skipweek', async (ctx) => {
     const nameArg = args.slice(0, -1).join(' ').trim();
     const weekNum = parseInt(weekArg, 10);
 
-    if (!nameArg || isNaN(weekNum) || weekNum < 1 || weekNum > 13) {
+    if (!nameArg || isNaN(weekNum) || weekNum < 14 || weekNum > 26) {
       await ctx.reply(
         `${bold('Usage:')} /skipweek \\[Name\\] \\[Week\\]\n\n` +
-        `Example: /skipweek Wilson 3\n\n` +
-        `${italic('Week must be a number between 1 and 13.')}`,
+        `Example: /skipweek Wilson ${toISOWeek(getWeekNumber())}\n\n` +
+        `${italic('Week must be between 14 and 26.')}`,
         { parse_mode: 'MarkdownV2' }
       );
       return;
     }
+
+    const internalWeek = fromISOWeek(weekNum);
 
     const user = await sheets.getUserByRealName(nameArg);
     if (!user?.realName) {
@@ -976,7 +995,7 @@ bot.command('skipweek', async (ctx) => {
       return;
     }
 
-    await sheets.logSkip(user.realName, user.department, weekNum);
+    await sheets.logSkip(user.realName, user.department, internalWeek);
     sheets.invalidateStatsCache();
 
     await ctx.reply(
@@ -1480,7 +1499,7 @@ bot.command('testmystats', async (ctx) => {
     const totalUsers = allUsers.length;
 
     const deptLine = [user.department, user.secondaryDepartment].filter(Boolean).join(' + ');
-    let msg = `${bold('Preview: /mystats for')} ${e(displayName)}\n${italic(deptLine)} · Week ${weekNum}\n\n`;
+    let msg = `${bold('Preview: /mystats for')} ${e(displayName)}\n${italic(deptLine)} · Week ${toISOWeek(weekNum)}\n\n`;
 
     if (!stats) {
       msg +=
@@ -1552,7 +1571,7 @@ bot.command('dashboard', async (ctx) => {
     const onTrack = rateThisWeek >= 90 ? '✅ On track' : rateThisWeek >= 70 ? '⚠️ Behind' : '❌ Needs attention';
 
     await ctx.reply(
-      `📊 TC CultivAIte Dashboard — Week ${weekNum} of 13\n\n` +
+      `📊 TC CultivAIte Dashboard — Week ${toISOWeek(weekNum)}\n\n` +
       `This week: ${rateThisWeek}% submitted (${submittedCount}/${totalCount})\n` +
       `Top dept: ${topDept?.department ?? 'N/A'} 🥇 (${topDept?.avgPoints ?? 0} avg pts)\n` +
       `Target 90%: ${onTrack}\n\n` +
@@ -1596,7 +1615,7 @@ bot.command('mystats', async (ctx) => {
     const yyyy = now.getFullYear();
     const todayStr = `${dd} ${months[now.getMonth()]} ${yyyy}`;
 
-    let msg = `${e(todayStr)} \\(Week ${weekNum}\\)\n\n`;
+    let msg = `${e(todayStr)} \\(Week ${toISOWeek(weekNum)}\\)\n\n`;
 
     if (!stats) {
       msg +=
@@ -1820,7 +1839,7 @@ bot.command('help', async (ctx) => {
   if (isAdmin(ctx)) {
     msg +=
       `\n${bold('Admin')}\n` +
-      `/skipweek — 🗓 Excuse a user for a week\n` +
+      `/skipweek — 🗓 Excuse a user for a week \\(e\\.g\\. W${toISOWeek(getWeekNumber())}\\)\n` +
       `/testnudge — 🔔 Preview the Monday morning nudge\n` +
       `  • /testnudge wilson — send to a specific person\n` +
       `/test1hwarning — ⏳ Preview the Monday 3PM 1\\-hour warning\n` +
