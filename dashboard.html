@@ -1602,8 +1602,8 @@ function openDeptDrawer(deptName) {
   const dept = _stats.depts.find(d => d.department === deptName);
   if (!dept) return;
 
-  const activeMembers = (_stats.users ?? []).filter(u => u.department === deptName);
-  const inactiveMembers = (_stats.inactiveUsers ?? []).filter(u => u.department === deptName);
+  const activeMembers = (_stats.users ?? []).filter(u => u.department === deptName || u.secondaryDepartment === deptName);
+  const inactiveMembers = (_stats.inactiveUsers ?? []).filter(u => u.department === deptName || u.secondaryDepartment === deptName);
 
   const wk = _dashWeek;
   const isCurrent = wk === _stats.weekNow;
@@ -1612,7 +1612,6 @@ function openDeptDrawer(deptName) {
   const submitted    = activeMembers.filter(isOnTime);
   const lateMembers  = activeMembers.filter(isLate);
   const notSubmitted = activeMembers.filter(u => !isOnTime(u) && !isLate(u));
-  const q2rate = dept.targetSubmissions ? Math.round(dept.totalSubmissions / dept.targetSubmissions * 100) : 0;
   const streak = dept.deptStreak ? `${dept.deptStreak} wk 🔥` : '—';
 
   const memberRow = (u, dimmed) => `
@@ -1633,7 +1632,7 @@ function openDeptDrawer(deptName) {
   document.getElementById('drawerName').textContent = deptName;
   document.getElementById('drawerMeta').textContent = `${activeMembers.length} active member${activeMembers.length !== 1 ? 's' : ''} · ${dept.gardenStage} Garden`;
   const ptsEl = document.getElementById('drawerPts');
-  ptsEl.textContent = `${q2rate}%`; ptsEl.nextElementSibling.textContent = 'Q2 Rate';
+  ptsEl.textContent = dept.totalSubmissions ?? 0; ptsEl.nextElementSibling.textContent = 'Submissions';
   const streakEl = document.getElementById('drawerStreak');
   streakEl.textContent = streak; streakEl.nextElementSibling.textContent = 'Streak';
   const stageEl = document.getElementById('drawerStage');
