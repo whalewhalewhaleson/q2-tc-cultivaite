@@ -1719,12 +1719,34 @@ async function moveSubmission(rowIndex, weekNum, name) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-async function moveGoodNewsWeek(gnId, currentWeek) {
-  const label = currentWeek ? ` (currently Week ${toISOWeek(currentWeek)})` : '';
-  const input = prompt(`Move Good News #${gnId} to which internal week?${label}\nEnter internal week number (e.g. 6 = Week ${toISOWeek(6)}):`);
-  const wk = parseInt(input);
-  if (!wk) return;
-  if (!confirm(`Move Good News #${gnId} to Week ${toISOWeek(wk)}? This affects points attribution.`)) return;
+function moveGoodNewsWeek(gnId, currentWeek) {
+  const card = document.getElementById(`gnc-${gnId}`);
+  if (!card || card.querySelector('.gn-week-move-section')) return;
+
+  const weekNow = _stats?.weekNow ?? 10;
+  const launchWeek = _stats?.launchWeek ?? 4;
+  const opts = Array.from({ length: weekNow - launchWeek + 1 }, (_, i) => {
+    const w = launchWeek + i;
+    const sel = w === currentWeek ? ' selected' : '';
+    return `<option value="${w}"${sel}>Week ${toISOWeek(w)}${w === weekNow ? ' (Current)' : ''}</option>`;
+  }).join('');
+
+  const el = document.createElement('div');
+  el.className = 'gn-week-move-section';
+  el.style.cssText = 'margin-top:10px;padding:10px;background:#f0f4f0;border-radius:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap';
+  el.innerHTML = `
+    <span style="font-size:12px;font-weight:600;color:#4a6741">📅 Move to:</span>
+    <select id="gnwk-${gnId}" class="filter-select" style="font-size:13px">${opts}</select>
+    <button class="btn-save" style="padding:5px 12px;font-size:12px" onclick="confirmMoveGNWeek(${gnId})">Move</button>
+    <button class="btn-cancel-edit" style="padding:5px 10px;font-size:12px" onclick="this.closest('.gn-week-move-section').remove()">Cancel</button>
+  `;
+  card.querySelector('.gn-body').appendChild(el);
+}
+
+async function confirmMoveGNWeek(gnId) {
+  const sel = document.getElementById(`gnwk-${gnId}`);
+  if (!sel) return;
+  const wk = parseInt(sel.value);
   try {
     await fetch(`/api/good-news/${gnId}/week`, {
       method: 'PATCH',
