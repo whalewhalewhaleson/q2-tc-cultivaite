@@ -885,7 +885,7 @@ function renderRankings() {
       gardenAtWk = pointsToStage(avgPtsAtWk);
     }
     return { ...d, wkRate: wkData.total ? Math.round(wkData.submitted / wkData.total * 100) : 0, wkStreak, avgPtsAtWk, gardenAtWk };
-  }).sort((a, b) => b.wkRate - a.wkRate || b.avgPtsAtWk - a.avgPtsAtWk);
+  }).sort((a, b) => b.avgPtsAtWk - a.avgPtsAtWk || b.wkRate - a.wkRate);
 
   const deptRows = deptsForWk.map((d, i) => {
     const streak = d.wkStreak ? `${d.wkStreak} wk 🔥` : '—';
