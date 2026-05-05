@@ -928,6 +928,19 @@ function renderRankings() {
   const maxStreak = Math.max(...usersWithWkSub.map(u => u.wkStreak), 0);
   const submittedWkCount = usersWithWkSub.filter(u => u.submittedWk).length;
 
+  // Good news received this week per user (approved nominations only)
+  const gnWkMap = {};
+  let gnWkTotal = 0;
+  for (const g of _gnReviewed.filter(g => g.status === 'Approved')) {
+    const gnWk = g.week_number ?? weekNumFromTimestamp(g.timestamp);
+    if (gnWk !== wk) continue;
+    gnWkTotal++;
+    for (const a of (g.awards ?? [])) {
+      const nm = (a.recipient_name ?? '').trim();
+      if (nm) gnWkMap[nm] = (gnWkMap[nm] ?? 0) + 1;
+    }
+  }
+
   const indivRows = pageUsers.map(u => {
     const ds = displayStage(u.wkStage, u.wkMisses);
     const streakDots = u.wkStreak > 0
@@ -936,6 +949,8 @@ function renderRankings() {
     const ptsLabel = !isCurrent && u.wkPts > 0
       ? `${u.cumulPts} <span style="font-size:10px;color:#52b788">(+${u.wkPts})</span>`
       : `${u.cumulPts}`;
+    const gnCount = gnWkMap[u.realName] ?? 0;
+    const gnCell = gnCount ? `<span style="color:#9c27b0;font-weight:700">${gnCount} 🌟</span>` : '—';
     return `<tr style="${!u.submittedWk && u.cumulPts === 0 ? 'opacity:0.55' : ''}">
       <td>${rankBadge(u.wkRank)}</td>
       <td><span class="name-link" onclick="openDrawer(${jAttr(u.realName)})">${esc(u.realName)}</span></td>
@@ -944,6 +959,7 @@ function renderRankings() {
       <td style="text-align:center;font-weight:700;${u.cumulPts >= 86?'color:#2d6a4f':''}">${ptsLabel}</td>
       <td style="text-align:center">${streakDots}</td>
       <td style="text-align:center">${u.submittedWk ? '<span class="sub-yes">✅</span>' : '<span class="sub-no">❌</span>'}</td>
+      <td style="text-align:center">${gnCell}</td>
     </tr>`;
   }).join('');
 
@@ -978,14 +994,14 @@ function renderRankings() {
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a2e1a">${submittedWkCount}</div><div style="font-size:11px;color:#8a9a8a">Submitted ${isCurrent ? 'this week' : `W${toISOWeek(wk)}`}</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${topPts}</div><div style="font-size:11px;color:#8a9a8a">Top score${isCurrent ? '' : ` (end W${toISOWeek(wk)})`}</div></div>
         <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#1a73e8">${maxStreak}</div><div style="font-size:11px;color:#8a9a8a">Max streak${isCurrent ? '' : ` (at W${toISOWeek(wk)})`}</div></div>
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${_gnPending.length + _gnReviewed.filter(g=>g.status==='Approved').length}</div><div style="font-size:11px;color:#8a9a8a">Good news nominations</div></div>
+        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${gnWkTotal}</div><div style="font-size:11px;color:#8a9a8a">Good news ${isCurrent ? 'this week' : `W${toISOWeek(wk)}`}</div></div>
       </div>
       ${paginationHtml}
       <table class="data-table">
         <thead><tr>
           <th>Rank</th><th>Name</th><th>Dept</th>
           <th class="center">Plant</th><th class="center">Points</th>
-          <th class="center">Streak</th><th class="center">${isCurrent ? 'This Week' : `W${toISOWeek(wk)}`}</th>
+          <th class="center">Streak</th><th class="center">${isCurrent ? 'This Week' : `W${toISOWeek(wk)}`}</th><th class="center">Good News</th>
         </tr></thead>
         <tbody>${indivRows}</tbody>
       </table>
