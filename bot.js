@@ -10,7 +10,8 @@ import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
 import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
-         getUserByRealName, getUserByChatId, setGoodNewsWeek } from './db.js';
+         getUserByRealName, getUserByChatId, setGoodNewsWeek,
+         getApprovedUnnotifiedGoodNews, markGoodNewsNotified } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1241,6 +1242,131 @@ bot.command('firerecap', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /pendingnotifications — admin only, list what good news is queued to go out
+// ---------------------------------------------------------------------------
+
+bot.command('pendingnotifications', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const entries = await getApprovedUnnotifiedGoodNews();
+    if (!entries.length) {
+      await ctx.reply(`No pending good news notifications right now\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const lines = entries.flatMap(gn => {
+      const names = gn.awards.length > 0
+        ? gn.awards.map(a => a.recipient_name)
+        : [gn.nominee_name];
+      return names.map(r =>
+        `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(gn.week_number))}\\)\n  _"${e(gn.message)}"_`
+      );
+    }).join('\n');
+    const msg =
+      `📨 ${bold(`Pending Good News Notifications (${entries.length})`)}\n\n` +
+      `${lines}\n\n` +
+      `Use /firenotifications to send now, or they fire automatically Tue 10:15AM SGT\\.`;
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/pendingnotifications error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /testnotification — admin only, preview both notification messages to yourself
+// Uses the first pending unnotified entry, or a sample if none exist
+// ---------------------------------------------------------------------------
+
+bot.command('testnotification', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const adminChatId = ctx.from.id;
+
+    const entries = await getApprovedUnnotifiedGoodNews();
+    let nominator, nominee, message, pts, nominatorPts;
+
+    if (entries.length > 0) {
+      const gn = entries[0];
+      nominator = gn.nominator_name;
+      const firstAward = gn.awards[0];
+      nominee = firstAward?.recipient_name ?? gn.nominee_name;
+      pts = firstAward?.pts ?? 3;
+      message = gn.message;
+      nominatorPts = gn.pts_sharer ?? 5;
+    } else {
+      nominator = 'Wilson Tan';
+      nominee = 'Sarah Lim';
+      pts = 3;
+      nominatorPts = 5;
+      message = 'She went above and beyond helping the new team members settle in this week — really showed care and initiative!';
+    }
+
+    await ctx.reply(`${italic('Preview — nominee receives:')}\n​`, { parse_mode: 'MarkdownV2' });
+
+    const nomineeMsg =
+      `🌟 ${bold('Good News Shoutout!')}\n\n` +
+      `${e(nominator)} shared good news about you:\n\n` +
+      `_"${e(message)}"_\n\n` +
+      `You've earned \\+${e(String(pts))} pts 🎉`;
+    await bot.api.sendMessage(adminChatId, nomineeMsg, { parse_mode: 'MarkdownV2' });
+
+    await ctx.reply(`${italic('Preview — nominator receives:')}\n​`, { parse_mode: 'MarkdownV2' });
+
+    const nominatorMsg =
+      `✅ ${bold('Your Good News was Approved!')}\n\n` +
+      `Your shoutout about ${e(nominee)} went through\\!\n\n` +
+      `You've earned \\+${e(String(nominatorPts))} pts 🌟`;
+    await bot.api.sendMessage(adminChatId, nominatorMsg, { parse_mode: 'MarkdownV2' });
+
+    const source = entries.length > 0 ? `\\(using real entry from ${e(nominator)}\\)` : `\\(sample data — no pending entries\\)`;
+    await ctx.reply(`That's what they'll see\\. ${source}`, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/testnotification error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /firenotifications — admin only, send pending good news notifications now
+// ---------------------------------------------------------------------------
+
+bot.command('firenotifications', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const entries = await getApprovedUnnotifiedGoodNews();
+    if (!entries.length) {
+      await ctx.reply(`No pending good news notifications right now\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    await ctx.reply(
+      `📨 Sending ${e(String(entries.length))} good news notification${entries.length === 1 ? '' : 's'}\\.\\.\\. `,
+      { parse_mode: 'MarkdownV2' }
+    );
+    const { sent, noChat } = await sendGoodNewsNotifications();
+    let reply = `✅ Done\\!\n\n`;
+    if (sent.length) {
+      reply += `Notified:\n` + sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`).join('\n');
+    }
+    if (noChat.length) {
+      reply += `\n\nNo Telegram \\(not reached\\):\n` + noChat.map(n => `• ${e(n)}`).join('\n');
+    }
+    await ctx.reply(reply, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/firenotifications error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /testshoutout — admin only, sends a dept 100% shoutout to yourself
 // Usage: /testshoutout [Department Name]
 // ---------------------------------------------------------------------------
@@ -1851,6 +1977,9 @@ bot.command('help', async (ctx) => {
       `  • /testdeadlinenudge wilson — send to a specific person\n` +
       `/testrecap — 📊 Preview the weekly recap message\n` +
       `/firerecap — 🚀 Send the weekly recap to everyone now\n` +
+      `/pendingnotifications — 📋 List what good news is queued to send\n` +
+      `/testnotification — 👀 Preview both notification messages to yourself\n` +
+      `/firenotifications — 📨 Send pending good news notifications now\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
@@ -1872,6 +2001,8 @@ bot.command('help', async (ctx) => {
       `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
       `Fri 10AM SGT — Recap reminder to admins\n` +
       `Fri 3:30PM SGT — Weekly recap to everyone \\(skips if already sent via /firerecap\\)\n` +
+      `Tue 10AM SGT — Good news notification preview to admins\n` +
+      `Tue 10:15AM SGT — Good news notifications to nominees \\+ nominators\n` +
       `On submit — Dept 100% shoutout \\(first dept to hit 100% that week\\)\n`;
   }
 
@@ -2027,6 +2158,61 @@ cron.schedule('0 8 * * 1', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
+// Good news notifications — shared by cron and /firenotifications
+// ---------------------------------------------------------------------------
+
+async function sendGoodNewsNotifications() {
+  const entries = await getApprovedUnnotifiedGoodNews();
+  if (!entries.length) return { sent: [], noChat: [], count: 0 };
+
+  const sent = [];
+  const noChat = [];
+
+  for (const gn of entries) {
+    const { nominator_name, message, pts_sharer, awards } = gn;
+    const recipients = awards.length > 0 ? awards : [{ recipient_name: gn.nominee_name, pts: 3 }];
+
+    // Notify each recipient
+    for (const award of recipients) {
+      const user = await getUserByRealName(award.recipient_name);
+      if (!user?.chatId) { noChat.push(award.recipient_name); continue; }
+      const msg =
+        `🌟 ${bold('Good News Shoutout!')}\n\n` +
+        `${e(nominator_name)} shared good news about you:\n\n` +
+        `_"${e(message)}"_\n\n` +
+        `You've earned \\+${e(String(award.pts))} pts 🎉`;
+      try {
+        await bot.api.sendMessage(user.chatId, msg, { parse_mode: 'MarkdownV2' });
+        sent.push({ name: award.recipient_name, fromName: nominator_name, pts: award.pts });
+      } catch (err) {
+        console.error(`[GN notify] Failed → ${award.recipient_name}:`, err.message);
+        noChat.push(award.recipient_name);
+      }
+    }
+
+    // Notify nominator
+    const nominatorUser = await getUserByRealName(nominator_name);
+    if (nominatorUser?.chatId) {
+      const names = recipients.map(a => a.recipient_name);
+      const recipientList = names.length === 1
+        ? e(names[0])
+        : names.slice(0, -1).map(e).join(', ') + ' and ' + e(names.at(-1));
+      const nominatorMsg =
+        `✅ ${bold('Your Good News was Approved!')}\n\n` +
+        `Your shoutout about ${recipientList} went through\\!\n\n` +
+        `You've earned \\+${e(String(pts_sharer ?? 5))} pts 🌟`;
+      try {
+        await bot.api.sendMessage(nominatorUser.chatId, nominatorMsg, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        console.error(`[GN notify] Failed → nominator ${nominator_name}:`, err.message);
+      }
+    }
+  }
+
+  await markGoodNewsNotified(entries.map(gn => gn.id));
+  return { sent, noChat, count: entries.length };
+}
+
 // Recap broadcast — shared by cron, /firerecap, and one-off triggers
 // ---------------------------------------------------------------------------
 
@@ -2101,6 +2287,79 @@ cron.schedule('0 2 * * 5', async () => {
       await bot.api.sendMessage(adminId, `⏰ Heads up — the weekly recap is scheduled to fire at 3:30 PM SGT today\\.\n\nUse /firerecap to send it now, or let it fire automatically\\.`, { parse_mode: 'MarkdownV2' });
     } catch (err) {
       console.error(`[Cron] Failed recap reminder to admin ${adminId}:`, err.message);
+    }
+  }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// Tuesday 10:00 AM SGT — admin heads-up preview before good news notifications
+// ---------------------------------------------------------------------------
+
+cron.schedule('0 2 * * 2', async () => {
+  const week = currentQ2Week();
+  if (week < 1 || week > 13) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  if (!adminIds.length) return;
+  try {
+    const entries = await getApprovedUnnotifiedGoodNews();
+    let msg;
+    if (!entries.length) {
+      msg = `📨 No pending good news notifications for today\\.`;
+    } else {
+      const lines = entries.flatMap(gn => {
+        const names = gn.awards.length > 0
+          ? gn.awards.map(a => a.recipient_name)
+          : [gn.nominee_name];
+        return names.map(r => `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(gn.week_number))}\\)`);
+      }).join('\n');
+      msg =
+        `📨 Good news notifications fire at *10:15 AM SGT* today\\.\n\n` +
+        `${e(String(entries.length))} entr${entries.length === 1 ? 'y' : 'ies'} will go out:\n${lines}\n\n` +
+        `Use /firenotifications to send now, or let it fire automatically\\.`;
+    }
+    for (const adminId of adminIds) {
+      try {
+        await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        console.error(`[Cron] GN heads-up failed for admin ${adminId}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[Cron] GN heads-up error:', err);
+  }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
+// Tuesday 10:15 AM SGT — send good news notifications
+// ---------------------------------------------------------------------------
+
+cron.schedule('15 2 * * 2', async () => {
+  const week = currentQ2Week();
+  if (week < 1 || week > 13) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  try {
+    const { sent, noChat, count } = await sendGoodNewsNotifications();
+    if (count === 0) return;
+    let summary = `✅ Good news notifications sent\\!\n\n`;
+    if (sent.length) {
+      summary += `Notified:\n` + sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`).join('\n');
+    }
+    if (noChat.length) {
+      summary += `\n\nNo Telegram \\(not reached\\):\n` + noChat.map(n => `• ${e(n)}`).join('\n');
+    }
+    for (const adminId of adminIds) {
+      try {
+        await bot.api.sendMessage(adminId, summary, { parse_mode: 'MarkdownV2' });
+      } catch (err) {
+        console.error(`[Cron] GN summary failed for admin ${adminId}:`, err.message);
+      }
+    }
+  } catch (err) {
+    console.error('[Cron] GN notifications error:', err);
+    for (const adminId of adminIds) {
+      try {
+        await bot.api.sendMessage(adminId, `⚠️ Good news notifications failed\\. Check Railway logs\\.`, { parse_mode: 'MarkdownV2' });
+      } catch {}
     }
   }
 }, { timezone: 'UTC' });

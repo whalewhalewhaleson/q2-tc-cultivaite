@@ -639,12 +639,47 @@ export async function reapproveGoodNews(gnId, awards = []) {
   const [delResult, insResult, updResult] = await Promise.all([
     supabase.from('good_news_awards').delete().eq('good_news_id', gnId),
     supabase.from('good_news_awards').insert(awardRows),
-    supabase.from('good_news').update({ status: 'Approved' }).eq('id', gnId),
+    supabase.from('good_news').update({ status: 'Approved', notified_at: null }).eq('id', gnId),
   ]);
   if (delResult.error) throw delResult.error;
   if (insResult.error) throw insResult.error;
   if (updResult.error) throw updResult.error;
   cacheInvalidate('stats');
+}
+
+// Returns all approved good_news entries that haven't been notified yet, with their awards.
+export async function getApprovedUnnotifiedGoodNews() {
+  const { data: rows, error: e1 } = await supabase
+    .from('good_news')
+    .select('id, nominator_name, nominee_name, message, week_number, pts_sharer')
+    .eq('status', 'Approved')
+    .is('notified_at', null);
+  if (e1) throw e1;
+  if (!rows?.length) return [];
+
+  const gnIds = rows.map(r => r.id);
+  const { data: awards, error: e2 } = await supabase
+    .from('good_news_awards')
+    .select('good_news_id, recipient_name, pts')
+    .in('good_news_id', gnIds);
+  if (e2) throw e2;
+
+  const awardsByGnId = {};
+  for (const a of (awards ?? [])) {
+    if (!awardsByGnId[a.good_news_id]) awardsByGnId[a.good_news_id] = [];
+    awardsByGnId[a.good_news_id].push(a);
+  }
+  return rows.map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] }));
+}
+
+// Stamps notified_at on a batch of good_news rows so they don't fire again.
+export async function markGoodNewsNotified(ids) {
+  if (!ids.length) return;
+  const { error } = await supabase
+    .from('good_news')
+    .update({ notified_at: new Date().toISOString() })
+    .in('id', ids);
+  if (error) throw error;
 }
 
 // Un-reject: flip a rejected nomination back to Pending so it can be re-reviewed.
