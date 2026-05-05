@@ -173,20 +173,23 @@ function buildWeeklyBreakdown(stats) {
     excused: '🟡', missed: '❌', pending: '⏳',
   };
 
+  const gnByWeek = new Map();
+  for (const gn of stats.goodNewsEvents) {
+    if (gn.week == null) continue;
+    if (!gnByWeek.has(gn.week)) gnByWeek.set(gn.week, []);
+    gnByWeek.get(gn.week).push(gn);
+  }
+
   let out = `\n\n📊 ${bold('Weekly Breakdown')}`;
   for (const w of stats.weeklyBreakdown) {
     const icon = STATUS_ICON[w.status] ?? '—';
     const ptsStr = w.pts > 0 ? `${e(String(w.pts))} pts` : '—';
     const bonus = w.dept2x ? ' ×2' : '';
     out += `\nW${toISOWeek(w.week)} ${icon} ${ptsStr}${e(bonus)}`;
-  }
-
-  if (stats.goodNewsEvents.length > 0) {
-    out += `\n\n🗞 ${bold('Good News')}`;
-    for (const gn of stats.goodNewsEvents) {
-      const weekLabel = gn.week != null ? `W${gn.week}` : '';
-      const verb = gn.kind === 'shared' ? 'Shared' : 'Received';
-      out += `\n${e(weekLabel)} ${e(verb)} · \\+${e(String(gn.pts))} pts`;
+    const gnEvents = gnByWeek.get(w.week);
+    if (gnEvents) {
+      const parts = gnEvents.map(gn => `${gn.kind === 'shared' ? 'Shared' : 'Received'} \\+${e(String(gn.pts))}`);
+      out += `\n  🗞 ${parts.join(' · ')}`;
     }
   }
 
