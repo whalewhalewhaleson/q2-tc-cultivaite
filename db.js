@@ -766,6 +766,12 @@ export async function setSubmissionWeek(id, weekNum) {
   cacheInvalidate('stats');
 }
 
+export async function setGoodNewsWeek(gnId, weekNum) {
+  const { error } = await supabase.from('good_news').update({ week_number: weekNum }).eq('id', gnId);
+  if (error) throw error;
+  cacheInvalidate('stats');
+}
+
 export async function grantExtension(realName, weekNumber, type = 'extension') {
   const { error } = await supabase.from('extensions')
     .insert({ real_name: realName, week_number: weekNumber, type });

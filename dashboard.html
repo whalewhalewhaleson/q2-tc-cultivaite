@@ -1230,6 +1230,7 @@ function gnCard(gn, status) {
       ? `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>`
       : `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>
       <button class="btn-edit" style="margin-left:8px" onclick="editGNReviewed(${gnId},'approved')">✏️ Edit</button>
+      <button class="btn-edit" style="margin-left:8px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
     `;
   } else {
     cardClass = 'rejected';
@@ -1715,6 +1716,23 @@ async function moveSubmission(rowIndex, weekNum, name) {
     });
     await refresh();
     openDrawer(name);
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function moveGoodNewsWeek(gnId, currentWeek) {
+  const label = currentWeek ? ` (currently Week ${toISOWeek(currentWeek)})` : '';
+  const input = prompt(`Move Good News #${gnId} to which internal week?${label}\nEnter internal week number (e.g. 6 = Week ${toISOWeek(6)}):`);
+  const wk = parseInt(input);
+  if (!wk) return;
+  if (!confirm(`Move Good News #${gnId} to Week ${toISOWeek(wk)}? This affects points attribution.`)) return;
+  try {
+    await fetch(`/api/good-news/${gnId}/week`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ weekNum: wk }),
+    });
+    await refresh();
+    renderGoodNews();
   } catch (e) { alert('Error: ' + e.message); }
 }
 

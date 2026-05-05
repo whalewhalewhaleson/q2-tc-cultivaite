@@ -10,7 +10,7 @@ import { fileURLToPath } from 'url';
 import * as sheets from './db.js';
 import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
-         getUserByRealName, getUserByChatId } from './db.js';
+         getUserByRealName, getUserByChatId, setGoodNewsWeek } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2444,6 +2444,17 @@ http.createServer(async (req, res) => {
       const { weekNum } = body;
       if (!weekNum) { res.writeHead(400); return res.end('Missing weekNum'); }
       await sheets.setSubmissionWeek(parseInt(subWeekM[1]), parseInt(weekNum));
+      return jsonRes(res, { ok: true });
+    }
+
+    // PATCH /api/good-news/:id/week  — reassign good news to a different week
+    const gnWeekM = route.match(/^\/api\/good-news\/(\d+)\/week$/);
+    if (req.method === 'PATCH' && gnWeekM) {
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
+      const body = await parseBody(req);
+      const { weekNum } = body;
+      if (!weekNum) { res.writeHead(400); return res.end('Missing weekNum'); }
+      await setGoodNewsWeek(parseInt(gnWeekM[1]), parseInt(weekNum));
       return jsonRes(res, { ok: true });
     }
 

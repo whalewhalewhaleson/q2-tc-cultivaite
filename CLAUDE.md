@@ -13,15 +13,17 @@ Q2 2026 weekly reflection bot for TC Acoustic. Telegram bot + web dashboard.
 ## Architecture
 
 ```
-bot.js (2500 lines)
+bot.js (~2500 lines)
 ├── Telegram bot handlers (grammyjs)
 ├── HTTP server → serves dashboard.html + API endpoints
-│   ├── GET /api/stats     → getFullDashboardStats()  (main data)
+│   ├── GET /api/stats            → getFullDashboardStats()  (main data)
 │   ├── GET /api/reflections?week=N
+│   ├── PATCH /api/submissions/:id/week  → move submission to a different week
+│   ├── PATCH /api/good-news/:id/week   → reassign good news to a different week (fixes late-entry attribution)
 │   └── POST endpoints for admin actions
 └── Cron jobs (reminders, nudges)
 
-db.js (900 lines)
+db.js (~900 lines)
 ├── buildStatsCache()  → core computation, cached 30s
 │   ├── userWeekMap    → per-user per-week submission state
 │   ├── deptWeekRate   → per-dept per-week submission rates
@@ -31,11 +33,12 @@ db.js (900 lines)
 ├── Supabase CRUD (users, submissions, good_news, extensions)
 └── Helper functions (pointsToStage, week calculations)
 
-dashboard.html (2000 lines)
+dashboard.html (~2000 lines)
 ├── Tabs: Overview | Members (Rankings) | Reflections | Good News | Admin
-├── renderOverview()   → week-selectable overview with KPIs
-├── renderRankings()   → Departments + Individuals tables, week selector
-├── renderReflections()→ per-week reflection cards
+├── renderOverview()    → week-selectable overview with KPIs
+├── renderRankings()    → Departments + Individuals tables, week selector
+├── renderReflections() → per-week reflection cards
+├── renderGoodNews()    → pending/approved/rejected GN cards; admin "📅 Move week" button on approved cards
 └── Drawer views for individual users and departments
 ```
 
@@ -74,3 +77,4 @@ dashboard.html (2000 lines)
 - Admin auth: dashboard access controlled by `dashboard_access` table
 - All Supabase queries in db.js, bot.js handles Telegram + HTTP routing
 - Department names are case-sensitive in most places; `deptStatsMap` keys are lowercased
+- Good news `week_number` is set at submission time; late entries may land in the wrong week — use "📅 Move week" on approved cards to fix attribution manually
