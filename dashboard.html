@@ -451,6 +451,7 @@ let _rankView   = 'depts';
 let _rankWeek   = null;
 let _rankPage   = 1;
 let _dashWeek   = null;
+let _openDeptDrawer = null;
 
 // ── Boot ───────────────────────────────────────────────────────────────────
 async function init() {
@@ -574,6 +575,7 @@ function setRankWeek(n) {
   _rankWeek = Math.max(_stats.launchWeek ?? 1, Math.min(_stats.weekNow, n));
   _rankPage = 1;
   renderRankings();
+  if (_openDeptDrawer) openDeptDrawer(_openDeptDrawer);
 }
 
 function setRankPage(p) {
@@ -1602,10 +1604,12 @@ function openDeptDrawer(deptName) {
   const dept = _stats.depts.find(d => d.department === deptName);
   if (!dept) return;
 
+  _openDeptDrawer = deptName;
+
   const activeMembers = (_stats.users ?? []).filter(u => u.department === deptName || u.secondaryDepartment === deptName);
   const inactiveMembers = (_stats.inactiveUsers ?? []).filter(u => u.department === deptName || u.secondaryDepartment === deptName);
 
-  const wk = _dashWeek;
+  const wk = _rankWeek ?? _dashWeek;
   const isCurrent = wk === _stats.weekNow;
   const isOnTime = (u) => isCurrent ? u.submittedThisWeek : (u.weekHistory?.[wk]?.submitted && !u.weekHistory?.[wk]?.late);
   const isLate   = (u) => isCurrent ? false : (u.weekHistory?.[wk]?.submitted && !!u.weekHistory?.[wk]?.late);
@@ -2049,6 +2053,7 @@ async function toggleActive(name) {
 function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
   document.getElementById('profileDrawer').classList.remove('open');
+  _openDeptDrawer = null;
 }
 
 // ── Start ──────────────────────────────────────────────────────────────────
