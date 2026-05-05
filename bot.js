@@ -33,6 +33,25 @@ function italic(text) { return `_${e(text)}_`; }
 // Monospace / code text (no escaping needed inside backticks)
 function mono(text) { return `\`${text}\``; }
 
+// Splits an array of line strings into pages that fit within Telegram's 4096-char limit.
+// reservedTail is the length of any footer appended only to the last page.
+function paginateLines(lines, reservedTail = 0, maxChars = 3500) {
+  const pages = [];
+  let page = '';
+  for (const line of lines) {
+    const sep = page ? '\n' : '';
+    const wouldExceed = page.length + sep.length + line.length + (pages.length === 0 ? reservedTail : 0) > maxChars;
+    if (page && wouldExceed) {
+      pages.push(page);
+      page = line;
+    } else {
+      page += sep + line;
+    }
+  }
+  if (page) pages.push(page);
+  return pages.length ? pages : [''];
+}
+
 // ---------------------------------------------------------------------------
 // Growth helpers
 // ---------------------------------------------------------------------------
@@ -1256,21 +1275,51 @@ bot.command('pendingnotifications', async (ctx) => {
       await ctx.reply(`No pending good news notifications right now\\.`, { parse_mode: 'MarkdownV2' });
       return;
     }
-    const lines = entries.flatMap(gn => {
+    const entryLines = entries.flatMap(gn => {
       const names = gn.awards.length > 0
         ? gn.awards.map(a => a.recipient_name)
         : [gn.nominee_name];
       return names.map(r =>
         `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(gn.week_number))}\\)\n  _"${e(gn.message)}"_`
       );
-    }).join('\n');
-    const msg =
-      `📨 ${bold(`Pending Good News Notifications (${entries.length})`)}\n\n` +
-      `${lines}\n\n` +
-      `Use /firenotifications to send now, or they fire automatically Tue 10:15AM SGT\\.`;
-    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+    });
+    const header = `📨 ${bold(`Pending Good News Notifications (${entries.length})`)}\n\n`;
+    const footer = `\n\nUse /firenotifications to send now, or they fire automatically Tue 10:15AM SGT\\.`;
+    const pages = paginateLines(entryLines, footer.length);
+    await ctx.reply(header + pages[0] + (pages.length === 1 ? footer : ''), { parse_mode: 'MarkdownV2' });
+    for (let i = 1; i < pages.length; i++) {
+      await ctx.reply(pages[i] + (i === pages.length - 1 ? footer : ''), { parse_mode: 'MarkdownV2' });
+    }
   } catch (err) {
     console.error('/pendingnotifications error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /dismissnotifications — admin only, mark all pending as notified without sending
+// Use this to clear a backlog of old entries you don't want to fire
+// ---------------------------------------------------------------------------
+
+bot.command('dismissnotifications', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const entries = await getApprovedUnnotifiedGoodNews();
+    if (!entries.length) {
+      await ctx.reply(`No pending good news notifications to dismiss\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    await markGoodNewsNotified(entries.map(gn => gn.id));
+    await ctx.reply(
+      `🗑 ${bold(`Dismissed ${entries.length} pending notification${entries.length === 1 ? '' : 's'}`)}\n\n` +
+      `They've been marked as sent without notifying anyone\\. Only new approvals from here on will fire\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } catch (err) {
+    console.error('/dismissnotifications error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
@@ -1352,14 +1401,18 @@ bot.command('firenotifications', async (ctx) => {
       { parse_mode: 'MarkdownV2' }
     );
     const { sent, noChat } = await sendGoodNewsNotifications();
-    let reply = `✅ Done\\!\n\n`;
-    if (sent.length) {
-      reply += `Notified:\n` + sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`).join('\n');
+    const sentLines = sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`);
+    const noChatLines = noChat.map(n => `• ${e(n)}`);
+    const summaryHeader = `✅ Done\\!\n\n`;
+    const summaryParts = [];
+    if (sentLines.length) summaryParts.push(`Notified:\n` + sentLines.join('\n'));
+    if (noChatLines.length) summaryParts.push(`No Telegram \\(not reached\\):\n` + noChatLines.join('\n'));
+    const summaryBody = summaryParts.join('\n\n');
+    const pages = paginateLines(summaryBody.split('\n'), 0);
+    await ctx.reply(summaryHeader + pages[0], { parse_mode: 'MarkdownV2' });
+    for (let i = 1; i < pages.length; i++) {
+      await ctx.reply(pages[i], { parse_mode: 'MarkdownV2' });
     }
-    if (noChat.length) {
-      reply += `\n\nNo Telegram \\(not reached\\):\n` + noChat.map(n => `• ${e(n)}`).join('\n');
-    }
-    await ctx.reply(reply, { parse_mode: 'MarkdownV2' });
   } catch (err) {
     console.error('/firenotifications error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
@@ -1978,6 +2031,7 @@ bot.command('help', async (ctx) => {
       `/testrecap — 📊 Preview the weekly recap message\n` +
       `/firerecap — 🚀 Send the weekly recap to everyone now\n` +
       `/pendingnotifications — 📋 List what good news is queued to send\n` +
+      `/dismissnotifications — 🗑 Mark all pending as sent without notifying \\(clears backlog\\)\n` +
       `/testnotification — 👀 Preview both notification messages to yourself\n` +
       `/firenotifications — 📨 Send pending good news notifications now\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
