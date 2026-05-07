@@ -792,6 +792,38 @@ async function setGoalConversation(conversation, ctx) {
 // /editreflection conversation
 // ---------------------------------------------------------------------------
 
+// Shared helper — edit the user's most recent Pending good news entry.
+// Called from both editReflectionConversation (Q3 button) and editGoodNewsConversation.
+async function doEditGoodNews(conversation, ctx, user) {
+  const latest = await conversation.external(() => sheets.getLatestGoodNewsForNominator(user.realName));
+  if (!latest) {
+    await ctx.reply(`No good news submissions found\\. Share one with /goodnews anytime\\! ⭐️`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+  if (latest.status !== 'Pending') {
+    await ctx.reply(
+      `Your most recent good news has already been ${e(latest.status.toLowerCase())} by the team \\(W${e(String(latest.week_number))}\\)\\.\n\nOnly Pending submissions can be edited\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+  await ctx.reply(
+    `${bold('Your most recent good news')} ${italic(`(W${latest.week_number}, Pending)`)}\n\n` +
+    `${e(latest.message)}\n\n` +
+    `What would you like to change it to?`,
+    { parse_mode: 'MarkdownV2' }
+  );
+  const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back whenever you're ready\\.`);
+  if (!inputCtx) return;
+  const message = inputCtx.message.text.trim();
+  if (!message) {
+    await ctx.reply(`Hmm, nothing there\\. Try again\\.`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+  await conversation.external(() => sheets.updatePendingGoodNews(latest.id, latest.nominee_name, message));
+  await ctx.reply(`✅ Good news updated\\! The team will still review it on Monday\\. 😊`, { parse_mode: 'MarkdownV2' });
+}
+
 async function editReflectionConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
@@ -809,34 +841,33 @@ async function editReflectionConversation(conversation, ctx) {
   }
 
   const latest = submissions[0];
-  await ctx.reply(
-    `${bold('Your most recent reflection:')}\n\n` +
-    `📅 ${e(latest.date)}\n\n` +
-    `${bold('Q1:')} ${e(latest.q1)}\n\n` +
-    `${bold('Q2:')} ${e(latest.q2)}\n\n` +
-    `Which part would you like to update?\nReply ${bold('1')} for Q1, ${bold('2')} for Q2, ${bold('3')} for both, or ${bold('4')} for Q3 \\(good news\\)`,
-    { parse_mode: 'MarkdownV2' }
-  );
 
-  const choiceCtx = await waitForText(conversation, ctx);
-  if (!choiceCtx) return;
-  const choice = choiceCtx.message.text.trim();
+  // 3 separate messages — one per question
+  await ctx.reply(`${bold('Your most recent reflection')} · 📅 ${e(latest.date)}`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`${bold('Q1')}\n${e(latest.q1 || '—')}`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`${bold('Q2')}\n${e(latest.q2 || '—')}`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`${bold('Q3 ⭐️')}\n${e(latest.q3 || 'None shared this week')}`, { parse_mode: 'MarkdownV2' });
 
-  if (choice === '4') {
-    await ctx.conversation.exit();
-    await ctx.conversation.enter('editGoodNewsConversation');
-    return;
-  }
+  // Inline keyboard for choice
+  const keyboard = new InlineKeyboard()
+    .text('Q1', 'edit_q1').text('Q2', 'edit_q2').row()
+    .text('Q1 + Q2', 'edit_both').text('Q3 Good News ⭐️', 'edit_q3');
 
-  if (!['1', '2', '3'].includes(choice)) {
-    await ctx.reply(`Just reply with 1, 2, 3, or 4\\. Try /editreflection again whenever you're ready\\.`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply('Which part would you like to update?', { reply_markup: keyboard });
+
+  const event = await conversation.waitFor('callback_query:data');
+  await event.answerCallbackQuery();
+  const choice = event.callbackQuery.data;
+
+  if (choice === 'edit_q3') {
+    await doEditGoodNews(conversation, ctx, user);
     return;
   }
 
   let newQ1 = latest.q1;
   let newQ2 = latest.q2;
 
-  if (choice === '1' || choice === '3') {
+  if (choice === 'edit_q1' || choice === 'edit_both') {
     await ctx.reply(
       `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
       `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
@@ -847,11 +878,8 @@ async function editReflectionConversation(conversation, ctx) {
     newQ1 = q1Ctx.message.text;
   }
 
-  if (choice === '2' || choice === '3') {
-    await ctx.reply(
-      `${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`,
-      { parse_mode: 'MarkdownV2' }
-    );
+  if (choice === 'edit_q2' || choice === 'edit_both') {
+    await ctx.reply(`${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`, { parse_mode: 'MarkdownV2' });
     const q2Ctx = await waitForText(conversation, ctx);
     if (!q2Ctx) return;
     newQ2 = q2Ctx.message.text;
@@ -862,63 +890,18 @@ async function editReflectionConversation(conversation, ctx) {
 }
 
 // ---------------------------------------------------------------------------
-// /editgoodnews conversation — edit most recent Pending good news submission
+// /editgoodnews conversation
 // ---------------------------------------------------------------------------
 
 async function editGoodNewsConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
-
   const user = await conversation.external(() => lookupUser(chatId, username));
   if (!user?.realName) {
     await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
     return;
   }
-
-  const latest = await conversation.external(() => sheets.getLatestGoodNewsForNominator(user.realName));
-  if (!latest) {
-    await ctx.reply(`No good news submissions found\\. Share one with /goodnews anytime\\! ⭐️`, { parse_mode: 'MarkdownV2' });
-    return;
-  }
-
-  if (latest.status !== 'Pending') {
-    await ctx.reply(
-      `Your most recent good news has already been ${e(latest.status.toLowerCase())} by the team \\(W${e(String(latest.week_number))}\\)\\.\n\n` +
-      `Only Pending submissions can be edited\\.`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
-
-  await ctx.reply(
-    `${bold('Your most recent good news:')} ${italic(`(W${latest.week_number}, Pending)`)}\n\n` +
-    `${bold('About:')} ${e(latest.nominee_name)}\n` +
-    `${bold('Message:')} ${e(latest.message)}\n\n` +
-    `Send the updated version in the same format:\n${italic('Name — message')}`,
-    { parse_mode: 'MarkdownV2' }
-  );
-
-  const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back with /editgoodnews whenever you're ready\\.`);
-  if (!inputCtx) return;
-
-  const input = inputCtx.message.text.trim();
-  let nomineeName, message;
-  const sepIdx = input.indexOf(' — ');
-  if (sepIdx !== -1) {
-    nomineeName = input.slice(0, sepIdx).trim();
-    message = input.slice(sepIdx + 3).trim();
-  } else {
-    nomineeName = latest.nominee_name;
-    message = input;
-  }
-
-  if (!message) {
-    await ctx.reply(`Hmm, no message found\\. Try again with /editgoodnews\\.`, { parse_mode: 'MarkdownV2' });
-    return;
-  }
-
-  await conversation.external(() => sheets.updatePendingGoodNews(latest.id, nomineeName, message));
-  await ctx.reply(`✅ Good news updated\\! The team will still review it on Monday\\. 😊`, { parse_mode: 'MarkdownV2' });
+  await doEditGoodNews(conversation, ctx, user);
 }
 
 // ---------------------------------------------------------------------------
