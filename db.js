@@ -859,6 +859,32 @@ export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nom
 }
 
 // ---------------------------------------------------------------------------
+// Good news edit helpers
+// ---------------------------------------------------------------------------
+
+export async function getLatestGoodNewsForNominator(nominatorName) {
+  const { data, error } = await supabase
+    .from('good_news')
+    .select('id, nominee_name, message, week_number, status, timestamp')
+    .eq('nominator_name', nominatorName)
+    .order('timestamp', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function updatePendingGoodNews(gnId, nomineeName, message) {
+  const { error } = await supabase
+    .from('good_news')
+    .update({ nominee_name: nomineeName, message })
+    .eq('id', gnId)
+    .eq('status', 'Pending');
+  if (error) throw error;
+  invalidateStatsCache();
+}
+
+// ---------------------------------------------------------------------------
 // Recap announcement (admin-editable via /setchangelog)
 // ---------------------------------------------------------------------------
 

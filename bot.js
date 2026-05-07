@@ -704,10 +704,10 @@ async function goodNewsConversation(conversation, ctx) {
   }
 
   await safeReply(ctx,
-    `⭐️ ${bold('Got someone to shout out?')}\n\n` +
-    `${italic('Tell us who and what happened — the more specific, the better!')}\n\n` +
-    `Format: ${italic('Name — message')}\n` +
-    `${italic('(You can mention more than one name.)')}`,
+    `${bold('Q3 (Optional): Any good news to share? ⭐️')}\n\n` +
+    `Did someone display our core values, go the extra mile, or show great character? ` +
+    `Tell us who and what happened — the more specific, the better\\!\n\n` +
+    `You can shout out more than one person\\.`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -735,11 +735,7 @@ async function goodNewsConversation(conversation, ctx) {
     sheets.invalidateStatsCache();
   });
 
-  const nomineeDisplay = nomineeName !== 'Unknown' ? e(nomineeName) : 'your teammate';
-  await ctx.reply(
-    `Got it ⭐️ Good news about ${nomineeDisplay} is queued for review\\.\n\nThe team takes a look on Monday and they'll hear back on Tuesday\\.`,
-    { parse_mode: 'MarkdownV2' }
-  );
+  await ctx.reply(`Logged\\! ⭐️ The team will review it on Monday\\! 😊`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -819,7 +815,7 @@ async function editReflectionConversation(conversation, ctx) {
     `📅 ${e(latest.date)}\n\n` +
     `${bold('Q1:')} ${e(latest.q1)}\n\n` +
     `${bold('Q2:')} ${e(latest.q2)}\n\n` +
-    `Which part would you like to update?\nReply ${bold('1')} for Q1, ${bold('2')} for Q2, or ${bold('3')} for both`,
+    `Which part would you like to update?\nReply ${bold('1')} for Q1, ${bold('2')} for Q2, ${bold('3')} for both, or ${bold('4')} for Q3 \\(good news\\)`,
     { parse_mode: 'MarkdownV2' }
   );
 
@@ -827,8 +823,14 @@ async function editReflectionConversation(conversation, ctx) {
   if (!choiceCtx) return;
   const choice = choiceCtx.message.text.trim();
 
+  if (choice === '4') {
+    await ctx.conversation.exit();
+    await ctx.conversation.enter('editGoodNewsConversation');
+    return;
+  }
+
   if (!['1', '2', '3'].includes(choice)) {
-    await ctx.reply(`Just reply with 1, 2, or 3\\. Try /editreflection again whenever you're ready\\.`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`Just reply with 1, 2, 3, or 4\\. Try /editreflection again whenever you're ready\\.`, { parse_mode: 'MarkdownV2' });
     return;
   }
 
@@ -861,6 +863,66 @@ async function editReflectionConversation(conversation, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// /editgoodnews conversation — edit most recent Pending good news submission
+// ---------------------------------------------------------------------------
+
+async function editGoodNewsConversation(conversation, ctx) {
+  const chatId = ctx.from?.id;
+  const username = ctx.from?.username?.toLowerCase();
+
+  const user = await conversation.external(() => lookupUser(chatId, username));
+  if (!user?.realName) {
+    await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  const latest = await conversation.external(() => sheets.getLatestGoodNewsForNominator(user.realName));
+  if (!latest) {
+    await ctx.reply(`No good news submissions found\\. Share one with /goodnews anytime\\! ⭐️`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  if (latest.status !== 'Pending') {
+    await ctx.reply(
+      `Your most recent good news has already been ${e(latest.status.toLowerCase())} by the team \\(W${e(String(latest.week_number))}\\)\\.\n\n` +
+      `Only Pending submissions can be edited\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  await ctx.reply(
+    `${bold('Your most recent good news:')} ${italic(`(W${latest.week_number}, Pending)`)}\n\n` +
+    `${bold('About:')} ${e(latest.nominee_name)}\n` +
+    `${bold('Message:')} ${e(latest.message)}\n\n` +
+    `Send the updated version in the same format:\n${italic('Name — message')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+
+  const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back with /editgoodnews whenever you're ready\\.`);
+  if (!inputCtx) return;
+
+  const input = inputCtx.message.text.trim();
+  let nomineeName, message;
+  const sepIdx = input.indexOf(' — ');
+  if (sepIdx !== -1) {
+    nomineeName = input.slice(0, sepIdx).trim();
+    message = input.slice(sepIdx + 3).trim();
+  } else {
+    nomineeName = latest.nominee_name;
+    message = input;
+  }
+
+  if (!message) {
+    await ctx.reply(`Hmm, no message found\\. Try again with /editgoodnews\\.`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  await conversation.external(() => sheets.updatePendingGoodNews(latest.id, nomineeName, message));
+  await ctx.reply(`✅ Good news updated\\! The team will still review it on Monday\\. 😊`, { parse_mode: 'MarkdownV2' });
+}
+
+// ---------------------------------------------------------------------------
 // Bot setup
 // ---------------------------------------------------------------------------
 
@@ -876,6 +938,7 @@ bot.use(createConversation(setupConversation));
 bot.use(createConversation(setNicknameConversation));
 bot.use(createConversation(reflectConversation));
 bot.use(createConversation(goodNewsConversation));
+bot.use(createConversation(editGoodNewsConversation));
 bot.use(createConversation(setGoalConversation));
 bot.use(createConversation(editReflectionConversation));
 
@@ -2085,6 +2148,19 @@ bot.command('editreflection', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /editgoodnews
+// ---------------------------------------------------------------------------
+
+bot.command('editgoodnews', async (ctx) => {
+  try {
+    await ctx.conversation.enter('editGoodNewsConversation');
+  } catch (err) {
+    console.error('/editgoodnews error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
 // /tutorial
 // ---------------------------------------------------------------------------
 
@@ -2172,7 +2248,8 @@ bot.command('help', async (ctx) => {
     `/tutorial — 📖 How points and stages work\n` +
     `/myreflections — 📋 List your past reflections\n` +
     `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
-    `/editreflection — ✏️ Update your most recent reflection\n` +
+    `/editreflection — ✏️ Update your most recent reflection \\(Q1, Q2, or Q3 good news\\)\n` +
+    `/editgoodnews — ✏️ Edit your most recent Pending good news submission\n` +
     `/cancel — ❌ Cancel whatever's in progress\n` +
     `/help — Show this message\n`;
 
