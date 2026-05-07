@@ -859,6 +859,28 @@ export async function logGoodNews(nominatorName, nominatorDept, nomineeName, nom
 }
 
 // ---------------------------------------------------------------------------
+// Recap announcement (admin-editable via /setchangelog)
+// ---------------------------------------------------------------------------
+
+export async function getChangelog() {
+  const { data } = await supabase.from('recap_announcement').select('text, updated_at, updated_by').eq('id', 1).maybeSingle();
+  return data ?? null;
+}
+
+export async function setChangelog(text, updatedBy) {
+  const { error } = await supabase.from('recap_announcement').upsert({
+    id: 1, text, updated_at: new Date().toISOString(), updated_by: updatedBy,
+  }, { onConflict: 'id' });
+  if (error) throw error;
+}
+
+export async function clearChangelog() {
+  await supabase.from('recap_announcement').update({
+    text: null, updated_at: new Date().toISOString(), updated_by: null,
+  }).eq('id', 1);
+}
+
+// ---------------------------------------------------------------------------
 // Dashboard access management
 // ---------------------------------------------------------------------------
 

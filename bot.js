@@ -105,7 +105,7 @@ function resolveDisplayStage(plantStage, consecutiveMisses) {
   return plantStage;
 }
 
-function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts) {
+function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts, changelog = null) {
   let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱`;
 
   if (!stats.submittedThisWeek) {
@@ -136,7 +136,10 @@ function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, total
     msg += `🏡 \\#${e(String(deptRank))} out of ${e(String(totalDepts))} · ${e(String(deptAvgPts))} avg pts\n`;
   }
 
-  msg += `\n→ /mystats · /leaderboard · /department`;
+  if (changelog) {
+    msg += `\n\n📣 ${bold('Updates')}\n${e(changelog)}`;
+  }
+  msg += `\n\n→ /mystats · /leaderboard · /department`;
   return msg;
 }
 
@@ -663,6 +666,67 @@ async function reflectConversation(conversation, ctx) {
 }
 
 // ---------------------------------------------------------------------------
+// /goodnews conversation
+// ---------------------------------------------------------------------------
+
+async function goodNewsConversation(conversation, ctx) {
+  const chatId = ctx.from?.id;
+  const username = ctx.from?.username?.toLowerCase();
+
+  if (!chatId) {
+    await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  const user = await conversation.external(() => lookupUser(chatId, username));
+  if (!user?.realName) {
+    await ctx.reply(
+      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    return;
+  }
+
+  await ctx.reply(
+    `⭐️ ${bold('Got someone to shout out?')}\n\n` +
+    `${italic('Tell us who and what happened — the more specific, the better\\!')}\n\n` +
+    `Format: ${italic('Name — message')}\n` +
+    `${italic('\\(You can mention more than one name\\.\\)')}`,
+    { parse_mode: 'MarkdownV2' }
+  );
+
+  const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back anytime to share good news\\! ⭐️`);
+  if (!inputCtx) return;
+
+  const input = inputCtx.message.text.trim();
+  let nomineeName, message;
+  const sepIdx = input.indexOf(' — ');
+  if (sepIdx !== -1) {
+    nomineeName = input.slice(0, sepIdx).trim();
+    message = input.slice(sepIdx + 3).trim();
+  } else {
+    nomineeName = 'Unknown';
+    message = input;
+  }
+
+  if (!message) {
+    await ctx.reply(`Hmm, didn't catch a message there\\. Try again with /goodnews\\! ⭐️`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+
+  await conversation.external(async () => {
+    await sheets.logGoodNews(user.realName, user.department, nomineeName, 'Unknown', message, getWeekNumber());
+    sheets.invalidateStatsCache();
+  });
+
+  const nomineeDisplay = nomineeName !== 'Unknown' ? e(nomineeName) : 'your teammate';
+  await ctx.reply(
+    `Got it ⭐️ Good news about ${nomineeDisplay} is queued for review\\.\n\nThe team takes a look on Monday and they'll hear back on Tuesday\\.`,
+    { parse_mode: 'MarkdownV2' }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // /setgoal conversation
 // ---------------------------------------------------------------------------
 
@@ -795,6 +859,7 @@ bot.use(conversations());
 bot.use(createConversation(setupConversation));
 bot.use(createConversation(setNicknameConversation));
 bot.use(createConversation(reflectConversation));
+bot.use(createConversation(goodNewsConversation));
 bot.use(createConversation(setGoalConversation));
 bot.use(createConversation(editReflectionConversation));
 
@@ -807,6 +872,19 @@ bot.command('reflect', async (ctx) => {
     await ctx.conversation.enter('reflectConversation');
   } catch (err) {
     console.error('/reflect error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /goodnews
+// ---------------------------------------------------------------------------
+
+bot.command('goodnews', async (ctx) => {
+  try {
+    await ctx.conversation.enter('goodNewsConversation');
+  } catch (err) {
+    console.error('/goodnews error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
@@ -1231,7 +1309,8 @@ bot.command('testrecap', async (ctx) => {
     const deptKey = user.department?.toLowerCase();
     const deptRank = deptKey ? (deptsSorted.findIndex(d => d.department.toLowerCase() === deptKey) + 1 || null) : null;
     const deptAvgPts = deptKey ? (deptsSorted.find(d => d.department.toLowerCase() === deptKey)?.avgPoints ?? null) : null;
-    const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts);
+    const cl = await sheets.getChangelog();
+    const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts, cl?.text ?? null);
 
     await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
   } catch (err) {
@@ -1320,6 +1399,68 @@ bot.command('dismissnotifications', async (ctx) => {
     );
   } catch (err) {
     console.error('/dismissnotifications error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// ---------------------------------------------------------------------------
+// /setchangelog /clearchangelog /showchangelog — admin only, edit Friday recap announcement
+// ---------------------------------------------------------------------------
+
+bot.command('setchangelog', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const text = ctx.match?.trim();
+    if (!text) {
+      await ctx.reply(
+        `Usage: /setchangelog <message>\n\nThe message will appear in the next /testrecap and /firerecap, then auto\\-clear after broadcast\\.`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      return;
+    }
+    await sheets.setChangelog(text, String(ctx.from?.id));
+    await ctx.reply(`✅ Saved\\. Will appear in the next /testrecap and /firerecap\\.`, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/setchangelog error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+bot.command('clearchangelog', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    await sheets.clearChangelog();
+    await ctx.reply(`✅ Changelog cleared\\.`, { parse_mode: 'MarkdownV2' });
+  } catch (err) {
+    console.error('/clearchangelog error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+bot.command('showchangelog', async (ctx) => {
+  try {
+    if (!isAdmin(ctx)) {
+      await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const cl = await sheets.getChangelog();
+    if (!cl?.text) {
+      await ctx.reply(`No changelog set\\.`, { parse_mode: 'MarkdownV2' });
+      return;
+    }
+    const updatedAt = cl.updated_at ? new Date(cl.updated_at).toLocaleString('en-SG', { timeZone: 'Asia/Singapore' }) : 'unknown';
+    await ctx.reply(
+      `📣 ${bold('Current changelog:')}\n\n${e(cl.text)}\n\n${italic(`Last updated: ${updatedAt}`)}`,
+      { parse_mode: 'MarkdownV2' }
+    );
+  } catch (err) {
+    console.error('/showchangelog error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
   }
 });
@@ -2005,6 +2146,7 @@ bot.command('help', async (ctx) => {
     `🌱 ${bold('TC CultivAIte')}\n` +
     `${italic('Your Q2 reflection companion')}\n\n` +
     `/reflect — 💧 Submit your weekly reflection\n` +
+    `/goodnews — ⭐️ Share an adhoc shoutout about a teammate\n` +
     `/mystats — 🌿 Check your plant, pts & streak\n` +
     `/setgoal — 🎯 Set or update your Q2 goal\n` +
     `/nick — 🏷 Set or update your nickname\n` +
@@ -2034,6 +2176,9 @@ bot.command('help', async (ctx) => {
       `/dismissnotifications — 🗑 Mark all pending as sent without notifying \\(clears backlog\\)\n` +
       `/testnotification — 👀 Preview both notification messages to yourself\n` +
       `/firenotifications — 📨 Send pending good news notifications now\n` +
+      `/setchangelog <msg> — 📣 Set the announcement block in Friday's recap\n` +
+      `/showchangelog — 👀 Preview the current changelog\n` +
+      `/clearchangelog — 🗑 Clear the current changelog\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
       `  • /testshoutout Marketing — preview for a specific dept\n` +
       `/broadcast — 📣 Send a message to all or one user\n` +
@@ -2290,6 +2435,9 @@ async function runRecapBroadcast() {
       deptRankMap[deptsSorted[i].department.toLowerCase()] = i + 1;
     }
 
+    const cl = await sheets.getChangelog();
+    const changelogText = cl?.text ?? null;
+
     for (const { realName, chatId, nickname, department } of users) {
       try {
         const stats = await sheets.getStatsForUser(realName);
@@ -2299,7 +2447,7 @@ async function runRecapBroadcast() {
         const deptKey = department?.toLowerCase();
         const deptRank = deptKey ? (deptRankMap[deptKey] ?? null) : null;
         const deptAvgPts = deptKey ? (deptsSorted.find(d => d.department.toLowerCase() === deptKey)?.avgPoints ?? null) : null;
-        const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts);
+        const msg = buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts, changelogText);
 
         await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
         await new Promise(r => setTimeout(r, 200));
@@ -2308,6 +2456,7 @@ async function runRecapBroadcast() {
       }
     }
     lastRecapWeek = week;
+    if (changelogText) await sheets.clearChangelog();
     console.log('[Recap] Weekly recap complete.');
   } catch (err) {
     console.error('[Recap] Error:', err);
@@ -2338,7 +2487,7 @@ cron.schedule('0 2 * * 5', async () => {
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
   for (const adminId of adminIds) {
     try {
-      await bot.api.sendMessage(adminId, `⏰ Heads up — the weekly recap is scheduled to fire at 3:30 PM SGT today\\.\n\nUse /firerecap to send it now, or let it fire automatically\\.`, { parse_mode: 'MarkdownV2' });
+      await bot.api.sendMessage(adminId, `⏰ Heads up — the weekly recap fires at 3:30 PM SGT today\\.\n\n1\\. Run /testrecap to preview what everyone will receive\n2\\. Add an announcement with /setchangelog \\<message\\> if needed\n3\\. Run /firerecap when ready, or let it fire automatically at 3:30 PM\\.`, { parse_mode: 'MarkdownV2' });
     } catch (err) {
       console.error(`[Cron] Failed recap reminder to admin ${adminId}:`, err.message);
     }
