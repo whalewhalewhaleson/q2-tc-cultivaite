@@ -139,7 +139,7 @@ function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, total
   }
 
   if (changelog) {
-    msg += `\n\n📣 ${bold('Updates')}\n${e(changelog)}`;
+    msg += `\n\n📣 ${bold('Announcements from the Team')}\n${e(changelog)}`;
   }
   msg += `\n\n→ /mystats · /leaderboard · /department`;
   return msg;
