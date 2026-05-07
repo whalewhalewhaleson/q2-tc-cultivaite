@@ -19,7 +19,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // MarkdownV2 helpers
 // ---------------------------------------------------------------------------
 
-// Escape all MarkdownV2 special characters in plain text
+// Escape all MarkdownV2 special characters in plain text.
+// RULE: always pass RAW (unescaped) text to e(), bold(), italic().
+// Passing pre-escaped text (e.g. 'hello\\!') double-escapes and causes 400 errors.
 function e(text) {
   return String(text).replace(/[_*[\]()~`>#+=|{}.!\-]/g, '\\$&');
 }
@@ -319,6 +321,20 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
   }
 
   return msgCtx;
+}
+
+// Guard against MarkdownV2 parse errors — retries as plain text so a bad escape
+// never silently crashes a conversation. Use for complex formatted messages.
+async function safeReply(ctx, text, options = {}) {
+  try {
+    return await ctx.reply(text, options);
+  } catch (err) {
+    if (err.error_code === 400 && options.parse_mode) {
+      console.error('[safeReply] MarkdownV2 parse error, falling back to plain text:', err.description);
+      return await ctx.reply(text.replace(/\\/g, ''), { ...options, parse_mode: undefined });
+    }
+    throw err;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -687,11 +703,11 @@ async function goodNewsConversation(conversation, ctx) {
     return;
   }
 
-  await ctx.reply(
+  await safeReply(ctx,
     `⭐️ ${bold('Got someone to shout out?')}\n\n` +
-    `${italic('Tell us who and what happened — the more specific, the better\\!')}\n\n` +
+    `${italic('Tell us who and what happened — the more specific, the better!')}\n\n` +
     `Format: ${italic('Name — message')}\n` +
-    `${italic('\\(You can mention more than one name\\.\\)')}`,
+    `${italic('(You can mention more than one name.)')}`,
     { parse_mode: 'MarkdownV2' }
   );
 
