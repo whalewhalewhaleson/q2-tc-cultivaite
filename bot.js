@@ -2192,7 +2192,7 @@ bot.command('help', async (ctx) => {
       `/dismissnotifications — 🗑 Mark all pending as sent without notifying \\(clears backlog\\)\n` +
       `/testnotification — 👀 Preview both notification messages to yourself\n` +
       `/firenotifications — 📨 Send pending good news notifications now\n` +
-      `/setchangelog <msg> — 📣 Set the announcement block in Friday's recap\n` +
+      `/setchangelog \\<msg\\> — 📣 Set the announcement block in Friday's recap\n` +
       `/showchangelog — 👀 Preview the current changelog\n` +
       `/clearchangelog — 🗑 Clear the current changelog\n` +
       `/testshoutout — 🎉 Preview first\\-dept\\-100% shoutout \\(only fires once per week\\)\n` +
