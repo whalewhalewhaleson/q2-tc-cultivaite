@@ -323,6 +323,14 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
   return msgCtx;
 }
 
+// Strip legacy "Nominated Name — " prefix from q3 field for display.
+// Old submissions stored q3 as "Nominated X — message"; new ones store just the message.
+function cleanQ3(q3) {
+  if (!q3) return '';
+  const match = q3.match(/^Nominated .+? — (.+)$/s);
+  return match ? match[1] : q3;
+}
+
 // Guard against MarkdownV2 parse errors — retries as plain text so a bad escape
 // never silently crashes a conversation. Use for complex formatted messages.
 async function safeReply(ctx, text, options = {}) {
@@ -573,7 +581,7 @@ async function reflectConversation(conversation, ctx) {
   }
 
   // --- Step 7: Log submission + good news + trigger Apps Script ---
-  const q3Stored = (hasGoodNews && nomineeName) ? `Nominated ${nomineeName} — ${q3Raw}` : '';
+  const q3Stored = hasGoodNews ? q3Raw : '';
   await conversation.external(async () => {
     await sheets.logSubmission(user.realName, user.department, q1, q2, q3Stored);
     if (hasGoodNews && nomineeName) {
@@ -846,7 +854,7 @@ async function editReflectionConversation(conversation, ctx) {
   await ctx.reply(`${bold('Your most recent reflection')} · 📅 ${e(latest.date)}`, { parse_mode: 'MarkdownV2' });
   await ctx.reply(`${bold('Q1')}\n${e(latest.q1 || '—')}`, { parse_mode: 'MarkdownV2' });
   await ctx.reply(`${bold('Q2')}\n${e(latest.q2 || '—')}`, { parse_mode: 'MarkdownV2' });
-  await ctx.reply(`${bold('Q3 ⭐️')}\n${e(latest.q3 || 'None shared this week')}`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`${bold('Q3 ⭐️')}\n${e(cleanQ3(latest.q3) || 'None shared this week')}`, { parse_mode: 'MarkdownV2' });
 
   // Inline keyboard for choice
   const keyboard = new InlineKeyboard()
@@ -2103,8 +2111,9 @@ bot.hears(/^\/(\d+)$/, async (ctx) => {
       `${bold('Q1')} ${italic(sub.q1)}\n\n` +
       `${bold('Q2')} ${italic(sub.q2)}\n\n`;
 
-    if (sub.q3) {
-      msg += `${bold('Q3')} ${italic(sub.q3)}`;
+    const q3Clean = cleanQ3(sub.q3);
+    if (q3Clean) {
+      msg += `${bold('Q3')} ${italic(q3Clean)}`;
     } else {
       msg += `${bold('Q3')} ${italic('—')}`;
     }
