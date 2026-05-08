@@ -108,7 +108,7 @@ function resolveDisplayStage(plantStage, consecutiveMisses) {
 }
 
 function buildRecapMessage(displayName, week, stats, totalUsers, deptRank, totalDepts, deptAvgPts, changelog = null) {
-  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(week))} check\\-in 🌱`;
+  let msg = `Hey ${e(displayName)}\\! Here's your week ${e(String(toISOWeek(week)))} check\\-in 🌱`;
 
   if (!stats.submittedThisWeek) {
     msg += ` Haven't reflected yet\\? /reflect when you're ready\\! 🌳🍎`;
@@ -1396,7 +1396,7 @@ bot.command('firerecap', async (ctx) => {
     }
     const week = currentQ2Week();
     if (lastRecapWeek >= week) {
-      await ctx.reply(`Recap already sent for week ${e(String(week))}\\. Use /testrecap to preview without re\\-sending\\.`, { parse_mode: 'MarkdownV2' });
+      await ctx.reply(`Recap already sent for week ${e(String(toISOWeek(week)))}\\. Use /testrecap to preview without re\\-sending\\.`, { parse_mode: 'MarkdownV2' });
       return;
     }
     await ctx.reply(`🚀 Firing recap to all users now\\.\\.\\.`, { parse_mode: 'MarkdownV2' });
