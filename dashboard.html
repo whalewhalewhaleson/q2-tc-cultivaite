@@ -1033,34 +1033,49 @@ async function loadReflections() {
 
 function renderReflections() {
   if (!_stats) return;
-  const subs = (_reflCache[_reflWeek] ?? []).filter(s => _reflDept === 'All' || s.department === _reflDept);
+
+  // Build userMap + deptMembersMap first (needed for secondary-dept lookups below)
+  const userMap = {};
+  const deptMembersMap = {};
+  for (const u of (_stats.users ?? [])) {
+    userMap[u.realName.toLowerCase().trim()] = u;
+    for (const d of [u.department, u.secondaryDepartment].filter(Boolean)) {
+      if (!deptMembersMap[d]) deptMembersMap[d] = [];
+      deptMembersMap[d].push(u.realName);
+    }
+  }
+
+  // Filter: match primary dept OR secondary dept
+  const subs = (_reflCache[_reflWeek] ?? []).filter(s => {
+    if (_reflDept === 'All') return true;
+    if (s.department === _reflDept) return true;
+    return userMap[s.real_name?.toLowerCase().trim()]?.secondaryDepartment === _reflDept;
+  });
 
   // Week options
   const weekOpts = Array.from({ length: _stats.weekNow }, (_, i) => i + 1)
     .map(w => `<option value="${w}" ${w===_reflWeek?'selected':''}>Week ${toISOWeek(w)}${w===_stats.weekNow?' (Current)':''}</option>`)
     .join('');
 
-  // Dept chips
-  const allDepts = [...new Set((_reflCache[_reflWeek] ?? []).map(s => s.department).filter(Boolean))].sort();
+  // Dept chips — include secondary depts so dual-dept depts appear as filter options
+  const allDepts = [...new Set((_reflCache[_reflWeek] ?? []).flatMap(s => {
+    const u = userMap[s.real_name?.toLowerCase().trim()];
+    return [s.department, u?.secondaryDepartment].filter(Boolean);
+  }))].sort();
   const chips = ['All', ...allDepts].map(d =>
     `<div class="filter-chip ${d===_reflDept?'active':''}" onclick="setReflDept('${esc(d)}')">${esc(d)}</div>`
   ).join('');
 
-  // Group by dept
+  // Group by dept — bucket under primary AND secondary dept
   const byDept = {};
   for (const s of subs) {
-    const d = s.department || 'Unknown';
-    if (!byDept[d]) byDept[d] = [];
-    byDept[d].push(s);
-  }
-
-  const userMap = {};
-  const deptMembersMap = {};
-  for (const u of (_stats.users ?? [])) {
-    userMap[u.realName.toLowerCase().trim()] = u;
-    if (u.department) {
-      if (!deptMembersMap[u.department]) deptMembersMap[u.department] = [];
-      deptMembersMap[u.department].push(u.realName);
+    const primaryDept = s.department || 'Unknown';
+    const u = userMap[s.real_name?.toLowerCase().trim()];
+    const depts = [primaryDept];
+    if (u?.secondaryDepartment && u.secondaryDepartment !== primaryDept) depts.push(u.secondaryDepartment);
+    for (const d of depts) {
+      if (!byDept[d]) byDept[d] = [];
+      byDept[d].push(s);
     }
   }
 
