@@ -1440,7 +1440,7 @@ bot.command('pendingnotifications', async (ctx) => {
         : [gn.nominee_name];
       const recipients = names.map(n => e(n)).join(', ');
       const msg =
-        `🌟 ${bold(`W${e(String(gn.week_number))}`)}\n` +
+        `🌟 ${bold(`W${e(String(toISOWeek(gn.week_number ?? 0)))}`)}\n` +
         `${e(gn.nominator_name)} → ${recipients}\n` +
         `_"${e(gn.message)}"_`;
       await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
