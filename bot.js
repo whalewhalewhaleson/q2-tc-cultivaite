@@ -2707,7 +2707,7 @@ cron.schedule('30 1 * * 2', async () => {
         const names = gn.awards.length > 0
           ? gn.awards.map(a => a.recipient_name)
           : [gn.nominee_name];
-        return names.map(r => `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(gn.week_number))}\\)`);
+        return names.map(r => `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(toISOWeek(gn.week_number ?? 0)))}\\)`);
       }).join('\n');
       msg =
         `📨 Good news notifications fire at *10:15 AM SGT* today\\.\n\n` +
