@@ -75,6 +75,9 @@ const shoutedDepts = new Set();
 let firstShoutoutFiredThisWeek = false;
 let lastRecapWeek = 0;
 
+// Abort flags — set by /cancelnudge, checked by the corresponding cron before sending
+const cronAbortFlags = { deadline: false };
+
 function getWeekNumber() {
   const start = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
   const ms = Date.now() - start.getTime();
@@ -1347,6 +1350,19 @@ bot.command('testdeadlinenudge', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /cancelnudge — admin only, aborts the upcoming 4PM deadline nudge
+// ---------------------------------------------------------------------------
+
+bot.command('cancelnudge', async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.reply(`Sorry, this command is only available to admins\\.`, { parse_mode: 'MarkdownV2' });
+    return;
+  }
+  cronAbortFlags.deadline = true;
+  await ctx.reply(`✅ Deadline nudge cancelled for this cycle\\. It will resume next Monday\\.`, { parse_mode: 'MarkdownV2' });
+});
+
+// ---------------------------------------------------------------------------
 // /testrecap — admin only, sends the Friday recap message to yourself
 // ---------------------------------------------------------------------------
 
@@ -2254,6 +2270,7 @@ bot.command('help', async (ctx) => {
       `  • /test1hwarning wilson — send to a specific person\n` +
       `/testdeadlinenudge — ⏰ Preview the Monday 4PM deadline\\-over nudge\n` +
       `  • /testdeadlinenudge wilson — send to a specific person\n` +
+      `/cancelnudge — 🚫 Abort the upcoming 4PM deadline nudge \\(use after the 3:55PM preview if needed\\)\n` +
       `/testrecap — 📊 Preview the weekly recap message\n` +
       `/firerecap — 🚀 Send the weekly recap to everyone now\n` +
       `/pendingnotifications — 📋 List what good news is queued to send\n` +
@@ -2413,18 +2430,107 @@ cron.schedule('0 7 * * 1', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
+// Monday pre-flight preview crons — heads-up to admins before nudges fire
+// ---------------------------------------------------------------------------
+
+// 9:55 AM SGT (01:55 UTC) — light count before 10 AM nudge
+cron.schedule('55 1 * * 1', async () => {
+  if (currentQ2Week() === 1) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  if (!adminIds.length) return;
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    let count = 0;
+    for (const { realName } of users) {
+      const stats = await sheets.getStatsForUser(realName);
+      if (stats && stats.submittedThisWeek === false) count++;
+    }
+    const msg = count === 0
+      ? `✅ 10AM nudge fires in 5 min — everyone has already submitted this week\\.`
+      : `👋 10AM nudge fires in 5 min — ${e(String(count))} ${count === 1 ? 'person hasn\'t' : 'people haven\\'t'} submitted yet\\.`;
+    for (const adminId of adminIds) {
+      try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
+    }
+  } catch (err) { console.error('[Cron] 10AM preview error:', err); }
+}, { timezone: 'UTC' });
+
+// 2:55 PM SGT (06:55 UTC) — light count before 3 PM warning
+cron.schedule('55 6 * * 1', async () => {
+  if (currentQ2Week() === 1) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  if (!adminIds.length) return;
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    let count = 0;
+    for (const { realName } of users) {
+      const stats = await sheets.getStatsForUser(realName);
+      if (stats && stats.submittedThisWeek === false) count++;
+    }
+    const msg = count === 0
+      ? `✅ 3PM 1\\-hour warning fires in 5 min — everyone has already submitted\\.`
+      : `⏰ 3PM 1\\-hour warning fires in 5 min — ${e(String(count))} ${count === 1 ? 'person hasn\'t' : 'people haven\\'t'} submitted yet\\.`;
+    for (const adminId of adminIds) {
+      try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
+    }
+  } catch (err) { console.error('[Cron] 3PM preview error:', err); }
+}, { timezone: 'UTC' });
+
+// 3:55 PM SGT (07:55 UTC) — full preview + names + cancel before 4PM deadline nudge
+cron.schedule('55 7 * * 1', async () => {
+  if (currentQ2Week() === 1) return;
+  const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
+  if (!adminIds.length) return;
+  cronAbortFlags.deadline = false; // reset each week so last week's cancel doesn't carry over
+  try {
+    const users = await sheets.getAllUsersWithChatId();
+    const missed = [];
+    for (const { realName, nickname } of users) {
+      const stats = await sheets.getStatsForUser(realName);
+      if (stats && stats.submittedThisWeek === false) missed.push(nickname ?? realName);
+    }
+    let msg;
+    if (missed.length === 0) {
+      msg = `✅ Deadline nudge fires in 5 min — everyone submitted this week, nothing to send\\.`;
+    } else {
+      const nameList = missed.map(n => `• ${e(n)}`).join('\n');
+      msg =
+        `⚠️ *Deadline nudge fires in 5 min*\n\n` +
+        `${e(String(missed.length))} ${missed.length === 1 ? 'person' : 'people'} will receive:\n` +
+        `_"Hey\\! This week's deadline has just passed 🌧️ — you can still /reflect and earn 5 pts\\!"_\n\n` +
+        `${nameList}\n\n` +
+        `Run /cancelnudge to abort\\.`;
+    }
+    for (const adminId of adminIds) {
+      try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
+    }
+  } catch (err) { console.error('[Cron] 3:55PM preview error:', err); }
+}, { timezone: 'UTC' });
+
+// ---------------------------------------------------------------------------
 // Monday 4PM deadline cron — 4:00 PM SGT = 08:00 UTC, every Monday
 // ---------------------------------------------------------------------------
 
 cron.schedule('0 8 * * 1', async () => {
-  if (currentQ2Week() === 1) return;
-  console.log('[Cron] Running 4PM deadline nudge...');
+  // At exactly 4PM SGT the week counter flips to the NEW week.
+  // We must check the just-CLOSED week (weekNow - 1), not weekNow.
+  const weekNow = currentQ2Week();
+  if (weekNow === 1) return;
+  if (cronAbortFlags.deadline) {
+    console.log('[Cron] 4PM deadline nudge aborted by /cancelnudge.');
+    cronAbortFlags.deadline = false;
+    return;
+  }
+  const closedWeek = weekNow - 1;
+  console.log(`[Cron] Running 4PM deadline nudge for closed week ${closedWeek}...`);
   try {
     const users = await sheets.getAllUsersWithChatId();
     for (const { realName, chatId, nickname } of users) {
       try {
         const stats = await sheets.getStatsForUser(realName);
-        if (stats && stats.submittedThisWeek === false) {
+        const closedEntry = stats?.weeklyBreakdown?.find(w => w.week === closedWeek);
+        // If no breakdown entry for that week (pre-launch or unregistered), skip.
+        if (!closedEntry) continue;
+        if (closedEntry.status === 'missed') {
           const dn = e(nickname ?? realName);
           const msg = `Hey ${dn}\\! This week's deadline has just passed 🌧️\n\nNo worries — you can still /reflect and earn 5 pts\\! Better late than never 🌱\n\nAny questions\\? Text @whalewhalewhalee\\.`;
           await bot.api.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' });
