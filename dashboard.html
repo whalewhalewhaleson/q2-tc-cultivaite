@@ -444,6 +444,7 @@ let _myDept2    = null;    // secondary dept for multi-dept managers
 let _mgrDepts   = [];      // [dept, dept2] for filtering
 let _gnPending  = [];
 let _gnReviewed = [];
+let _gnWeek     = null;
 let _reflCache  = {};   // weekNum → array
 let _reflWeek   = null;
 let _reflDept   = 'All';
@@ -496,6 +497,7 @@ async function init() {
     if (_reflWeek === null) _reflWeek = stats.weekNow;
     if (_rankWeek === null) _rankWeek = stats.weekNow;
     if (_dashWeek === null) _dashWeek = stats.weekNow;
+    if (_gnWeek   === null) _gnWeek   = stats.weekNow;
 
     // Manager: lock reflections to their dept(s) and default to that tab
     if (_myRole === 'manager' && _myDept) {
@@ -1144,30 +1146,48 @@ function setReflDept(d) {
   renderReflections();
 }
 
+function setGnWeek(n) {
+  _gnWeek = n;
+  renderGoodNews();
+}
+
 // ── Good News ──────────────────────────────────────────────────────────────
 function renderGoodNews() {
-  const allPending  = _gnPending;
-  const allApproved = _gnReviewed.filter(g => g.status === 'Approved');
-  const allRejected = _gnReviewed.filter(g => g.status === 'Rejected');
+  if (!_stats) return;
+  const weekNow = _stats.weekNow;
+  const week = _gnWeek ?? weekNow;
 
-  const totalAll      = allPending.length + _gnReviewed.length;
-  const totalPending  = allPending.length;
-  const totalApproved = allApproved.length;
+  const weekPending  = _gnPending.filter(g => g.week_number === week);
+  const weekApproved = _gnReviewed.filter(g => g.status === 'Approved' && g.week_number === week);
+  const weekRejected = _gnReviewed.filter(g => g.status === 'Rejected' && g.week_number === week);
 
-  const pendingCards  = allPending.map(gn => gnCard(gn, 'pending')).join('') ||
-    '<div style="color:#8a9a8a;font-size:13px;padding:16px 0">No pending nominations.</div>';
-  const approvedCards = allApproved.map(gn => gnCard(gn, 'approved')).join('');
-  const rejectedCards = allRejected.map(gn => gnCard(gn, 'rejected')).join('');
+  const totalNominations = weekPending.length + weekApproved.length + weekRejected.length;
+  const totalPending     = weekPending.length;
+  const totalApproved    = weekApproved.length;
+
+  const weekOpts = Array.from({ length: weekNow }, (_, i) => i + 1)
+    .map(w => `<option value="${w}" ${w===week?'selected':''}>Week ${toISOWeek(w)}${w===weekNow?' (Current)':''}</option>`)
+    .join('');
+
+  const pendingCards  = weekPending.map(gn => gnCard(gn, 'pending')).join('') ||
+    '<div style="color:#8a9a8a;font-size:13px;padding:16px 0">No pending nominations this week.</div>';
+  const approvedCards = weekApproved.map(gn => gnCard(gn, 'approved')).join('');
+  const rejectedCards = weekRejected.map(gn => gnCard(gn, 'rejected')).join('');
 
   const pendingSectionTitle = _myRole === 'manager' ? '⏳ Pending' : '⏳ Pending Approval';
   document.getElementById('sheet-goodnews').innerHTML = `
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;flex:1">
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${totalAll}</div><div style="font-size:11px;color:#8a9a8a">Total nominations</div></div>
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #fef7e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#d4760a">${totalPending}</div><div style="font-size:11px;color:#8a9a8a">Pending</div></div>
-        <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #d9f0e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${totalApproved}</div><div style="font-size:11px;color:#8a9a8a">Approved</div></div>
-      </div>
-      ${_myRole === 'manager' ? '<span style="font-size:11px;color:#8a9a8a;margin-left:16px;white-space:nowrap">👁 Read-only view</span>' : ''}
+    <div class="filter-bar" style="margin-bottom:16px">
+      <span style="font-size:12px;color:#6b7c6b;font-weight:600">Week:</span>
+      <button class="filter-arrow" onclick="setGnWeek(Math.max(1,_gnWeek-1))" ${week<=1?'disabled':''}>◀</button>
+      <select class="filter-select" onchange="setGnWeek(parseInt(this.value))">${weekOpts}</select>
+      <button class="filter-arrow" onclick="setGnWeek(Math.min(${weekNow},_gnWeek+1))" ${week>=weekNow?'disabled':''}>▶</button>
+      ${_myRole === 'manager' ? '<span style="font-size:11px;color:#8a9a8a;margin-left:auto;white-space:nowrap">👁 Read-only view</span>' : ''}
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
+      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #dce3dc;text-align:center"><div style="font-size:22px;font-weight:700;color:#9c27b0">${totalNominations}</div><div style="font-size:11px;color:#8a9a8a">Total nominations</div></div>
+      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #fef7e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#d4760a">${totalPending}</div><div style="font-size:11px;color:#8a9a8a">Pending</div></div>
+      <div style="background:white;border-radius:10px;padding:14px 16px;border:1px solid #d9f0e0;text-align:center"><div style="font-size:22px;font-weight:700;color:#2d6a4f">${totalApproved}</div><div style="font-size:11px;color:#8a9a8a">Approved</div></div>
     </div>
 
     ${_myRole !== 'manager' ? `<div style="background:#fef7e0;border:1px solid #d4a017;border-radius:10px;padding:10px 16px;font-size:12px;color:#9a5a00;margin-bottom:16px">
@@ -1177,12 +1197,12 @@ function renderGoodNews() {
     <div class="section-header"><span class="section-title">${pendingSectionTitle}</span><span class="section-badge orange">${totalPending} nomination${totalPending!==1?'s':''}</span></div>
     <div id="pending-list">${pendingCards}</div>
 
-    ${allApproved.length ? `
-    <div class="section-header" style="margin-top:24px"><span class="section-title">✅ Approved</span><span class="section-badge green">${allApproved.length}</span></div>
+    ${weekApproved.length ? `
+    <div class="section-header" style="margin-top:24px"><span class="section-title">✅ Approved</span><span class="section-badge green">${weekApproved.length}</span></div>
     <div id="approved-list">${approvedCards}</div>` : ''}
 
-    ${allRejected.length ? `
-    <div class="section-header" style="margin-top:24px"><span class="section-title">✕ Rejected</span><span class="section-badge orange">${allRejected.length}</span></div>
+    ${weekRejected.length ? `
+    <div class="section-header" style="margin-top:24px"><span class="section-title">✕ Rejected</span><span class="section-badge orange">${weekRejected.length}</span></div>
     <div id="rejected-list">${rejectedCards}</div>` : ''}
   `;
 }
