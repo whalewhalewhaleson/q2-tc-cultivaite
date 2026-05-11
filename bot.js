@@ -11,7 +11,8 @@ import * as sheets from './db.js';
 import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDashboardAccessIds,
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
          getUserByRealName, getUserByChatId, setGoodNewsWeek,
-         getApprovedUnnotifiedGoodNews, markGoodNewsNotified } from './db.js';
+         getApprovedUnnotifiedGoodNews, markGoodNewsNotified,
+         getGoodNewsById } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -1428,21 +1429,26 @@ bot.command('pendingnotifications', async (ctx) => {
       await ctx.reply(`No pending good news notifications right now\\.`, { parse_mode: 'MarkdownV2' });
       return;
     }
-    const entryLines = entries.flatMap(gn => {
+    await ctx.reply(
+      `📨 ${bold(`Pending Good News Notifications (${entries.length})`)}\n\n` +
+      `Showing one card per nomination below\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    for (const gn of entries) {
       const names = gn.awards.length > 0
         ? gn.awards.map(a => a.recipient_name)
         : [gn.nominee_name];
-      return names.map(r =>
-        `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(gn.week_number))}\\)\n  _"${e(gn.message)}"_`
-      );
-    });
-    const header = `📨 ${bold(`Pending Good News Notifications (${entries.length})`)}\n\n`;
-    const footer = `\n\nUse /firenotifications to send now, or they fire automatically Tue 10:15AM SGT\\.`;
-    const pages = paginateLines(entryLines, footer.length);
-    await ctx.reply(header + pages[0] + (pages.length === 1 ? footer : ''), { parse_mode: 'MarkdownV2' });
-    for (let i = 1; i < pages.length; i++) {
-      await ctx.reply(pages[i] + (i === pages.length - 1 ? footer : ''), { parse_mode: 'MarkdownV2' });
+      const recipients = names.map(n => e(n)).join(', ');
+      const msg =
+        `🌟 ${bold(`W${e(String(gn.week_number))}`)}\n` +
+        `${e(gn.nominator_name)} → ${recipients}\n` +
+        `_"${e(gn.message)}"_`;
+      await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
     }
+    await ctx.reply(
+      `Use /firenotifications to send now, or they fire automatically Tue 10:15AM SGT\\.`,
+      { parse_mode: 'MarkdownV2' }
+    );
   } catch (err) {
     console.error('/pendingnotifications error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
@@ -3045,6 +3051,37 @@ http.createServer(async (req, res) => {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       await sheets.unapproveGoodNews(parseInt(unapproveM[1]));
       return jsonRes(res, { ok: true });
+    }
+
+    // POST /api/good-news/:id/notify-rejected — send notify-only messages without approving
+    const notifyRejectedM = route.match(/^\/api\/good-news\/(\d+)\/notify-rejected$/);
+    if (req.method === 'POST' && notifyRejectedM) {
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
+      const gnId = parseInt(notifyRejectedM[1]);
+      const body = await parseBody(req);
+      const recipients = body.recipients ?? []; // [{ name, dept }]
+      const gn = await getGoodNewsById(gnId);
+      if (!gn) return jsonRes(res, { error: 'Not found' }, 404);
+
+      const sent = [];
+      const noChat = [];
+      for (const r of recipients) {
+        const recipUser = await getUserByRealName(r.name);
+        if (!recipUser?.chatId) { noChat.push(r.name); continue; }
+        const msg =
+          `🌟 ${bold('Good News Shoutout!')}\n\n` +
+          `${e(gn.nominator_name)} shared good news about you:\n\n` +
+          `_"${e(gn.message)}"_`;
+        try {
+          await bot.api.sendMessage(recipUser.chatId, msg, { parse_mode: 'MarkdownV2' });
+          sent.push(r.name);
+        } catch (err) {
+          console.error(`[GN notify-rejected] Failed → ${r.name}:`, err.message);
+          noChat.push(r.name);
+        }
+      }
+      await markGoodNewsNotified([gnId]);
+      return jsonRes(res, { ok: true, sent, noChat });
     }
 
     // GET /api/reflections?week=N

@@ -887,6 +887,16 @@ export async function getLatestGoodNewsForNominator(nominatorName) {
   return data ?? null;
 }
 
+export async function getGoodNewsById(gnId) {
+  const { data, error } = await supabase
+    .from('good_news')
+    .select('id, nominator_name, nominee_name, message, week_number, pts_sharer, status')
+    .eq('id', gnId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
 export async function updatePendingGoodNews(gnId, nomineeName, message) {
   const { error } = await supabase
     .from('good_news')

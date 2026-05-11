@@ -1241,6 +1241,7 @@ function gnCard(gn, status) {
       <button class="btn-approve" onclick="approveGN(${gnId},this)">✅ Approve (+${gn.pts_sharer??5} pts ${nominator})</button>
       <button class="btn-edit" onclick="editGN(${gnId})">✏️ Edit recipients</button>
       <button class="btn-reject" onclick="rejectGN(${gnId})">✕ Reject</button>
+      <button class="btn-edit" style="margin-left:4px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
     `;
   } else if (status === 'approved') {
     cardClass = 'approved';
@@ -1265,6 +1266,8 @@ function gnCard(gn, status) {
       ? `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>`
       : `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>
       <button class="btn-undo" style="margin-left:8px" onclick="unRejectGN(${gnId})">↩ Undo — move back to Pending</button>
+      <button class="btn-edit" style="margin-left:8px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
+      <button class="btn-edit" style="margin-left:8px" onclick="notifyRejectedGN(${gnId})">📬 Notify anyway</button>
     `;
   }
 
@@ -1371,6 +1374,101 @@ async function unapproveGN(gnId) {
     updateGNBadge();
     renderGoodNews();
   } catch (e) { alert('Error: ' + e.message); }
+}
+
+function notifyRejectedGN(gnId) {
+  const card = document.getElementById(`gnc-${gnId}`);
+  if (!card || card.querySelector('.gn-notify-rejected-section')) return;
+
+  const el = document.createElement('div');
+  el.className = 'gn-notify-rejected-section';
+  el.style.cssText = 'margin-top:10px;padding:10px;background:#f0f4f0;border-radius:8px';
+  el.innerHTML = `
+    <div style="font-size:12px;font-weight:600;color:#4a6741;margin-bottom:8px">📬 Notify without approving — pick who to notify (no points, no approval)</div>
+    <div id="gnrj-${gnId}"></div>
+    <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addRejectedNotifyRow(${gnId})">+ Add person</button>
+    <div style="display:flex;gap:6px;margin-top:10px">
+      <button class="btn-save" style="font-size:12px" onclick="confirmRejectedNotify(${gnId})">📬 Send notifications</button>
+      <button class="btn-cancel-edit" style="font-size:12px" onclick="this.closest('.gn-notify-rejected-section').remove()">Cancel</button>
+    </div>
+  `;
+  card.querySelector('.gn-body').appendChild(el);
+  addRejectedNotifyRow(gnId);
+}
+
+function addRejectedNotifyRow(gnId, name = '', dept = '') {
+  const container = document.getElementById(`gnrj-${gnId}`);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'gn-recipient-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const uid = `gnrji-${gnId}-${Date.now()}`;
+  row.innerHTML = `
+    <div style="flex:1.5;position:relative">
+      <input class="gn-edit-input gn-name-input" id="${uid}" placeholder="Type a name..." value="${esc(name)}" autocomplete="off" style="width:100%">
+      <div class="gn-name-dropdown" id="${uid}-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #dce3dc;border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+    </div>
+    <input class="gn-edit-input gn-dept-input" placeholder="Dept" value="${esc(dept)}" style="flex:1" readonly>
+    <button onclick="this.closest('.gn-recipient-row').remove()" style="background:none;border:none;color:#c5221f;font-size:16px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+  `;
+  container.appendChild(row);
+  const input = row.querySelector(`#${uid}`);
+  const dd    = row.querySelector(`#${uid}-dd`);
+  const deptInput = row.querySelector('.gn-dept-input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !_stats) { dd.style.display = 'none'; return; }
+    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => { input.value = item.dataset.name; deptInput.value = item.dataset.dept; dd.style.display = 'none'; });
+    });
+  });
+  input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
+  input.addEventListener('focus', () => {
+    if (!_stats) return;
+    const all = _stats.users;
+    dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => { input.value = item.dataset.name; deptInput.value = item.dataset.dept; dd.style.display = 'none'; });
+    });
+  });
+}
+
+async function confirmRejectedNotify(gnId) {
+  const rows = document.querySelectorAll(`#gnrj-${gnId} .gn-recipient-row`);
+  const recipients = [];
+  rows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const dept = inputs[1].value.trim();
+    if (name) recipients.push({ name, dept: dept || null });
+  });
+  if (!recipients.length) return;
+  try {
+    const res = await fetch(`/api/good-news/${gnId}/notify-rejected`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipients }),
+    });
+    const data = await res.json();
+    const sentNames = (data.sent ?? []).join(', ') || '(none)';
+    const noChat = (data.noChat ?? []).join(', ');
+    let msg = `Sent to: ${sentNames}.`;
+    if (noChat) msg += `\nNo Telegram chat found for: ${noChat}`;
+    alert(msg);
+    // Mark notified locally
+    const idx = _gnReviewed.findIndex(g => g.id === gnId);
+    if (idx !== -1) _gnReviewed[idx] = { ..._gnReviewed[idx], notified_at: new Date().toISOString() };
+    renderGoodNews();
+  } catch (err) { alert('Error: ' + err.message); }
 }
 
 // ── GN inline edit (pending) ───────────────────────────────────────────────
@@ -1577,6 +1675,8 @@ function editGNReviewed(gnId, currentStatus) {
   const nominatorD = gn.nominator_dept ?? '';
   const ptsSharer  = gn.pts_sharer ?? 5;
   const existingAwards = gn.awards ?? [];
+  const ptsAwards    = existingAwards.filter(a => a.pts > 0);
+  const notifyAwards = existingAwards.filter(a => a.pts === 0);
 
   const el = document.createElement('div');
   el.className = 'gn-edit-section';
@@ -1589,17 +1689,23 @@ function editGNReviewed(gnId, currentStatus) {
     <div class="gn-edit-label" style="margin-bottom:6px">Award pts to</div>
     <div id="gnrr-${gnId}"></div>
     <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addReviewedRecipient(${gnId})">+ Add person</button>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e8ede8">
+      <div class="gn-edit-label" style="margin-bottom:6px">Notify only — no points</div>
+      <div id="gnrr-notify-${gnId}"></div>
+      <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addReviewedNotifyRecipient(${gnId})">+ Add notify-only person</button>
+    </div>
     <div style="display:flex;gap:6px;margin-top:10px">
-      <button class="btn-save" onclick="saveReviewedEdit(${gnId})">💾 Re-approve with new pts</button>
+      <button class="btn-save" onclick="saveReviewedEdit(${gnId})">💾 Re-approve with new recipients</button>
       <button class="btn-cancel-edit" onclick="cancelReviewedEdit(${gnId})">Cancel</button>
     </div>
   `;
   card.querySelector('.gn-body').appendChild(el);
 
-  const seed = existingAwards.length
-    ? existingAwards
+  const seedPts = ptsAwards.length
+    ? ptsAwards
     : [{ recipient_name: gn.nominee_name ?? '', recipient_dept: gn.nominee_dept ?? '', pts: 5 }];
-  for (const a of seed) addReviewedRecipient(gnId, a.recipient_name, a.recipient_dept, a.pts);
+  for (const a of seedPts) addReviewedRecipient(gnId, a.recipient_name, a.recipient_dept, a.pts);
+  for (const a of notifyAwards) addReviewedNotifyRecipient(gnId, a.recipient_name, a.recipient_dept);
 }
 
 function addReviewedRecipient(gnId, name = '', dept = '', pts = 5) {
@@ -1659,6 +1765,53 @@ function addReviewedRecipient(gnId, name = '', dept = '', pts = 5) {
   });
 }
 
+function addReviewedNotifyRecipient(gnId, name = '', dept = '') {
+  const container = document.getElementById(`gnrr-notify-${gnId}`);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'gn-recipient-row gn-notify-only-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const uid = `gnrrno-${gnId}-${Date.now()}`;
+  row.innerHTML = `
+    <div style="flex:1.5;position:relative">
+      <input class="gn-edit-input gn-name-input" id="${uid}" placeholder="Type a name..." value="${esc(name)}" autocomplete="off" style="width:100%">
+      <div class="gn-name-dropdown" id="${uid}-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #dce3dc;border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+    </div>
+    <input class="gn-edit-input gn-dept-input" placeholder="Dept" value="${esc(dept)}" style="flex:1" readonly>
+    <span style="width:52px;text-align:center;font-size:11px;color:#8a9a8a;flex-shrink:0">0 pts</span>
+    <button onclick="this.closest('.gn-recipient-row').remove()" style="background:none;border:none;color:#c5221f;font-size:16px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+  `;
+  container.appendChild(row);
+  const input = row.querySelector(`#${uid}`);
+  const dd    = row.querySelector(`#${uid}-dd`);
+  const deptInput = row.querySelector('.gn-dept-input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !_stats) { dd.style.display = 'none'; return; }
+    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => { input.value = item.dataset.name; deptInput.value = item.dataset.dept; dd.style.display = 'none'; });
+    });
+  });
+  input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
+  input.addEventListener('focus', () => {
+    if (!_stats) return;
+    const all = _stats.users;
+    dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => { input.value = item.dataset.name; deptInput.value = item.dataset.dept; dd.style.display = 'none'; });
+    });
+  });
+}
+
 async function saveReviewedEdit(gnId) {
   const rows = document.querySelectorAll(`#gnrr-${gnId} .gn-recipient-row`);
   const awards = [];
@@ -1668,6 +1821,13 @@ async function saveReviewedEdit(gnId) {
     const dept = inputs[1].value.trim();
     const pts  = parseInt(inputs[2].value) || 3;
     if (name) awards.push({ recipientName: name, recipientDept: dept || null, pts });
+  });
+  const notifyRows = document.querySelectorAll(`#gnrr-notify-${gnId} .gn-recipient-row`);
+  notifyRows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const dept = inputs[1].value.trim();
+    if (name) awards.push({ recipientName: name, recipientDept: dept || null, pts: 0 });
   });
   if (!awards.length) return;
 
