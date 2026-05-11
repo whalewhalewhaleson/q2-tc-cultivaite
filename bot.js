@@ -3154,3 +3154,9 @@ console.log('🌱 TC CultivAIte bot starting...');
 bot.start({
   onStart: () => console.log('✅ Bot is running! Press Ctrl+C to stop.'),
 });
+
+// Graceful shutdown — stops polling before the process exits so Railway
+// rolling deploys don't cause a 409 Conflict from two concurrent getUpdates.
+const shutdown = () => bot.stop();
+process.once('SIGTERM', shutdown);
+process.once('SIGINT',  shutdown);
