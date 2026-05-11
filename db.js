@@ -141,7 +141,7 @@ async function buildStatsCache() {
   // Build dept → member list (supports dual-dept membership)
   const deptMembers = {}; // dept → Set of real_name
   for (const u of users) {
-    const depts = [u.department, u.secondary_department].filter(Boolean);
+    const depts = [u.department, u.secondary_department].map(d => (d ?? '').trim()).filter(Boolean);
     for (const dept of depts) {
       if (!deptMembers[dept]) deptMembers[dept] = new Set();
       deptMembers[dept].add(u.real_name.toLowerCase());
@@ -611,7 +611,7 @@ export async function getReviewedGoodNews() {
   const [{ data: rows, error: e1 }, { data: awards, error: e2 }] = await Promise.all([
     supabase
       .from('good_news')
-      .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status')
+      .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status, notified_at')
       .in('status', ['Approved', 'Rejected'])
       .order('timestamp', { ascending: false }),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
@@ -688,6 +688,19 @@ export async function unRejectGoodNews(gnId) {
   if (error) throw error;
 }
 
+// Un-approve: revert an approved entry back to Pending.
+// Deletes award rows (reverting points) and clears notified_at so it can be re-approved.
+// Safe to use any time — if notifications already sent, points are reversed silently.
+export async function unapproveGoodNews(gnId) {
+  const [delResult, updResult] = await Promise.all([
+    supabase.from('good_news_awards').delete().eq('good_news_id', gnId),
+    supabase.from('good_news').update({ status: 'Pending', notified_at: null }).eq('id', gnId),
+  ]);
+  if (delResult.error) throw delResult.error;
+  if (updResult.error) throw updResult.error;
+  cacheInvalidate('stats');
+}
+
 // Returns all data the leadership dashboard needs in one call.
 export async function getFullDashboardStats() {
   const { sorted, deptStatsMap, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek } = await buildStatsCache();
@@ -704,7 +717,7 @@ export async function getFullDashboardStats() {
     .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown' }));
   const inactiveUsers      = allUsersRows
     .filter(r => r.active === false && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
-    .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown', active: false }));
+    .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown', secondaryDepartment: r.secondary_department ?? null, active: false }));
 
   const users = sorted.map(u => ({
     realName:            u.realName,

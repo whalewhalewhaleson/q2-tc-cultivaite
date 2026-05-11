@@ -1226,13 +1226,17 @@ function gnCard(gn, status) {
     cardClass = 'approved';
     chipHtml = '<span class="approved-chip">Approved</span>';
     const awardsLine = gn.awards && gn.awards.length
-      ? gn.awards.map(a => `<strong>${esc(a.recipient_name)}</strong> +${a.pts} pts`).join(' &nbsp;·&nbsp; ')
+      ? gn.awards.map(a => a.pts === 0
+          ? `<strong>${esc(a.recipient_name)}</strong> <span style="color:#8a9a8a;font-size:11px">notify only</span>`
+          : `<strong>${esc(a.recipient_name)}</strong> +${a.pts} pts`).join(' &nbsp;·&nbsp; ')
       : `<strong>${nominee || '(nominee)'}</strong> +3 pts (legacy)`;
+    const notifiedLabel = gn.notified_at ? `<span style="font-size:11px;color:#8a9a8a;margin-left:6px">Notified ✓</span>` : `<span style="font-size:11px;color:#d4760a;margin-left:6px">Not yet notified</span>`;
     actionsHtml = _myRole === 'manager'
       ? `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>`
-      : `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>
+      : `<span style="font-size:12px;color:#2d6a4f">✅ ${nominator} +${gn.pts_sharer??5} pts &nbsp;·&nbsp; ${awardsLine}</span>${notifiedLabel}
       <button class="btn-edit" style="margin-left:8px" onclick="editGNReviewed(${gnId},'approved')">✏️ Edit</button>
       <button class="btn-edit" style="margin-left:8px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
+      <button class="btn-undo" style="margin-left:8px" onclick="unapproveGN(${gnId})">↩ Un-approve</button>
     `;
   } else {
     cardClass = 'rejected';
@@ -1285,12 +1289,13 @@ async function approveGN(gnId, btn) {
     await fetch(`/api/good-news/${gnId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ awards: awards.map(r => ({ recipientName: r.name ?? r.recipientName, recipientDept: r.dept ?? r.recipientDept ?? null, pts: parseInt(r.pts) || 3 })) }),
+      body: JSON.stringify({ awards: awards.map(r => ({ recipientName: r.name ?? r.recipientName, recipientDept: r.dept ?? r.recipientDept ?? null, pts: parseInt(r.pts) >= 0 ? parseInt(r.pts) : 3 })) }),
     });
     // Move from pending to reviewed in local state
     const idx = _gnPending.findIndex(g => g.id === gnId);
     if (idx !== -1) {
-      const row = { ..._gnPending[idx], status: 'Approved', awards: awards.map(r => ({ recipient_name: r.name ?? r.recipientName, recipient_dept: r.dept ?? r.recipientDept ?? null, pts: parseInt(r.pts)||3 })) };
+      const parsePts = p => parseInt(p) >= 0 ? parseInt(p) : 3;
+      const row = { ..._gnPending[idx], status: 'Approved', awards: awards.map(r => ({ recipient_name: r.name ?? r.recipientName, recipient_dept: r.dept ?? r.recipientDept ?? null, pts: parsePts(r.pts) })) };
       _gnPending.splice(idx, 1);
       _gnReviewed.unshift(row);
     }
@@ -1333,6 +1338,21 @@ async function unRejectGN(gnId) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
+async function unapproveGN(gnId) {
+  if (!confirm('Un-approve this good news? Points will be reversed and it will return to Pending for re-review.')) return;
+  try {
+    await fetch(`/api/good-news/${gnId}/unapprove`, { method: 'POST' });
+    const idx = _gnReviewed.findIndex(g => g.id === gnId);
+    if (idx !== -1) {
+      const row = { ..._gnReviewed[idx], status: 'Pending', awards: [], notified_at: null };
+      _gnReviewed.splice(idx, 1);
+      _gnPending.push(row);
+    }
+    updateGNBadge();
+    renderGoodNews();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
 // ── GN inline edit (pending) ───────────────────────────────────────────────
 function editGN(gnId) {
   const card = document.getElementById(`gnc-${gnId}`);
@@ -1358,6 +1378,11 @@ function editGN(gnId) {
     <div class="gn-edit-label" style="margin-bottom:6px">Award pts to (add anyone — can be more than one)</div>
     <div id="gnr-${gnId}"></div>
     <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addRecipient(${gnId})">+ Add person</button>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #e8ede8">
+      <div class="gn-edit-label" style="margin-bottom:6px">Notify only — no points (share the good news without pts)</div>
+      <div id="gnr-notify-${gnId}"></div>
+      <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addNotifyOnly(${gnId})">+ Add notify-only person</button>
+    </div>
     <div style="display:flex;gap:6px;margin-top:10px">
       <button class="btn-save" onclick="saveGNEdit(${gnId})">💾 Save &amp; preview</button>
       <button class="btn-cancel-edit" onclick="cancelGNEdit(${gnId})">Cancel</button>
@@ -1423,6 +1448,45 @@ function addRecipient(gnId, name = '', dept = '', pts = 5) {
   });
 }
 
+function addNotifyOnly(gnId) {
+  const container = document.getElementById(`gnr-notify-${gnId}`);
+  if (!container) return;
+  const row = document.createElement('div');
+  row.className = 'gn-recipient-row gn-notify-only-row';
+  row.style.cssText = 'display:flex;gap:6px;align-items:center;margin-bottom:6px';
+  const uid = `gnrno-${gnId}-${Date.now()}`;
+  row.innerHTML = `
+    <div style="flex:1.5;position:relative">
+      <input class="gn-edit-input gn-name-input" id="${uid}" placeholder="Type a name..." autocomplete="off" style="width:100%">
+      <div class="gn-name-dropdown" id="${uid}-dd" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;border:1px solid #dce3dc;border-radius:8px;max-height:160px;overflow-y:auto;z-index:200;box-shadow:0 4px 12px rgba(0,0,0,0.12)"></div>
+    </div>
+    <input class="gn-edit-input gn-dept-input" placeholder="Dept" style="flex:1" readonly>
+    <span style="width:52px;text-align:center;font-size:11px;color:#8a9a8a;flex-shrink:0">0 pts</span>
+    <button onclick="this.closest('.gn-recipient-row').remove()" style="background:none;border:none;color:#c5221f;font-size:16px;cursor:pointer;padding:0 4px;line-height:1">×</button>
+  `;
+  container.appendChild(row);
+  const input = row.querySelector(`#${uid}`);
+  const dd = row.querySelector(`#${uid}-dd`);
+  const deptInput = row.querySelector('.gn-dept-input');
+  input.addEventListener('input', () => {
+    const q = input.value.toLowerCase().trim();
+    if (!q || !_stats) { dd.style.display = 'none'; return; }
+    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    if (!matches.length) { dd.style.display = 'none'; return; }
+    dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
+    dd.style.display = 'block';
+    dd.querySelectorAll('.gn-dd-item').forEach(item => {
+      item.addEventListener('mouseenter', () => item.style.background = '#f5f7f5');
+      item.addEventListener('mouseleave', () => item.style.background = 'white');
+      item.addEventListener('click', () => {
+        input.value = item.dataset.name;
+        deptInput.value = item.dataset.dept;
+        dd.style.display = 'none';
+      });
+    });
+  });
+}
+
 function saveGNEdit(gnId) {
   const card = document.getElementById(`gnc-${gnId}`);
   if (!card) return;
@@ -1435,21 +1499,37 @@ function saveGNEdit(gnId) {
     const pts  = inputs[2].value.trim() || '3';
     if (name) recipients.push({ name, dept, pts });
   });
+  // Collect notify-only rows (pts=0)
+  const notifyRows = document.querySelectorAll(`#gnr-notify-${gnId} .gn-recipient-row`);
+  notifyRows.forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    const name = inputs[0].value.trim();
+    const dept = inputs[1].value.trim();
+    if (name) recipients.push({ name, dept, pts: '0' });
+  });
   if (!recipients.length) return;
 
   card.dataset.recipients = JSON.stringify(recipients);
 
   // Update nominee display
+  const pointsRecips = recipients.filter(r => parseInt(r.pts) > 0);
+  const notifyRecips = recipients.filter(r => parseInt(r.pts) === 0);
   const nomineeEl = card.querySelector('.gn-nominee');
-  if (nomineeEl) nomineeEl.textContent = recipients.map(r => r.name + (r.dept ? ` (${r.dept})` : '')).join(', ');
+  if (nomineeEl) {
+    const parts = [];
+    if (pointsRecips.length) parts.push(pointsRecips.map(r => r.name + (r.dept ? ` (${r.dept})` : '')).join(', '));
+    if (notifyRecips.length) parts.push(`notify only: ${notifyRecips.map(r => r.name).join(', ')}`);
+    nomineeEl.textContent = parts.join(' · ');
+  }
 
   // Update approve button text
   const approveBtn = card.querySelector('.btn-approve');
   if (approveBtn) {
     const ptsSharer = card.dataset.ptsSharer || 5;
     const nominator = card.dataset.nominator?.split(' ')[0] ?? '';
-    const summary = recipients.map(r => `+${r.pts} pts ${r.name.split(' ')[0]}`).join(', ');
-    approveBtn.textContent = `✅ Approve (+${ptsSharer} pts ${nominator} · ${summary})`;
+    const ptsSummary = pointsRecips.map(r => `+${r.pts} pts ${r.name.split(' ')[0]}`).join(', ');
+    const notifySummary = notifyRecips.length ? ` · notify: ${notifyRecips.map(r => r.name.split(' ')[0]).join(', ')}` : '';
+    approveBtn.textContent = `✅ Approve (+${ptsSharer} pts ${nominator}${ptsSummary ? ' · ' + ptsSummary : ''}${notifySummary})`;
   }
   cancelGNEdit(gnId);
 }

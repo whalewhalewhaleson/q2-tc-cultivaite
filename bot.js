@@ -550,7 +550,8 @@ async function reflectConversation(conversation, ctx) {
   await ctx.reply(
     `${bold('Q3 (Optional): Any good news to share? ⭐️')}\n\n` +
     `${italic('Did someone display our core values, go the extra mile, or show great character? Tell us who and what happened — the more specific, the better!')}\n\n` +
-    `${italic('You can shout out more than one person.')}`,
+    `${italic('You can shout out more than one person.')}\n\n` +
+    `📬 ${italic('FYI: the person you shout out will receive a Telegram notification once the team reviews it\\.')}`,
     { parse_mode: 'MarkdownV2', reply_markup: q3Keyboard }
   );
   const q3Event = await conversation.waitFor(['message:text', 'callback_query:data']);
@@ -568,14 +569,8 @@ async function reflectConversation(conversation, ctx) {
   }
 
   if (q3Input.toLowerCase() !== 'skip') {
-    const sepIdx = q3Input.indexOf(' — ');
-    if (sepIdx !== -1) {
-      nomineeName = q3Input.slice(0, sepIdx).trim();
-      q3Raw = q3Input.slice(sepIdx + 3).trim();
-    } else {
-      nomineeName = 'Unknown';
-      q3Raw = q3Input;
-    }
+    nomineeName = 'Unknown';
+    q3Raw = q3Input.trim();
     hasGoodNews = q3Raw.length > 0;
     if (hasGoodNews && nomineeName !== 'Unknown') {
       const nomineeUser = await conversation.external(() => sheets.getUserByRealName(nomineeName));
@@ -726,14 +721,8 @@ async function goodNewsConversation(conversation, ctx) {
 
   const input = inputCtx.message.text.trim();
   let nomineeName, message;
-  const sepIdx = input.indexOf(' — ');
-  if (sepIdx !== -1) {
-    nomineeName = input.slice(0, sepIdx).trim();
-    message = input.slice(sepIdx + 3).trim();
-  } else {
-    nomineeName = 'Unknown';
-    message = input;
-  }
+  nomineeName = 'Unknown';
+  message = input.trim();
 
   if (!message) {
     await ctx.reply(`Hmm, didn't catch a message there\\. Try again with /goodnews\\! ⭐️`, { parse_mode: 'MarkdownV2' });
@@ -2296,8 +2285,11 @@ bot.command('help', async (ctx) => {
       `/listmanagers — 👥 View all dept managers\n` +
       `/testmystats \\<name\\> — 🌿 Preview any user's /mystats \\(incl\\. dual\\-dept\\)\n` +
       `\n${bold('Automations')}\n` +
+      `Mon 9:30AM SGT — Pre\\-flight count to admins before 10AM nudge\n` +
       `Mon 10AM SGT — Morning nudge to non\\-submitters\n` +
+      `Mon 2:30PM SGT — Pre\\-flight count to admins before 3PM warning\n` +
       `Mon 3PM SGT — 1\\-hour warning to non\\-submitters\n` +
+      `Mon 3:30PM SGT — Pre\\-flight preview \\+ recipient list to admins \\(cancel with /cancelnudge\\)\n` +
       `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
       `Fri 10AM SGT — Recap reminder to admins\n` +
       `Fri 3:30PM SGT — Weekly recap to everyone \\(skips if already sent via /firerecap\\)\n` +
@@ -2433,8 +2425,8 @@ cron.schedule('0 7 * * 1', async () => {
 // Monday pre-flight preview crons — heads-up to admins before nudges fire
 // ---------------------------------------------------------------------------
 
-// 9:55 AM SGT (01:55 UTC) — light count before 10 AM nudge
-cron.schedule('55 1 * * 1', async () => {
+// 9:30 AM SGT (01:30 UTC) — light count before 10 AM nudge
+cron.schedule('30 1 * * 1', async () => {
   if (currentQ2Week() === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
   if (!adminIds.length) return;
@@ -2447,15 +2439,15 @@ cron.schedule('55 1 * * 1', async () => {
     }
     const msg = count === 0
       ? `✅ 10AM nudge fires in 5 min — everyone has already submitted this week\\.`
-      : `👋 10AM nudge fires in 5 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
+      : `👋 10AM nudge fires in 30 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
     for (const adminId of adminIds) {
       try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
     }
   } catch (err) { console.error('[Cron] 10AM preview error:', err); }
 }, { timezone: 'UTC' });
 
-// 2:55 PM SGT (06:55 UTC) — light count before 3 PM warning
-cron.schedule('55 6 * * 1', async () => {
+// 2:30 PM SGT (06:30 UTC) — light count before 3 PM warning
+cron.schedule('30 6 * * 1', async () => {
   if (currentQ2Week() === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
   if (!adminIds.length) return;
@@ -2468,15 +2460,15 @@ cron.schedule('55 6 * * 1', async () => {
     }
     const msg = count === 0
       ? `✅ 3PM 1\\-hour warning fires in 5 min — everyone has already submitted\\.`
-      : `⏰ 3PM 1\\-hour warning fires in 5 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
+      : `⏰ 3PM 1\\-hour warning fires in 30 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
     for (const adminId of adminIds) {
       try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
     }
   } catch (err) { console.error('[Cron] 3PM preview error:', err); }
 }, { timezone: 'UTC' });
 
-// 3:55 PM SGT (07:55 UTC) — full preview + names + cancel before 4PM deadline nudge
-cron.schedule('55 7 * * 1', async () => {
+// 3:30 PM SGT (07:30 UTC) — full preview + names + cancel before 4PM deadline nudge
+cron.schedule('30 7 * * 1', async () => {
   if (currentQ2Week() === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
   if (!adminIds.length) return;
@@ -2494,7 +2486,7 @@ cron.schedule('55 7 * * 1', async () => {
     } else {
       const nameList = missed.map(n => `• ${e(n)}`).join('\n');
       msg =
-        `⚠️ *Deadline nudge fires in 5 min*\n\n` +
+        `⚠️ *Deadline nudge fires in 30 min*\n\n` +
         `${e(String(missed.length))} ${missed.length === 1 ? 'person' : 'people'} will receive:\n` +
         `_"Hey\\! This week's deadline has just passed 🌧️ — you can still /reflect and earn 5 pts\\!"_\n\n` +
         `${nameList}\n\n` +
@@ -2561,15 +2553,19 @@ async function sendGoodNewsNotifications() {
     const { nominator_name, message, pts_sharer, awards } = gn;
     const recipients = awards.length > 0 ? awards : [{ recipient_name: gn.nominee_name, pts: 3 }];
 
-    // Notify each recipient
+    // Notify each recipient (pts=0 = notify-only, no points line)
     for (const award of recipients) {
       const user = await getUserByRealName(award.recipient_name);
       if (!user?.chatId) { noChat.push(award.recipient_name); continue; }
-      const msg =
-        `🌟 ${bold('Good News Shoutout!')}\n\n` +
-        `${e(nominator_name)} shared good news about you:\n\n` +
-        `_"${e(message)}"_\n\n` +
-        `You've earned \\+${e(String(award.pts))} pts 🎉`;
+      const notifyOnly = award.pts === 0;
+      const msg = notifyOnly
+        ? `🌟 ${bold('Good News Shoutout!')}\n\n` +
+          `${e(nominator_name)} shared good news about you:\n\n` +
+          `_"${e(message)}"_`
+        : `🌟 ${bold('Good News Shoutout!')}\n\n` +
+          `${e(nominator_name)} shared good news about you:\n\n` +
+          `_"${e(message)}"_\n\n` +
+          `You've earned \\+${e(String(award.pts))} pts 🎉`;
       try {
         await bot.api.sendMessage(user.chatId, msg, { parse_mode: 'MarkdownV2' });
         sent.push({ name: award.recipient_name, fromName: nominator_name, pts: award.pts });
@@ -3040,6 +3036,14 @@ http.createServer(async (req, res) => {
     if (req.method === 'POST' && unRejectM) {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       await sheets.unRejectGoodNews(parseInt(unRejectM[1]));
+      return jsonRes(res, { ok: true });
+    }
+
+    // POST /api/good-news/:id/unapprove  — revert approved entry to Pending, delete award rows
+    const unapproveM = route.match(/^\/api\/good-news\/(\d+)\/unapprove$/);
+    if (req.method === 'POST' && unapproveM) {
+      if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
+      await sheets.unapproveGoodNews(parseInt(unapproveM[1]));
       return jsonRes(res, { ok: true });
     }
 
