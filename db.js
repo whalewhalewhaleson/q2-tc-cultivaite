@@ -651,8 +651,8 @@ export async function reapproveGoodNews(gnId, awards = []) {
 export async function getApprovedUnnotifiedGoodNews() {
   const { data: rows, error: e1 } = await supabase
     .from('good_news')
-    .select('id, nominator_name, nominee_name, message, week_number, pts_sharer')
-    .eq('status', 'Approved')
+    .select('id, nominator_name, nominee_name, message, week_number, pts_sharer, notify_anyway')
+    .or('status.eq.Approved,notify_anyway.eq.true')
     .is('notified_at', null);
   if (e1) throw e1;
   if (!rows?.length) return [];
@@ -680,6 +680,23 @@ export async function markGoodNewsNotified(ids) {
     .update({ notified_at: new Date().toISOString() })
     .in('id', ids);
   if (error) throw error;
+}
+
+// Queue a rejected GN for Tuesday notification: inserts pts=0 award rows and sets notify_anyway=true.
+// Status stays Rejected; nominator is NOT notified (it wasn't approved).
+export async function queueRejectedNotify(gnId, recipients) {
+  const awardRows = recipients.map(r => ({
+    good_news_id:   gnId,
+    recipient_name: r.name,
+    recipient_dept: r.dept ?? null,
+    pts:            0,
+  }));
+  const [insResult, updResult] = await Promise.all([
+    supabase.from('good_news_awards').insert(awardRows),
+    supabase.from('good_news').update({ notify_anyway: true }).eq('id', gnId),
+  ]);
+  if (insResult.error) throw insResult.error;
+  if (updResult.error) throw updResult.error;
 }
 
 // Un-reject: flip a rejected nomination back to Pending so it can be re-reviewed.

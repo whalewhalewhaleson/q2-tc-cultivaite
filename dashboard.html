@@ -1267,7 +1267,10 @@ function gnCard(gn, status) {
       : `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>
       <button class="btn-undo" style="margin-left:8px" onclick="unRejectGN(${gnId})">↩ Undo — move back to Pending</button>
       <button class="btn-edit" style="margin-left:8px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
-      <button class="btn-edit" style="margin-left:8px" onclick="notifyRejectedGN(${gnId})">📬 Notify anyway</button>
+      ${gn.notify_anyway
+        ? `<span style="font-size:11px;color:#d4760a;margin-left:8px">📬 Queued for Tue</span>`
+        : `<button class="btn-edit" style="margin-left:8px" onclick="notifyRejectedGN(${gnId})">📬 Notify anyway</button>`
+      }
     `;
   }
 
@@ -1453,20 +1456,14 @@ async function confirmRejectedNotify(gnId) {
   });
   if (!recipients.length) return;
   try {
-    const res = await fetch(`/api/good-news/${gnId}/notify-rejected`, {
+    await fetch(`/api/good-news/${gnId}/notify-rejected`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipients }),
     });
-    const data = await res.json();
-    const sentNames = (data.sent ?? []).join(', ') || '(none)';
-    const noChat = (data.noChat ?? []).join(', ');
-    let msg = `Sent to: ${sentNames}.`;
-    if (noChat) msg += `\nNo Telegram chat found for: ${noChat}`;
-    alert(msg);
-    // Mark notified locally
+    // Mark queued locally so the card shows the label
     const idx = _gnReviewed.findIndex(g => g.id === gnId);
-    if (idx !== -1) _gnReviewed[idx] = { ..._gnReviewed[idx], notified_at: new Date().toISOString() };
+    if (idx !== -1) _gnReviewed[idx] = { ..._gnReviewed[idx], notify_anyway: true };
     renderGoodNews();
   } catch (err) { alert('Error: ' + err.message); }
 }

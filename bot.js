@@ -12,7 +12,7 @@ import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDa
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
          getUserByRealName, getUserByChatId, setGoodNewsWeek,
          getApprovedUnnotifiedGoodNews, markGoodNewsNotified,
-         getGoodNewsById } from './db.js';
+         getGoodNewsById, queueRejectedNotify } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2581,21 +2581,23 @@ async function sendGoodNewsNotifications() {
       }
     }
 
-    // Notify nominator
-    const nominatorUser = await getUserByRealName(nominator_name);
-    if (nominatorUser?.chatId) {
-      const names = recipients.map(a => a.recipient_name);
-      const recipientList = names.length === 1
-        ? e(names[0])
-        : names.slice(0, -1).map(e).join(', ') + ' and ' + e(names.at(-1));
-      const nominatorMsg =
-        `✅ ${bold('Your Good News was Approved!')}\n\n` +
-        `Your shoutout about ${recipientList} went through\\!\n\n` +
-        `You've earned \\+${e(String(pts_sharer ?? 5))} pts 🌟`;
-      try {
-        await bot.api.sendMessage(nominatorUser.chatId, nominatorMsg, { parse_mode: 'MarkdownV2' });
-      } catch (err) {
-        console.error(`[GN notify] Failed → nominator ${nominator_name}:`, err.message);
+    // Notify nominator — skip for notify_anyway (rejected) entries, it wasn't approved
+    if (!gn.notify_anyway) {
+      const nominatorUser = await getUserByRealName(nominator_name);
+      if (nominatorUser?.chatId) {
+        const names = recipients.map(a => a.recipient_name);
+        const recipientList = names.length === 1
+          ? e(names[0])
+          : names.slice(0, -1).map(e).join(', ') + ' and ' + e(names.at(-1));
+        const nominatorMsg =
+          `✅ ${bold('Your Good News was Approved!')}\n\n` +
+          `Your shoutout about ${recipientList} went through\\!\n\n` +
+          `You've earned \\+${e(String(pts_sharer ?? 5))} pts 🌟`;
+        try {
+          await bot.api.sendMessage(nominatorUser.chatId, nominatorMsg, { parse_mode: 'MarkdownV2' });
+        } catch (err) {
+          console.error(`[GN notify] Failed → nominator ${nominator_name}:`, err.message);
+        }
       }
     }
   }
@@ -3053,35 +3055,16 @@ http.createServer(async (req, res) => {
       return jsonRes(res, { ok: true });
     }
 
-    // POST /api/good-news/:id/notify-rejected — send notify-only messages without approving
+    // POST /api/good-news/:id/notify-rejected — queue rejected GN for Tuesday batch
     const notifyRejectedM = route.match(/^\/api\/good-news\/(\d+)\/notify-rejected$/);
     if (req.method === 'POST' && notifyRejectedM) {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const gnId = parseInt(notifyRejectedM[1]);
       const body = await parseBody(req);
-      const recipients = body.recipients ?? []; // [{ name, dept }]
-      const gn = await getGoodNewsById(gnId);
-      if (!gn) return jsonRes(res, { error: 'Not found' }, 404);
-
-      const sent = [];
-      const noChat = [];
-      for (const r of recipients) {
-        const recipUser = await getUserByRealName(r.name);
-        if (!recipUser?.chatId) { noChat.push(r.name); continue; }
-        const msg =
-          `🌟 ${bold('Good News Shoutout!')}\n\n` +
-          `${e(gn.nominator_name)} shared good news about you:\n\n` +
-          `_"${e(gn.message)}"_`;
-        try {
-          await bot.api.sendMessage(recipUser.chatId, msg, { parse_mode: 'MarkdownV2' });
-          sent.push(r.name);
-        } catch (err) {
-          console.error(`[GN notify-rejected] Failed → ${r.name}:`, err.message);
-          noChat.push(r.name);
-        }
-      }
-      await markGoodNewsNotified([gnId]);
-      return jsonRes(res, { ok: true, sent, noChat });
+      const recipients = body.recipients ?? [];
+      if (!recipients.length) return jsonRes(res, { error: 'No recipients' }, 400);
+      await queueRejectedNotify(gnId, recipients);
+      return jsonRes(res, { ok: true, queued: true });
     }
 
     // GET /api/reflections?week=N
