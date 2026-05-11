@@ -691,6 +691,8 @@ export async function queueRejectedNotify(gnId, recipients) {
     recipient_dept: r.dept ?? null,
     pts:            0,
   }));
+  // Delete existing notify-only awards first so editing replaces rather than appends
+  await supabase.from('good_news_awards').delete().eq('good_news_id', gnId).eq('pts', 0);
   const [insResult, updResult] = await Promise.all([
     supabase.from('good_news_awards').insert(awardRows),
     supabase.from('good_news').update({ notify_anyway: true }).eq('id', gnId),

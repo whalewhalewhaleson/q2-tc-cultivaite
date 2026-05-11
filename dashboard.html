@@ -1267,10 +1267,8 @@ function gnCard(gn, status) {
       : `<span style="font-size:12px;color:#c5221f">✕ Rejected</span>
       <button class="btn-undo" style="margin-left:8px" onclick="unRejectGN(${gnId})">↩ Undo — move back to Pending</button>
       <button class="btn-edit" style="margin-left:8px" onclick="moveGoodNewsWeek(${gnId},${gn.week_number??'null'})">📅 Move week</button>
-      ${gn.notify_anyway
-        ? `<span style="font-size:11px;color:#d4760a;margin-left:8px">📬 Queued for Tue</span>`
-        : `<button class="btn-edit" style="margin-left:8px" onclick="notifyRejectedGN(${gnId})">📬 Notify anyway</button>`
-      }
+      <button class="btn-edit" style="margin-left:8px" onclick="notifyRejectedGN(${gnId})">${gn.notify_anyway ? '📬 Edit notify list' : '📬 Notify anyway'}</button>
+      ${gn.notify_anyway ? `<span style="font-size:11px;color:#d4760a;margin-left:4px">Queued for Tue</span>` : ''}
     `;
   }
 
@@ -1381,22 +1379,33 @@ async function unapproveGN(gnId) {
 
 function notifyRejectedGN(gnId) {
   const card = document.getElementById(`gnc-${gnId}`);
-  if (!card || card.querySelector('.gn-notify-rejected-section')) return;
+  if (!card) return;
+  // If panel already open, close it (toggle)
+  const existing = card.querySelector('.gn-notify-rejected-section');
+  if (existing) { existing.remove(); return; }
+
+  const gn = _gnReviewed.find(g => g.id === gnId);
+  const queued = (gn?.awards ?? []).filter(a => a.pts === 0);
 
   const el = document.createElement('div');
   el.className = 'gn-notify-rejected-section';
   el.style.cssText = 'margin-top:10px;padding:10px;background:#f0f4f0;border-radius:8px';
   el.innerHTML = `
-    <div style="font-size:12px;font-weight:600;color:#4a6741;margin-bottom:8px">📬 Notify without approving — pick who to notify (no points, no approval)</div>
+    <div style="font-size:12px;font-weight:600;color:#4a6741;margin-bottom:8px">📬 Notify without approving — goes out Tuesday with the rest</div>
     <div id="gnrj-${gnId}"></div>
     <button class="btn-cancel-edit" style="margin-top:6px;font-size:12px" onclick="addRejectedNotifyRow(${gnId})">+ Add person</button>
     <div style="display:flex;gap:6px;margin-top:10px">
-      <button class="btn-save" style="font-size:12px" onclick="confirmRejectedNotify(${gnId})">📬 Send notifications</button>
+      <button class="btn-save" style="font-size:12px" onclick="confirmRejectedNotify(${gnId})">💾 Save</button>
       <button class="btn-cancel-edit" style="font-size:12px" onclick="this.closest('.gn-notify-rejected-section').remove()">Cancel</button>
     </div>
   `;
   card.querySelector('.gn-body').appendChild(el);
-  addRejectedNotifyRow(gnId);
+
+  if (queued.length) {
+    for (const a of queued) addRejectedNotifyRow(gnId, a.recipient_name, a.recipient_dept ?? '');
+  } else {
+    addRejectedNotifyRow(gnId);
+  }
 }
 
 function addRejectedNotifyRow(gnId, name = '', dept = '') {
@@ -1461,9 +1470,12 @@ async function confirmRejectedNotify(gnId) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ recipients }),
     });
-    // Mark queued locally so the card shows the label
     const idx = _gnReviewed.findIndex(g => g.id === gnId);
-    if (idx !== -1) _gnReviewed[idx] = { ..._gnReviewed[idx], notify_anyway: true };
+    if (idx !== -1) _gnReviewed[idx] = {
+      ..._gnReviewed[idx],
+      notify_anyway: true,
+      awards: recipients.map(r => ({ recipient_name: r.name, recipient_dept: r.dept ?? null, pts: 0 })),
+    };
     renderGoodNews();
   } catch (err) { alert('Error: ' + err.message); }
 }
