@@ -2293,7 +2293,7 @@ bot.command('help', async (ctx) => {
       `Mon 4PM SGT — Deadline\\-over nudge to non\\-submitters\n` +
       `Fri 10AM SGT — Recap reminder to admins\n` +
       `Fri 3:30PM SGT — Weekly recap to everyone \\(skips if already sent via /firerecap\\)\n` +
-      `Tue 10AM SGT — Good news notification preview to admins\n` +
+      `Tue 9:30AM SGT — Good news notification preview to admins \\(45 min before send\\)\n` +
       `Tue 10:15AM SGT — Good news notifications to nominees \\+ nominators\n` +
       `On submit — Dept 100% shoutout \\(first dept to hit 100% that week\\)\n`;
   }
@@ -2681,10 +2681,10 @@ cron.schedule('0 2 * * 5', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
-// Tuesday 10:00 AM SGT — admin heads-up preview before good news notifications
+// Tuesday 9:30 AM SGT (01:30 UTC) — admin heads-up preview before good news notifications
 // ---------------------------------------------------------------------------
 
-cron.schedule('0 2 * * 2', async () => {
+cron.schedule('30 1 * * 2', async () => {
   const week = currentQ2Week();
   if (week < 1 || week > 13) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
@@ -2719,7 +2719,7 @@ cron.schedule('0 2 * * 2', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
-// Tuesday 10:15 AM SGT — send good news notifications
+// Tuesday 10:15 AM SGT (02:15 UTC) — send good news notifications
 // ---------------------------------------------------------------------------
 
 cron.schedule('15 2 * * 2', async () => {
