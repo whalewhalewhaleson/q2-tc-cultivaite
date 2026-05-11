@@ -2699,26 +2699,30 @@ cron.schedule('30 1 * * 2', async () => {
   if (!adminIds.length) return;
   try {
     const entries = await getApprovedUnnotifiedGoodNews();
-    let msg;
     if (!entries.length) {
-      msg = `📨 No pending good news notifications for today\\.`;
+      for (const adminId of adminIds) {
+        try { await bot.api.sendMessage(adminId, `📨 No pending good news notifications for today\\.`, { parse_mode: 'MarkdownV2' }); } catch {}
+      }
     } else {
-      const lines = entries.flatMap(gn => {
+      const lineArr = entries.flatMap(gn => {
         const names = gn.awards.length > 0
           ? gn.awards.map(a => a.recipient_name)
           : [gn.nominee_name];
         return names.map(r => `• ${e(gn.nominator_name)} → ${e(r)} \\(W${e(String(toISOWeek(gn.week_number ?? 0)))}\\)`);
-      }).join('\n');
-      msg =
-        `📨 Good news notifications fire at *10:15 AM SGT* today\\.\n\n` +
-        `${e(String(entries.length))} entr${entries.length === 1 ? 'y' : 'ies'} will go out:\n${lines}\n\n` +
-        `Use /firenotifications to send now, or let it fire automatically\\.`;
-    }
-    for (const adminId of adminIds) {
-      try {
-        await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' });
-      } catch (err) {
-        console.error(`[Cron] GN heads-up failed for admin ${adminId}:`, err.message);
+      });
+      const intro = `📨 Good news notifications fire at *10:15 AM SGT* today\\.\n\n${e(String(entries.length))} entr${entries.length === 1 ? 'y' : 'ies'} will go out:\n`;
+      const outro = `\n\nUse /firenotifications to send now, or let it fire automatically\\.`;
+      const pages = paginateLines(lineArr, 0);
+      for (const adminId of adminIds) {
+        try {
+          for (let i = 0; i < pages.length; i++) {
+            const prefix = i === 0 ? intro : '';
+            const suffix = i === pages.length - 1 ? outro : '';
+            await bot.api.sendMessage(adminId, prefix + pages[i] + suffix, { parse_mode: 'MarkdownV2' });
+          }
+        } catch (err) {
+          console.error(`[Cron] GN heads-up failed for admin ${adminId}:`, err.message);
+        }
       }
     }
   } catch (err) {
@@ -2737,16 +2741,19 @@ cron.schedule('15 2 * * 2', async () => {
   try {
     const { sent, noChat, count } = await sendGoodNewsNotifications();
     if (count === 0) return;
-    let summary = `✅ Good news notifications sent\\!\n\n`;
-    if (sent.length) {
-      summary += `Notified:\n` + sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`).join('\n');
-    }
-    if (noChat.length) {
-      summary += `\n\nNo Telegram \\(not reached\\):\n` + noChat.map(n => `• ${e(n)}`).join('\n');
-    }
+    const sentLines = sent.map(s => `• ${e(s.name)} \\(from ${e(s.fromName)}, \\+${e(String(s.pts))} pts\\)`);
+    const noChatLines = noChat.map(n => `• ${e(n)}`);
+    const bodyParts = [];
+    if (sentLines.length) bodyParts.push(`Notified:\n` + sentLines.join('\n'));
+    if (noChatLines.length) bodyParts.push(`No Telegram \\(not reached\\):\n` + noChatLines.join('\n'));
+    const summaryHeader = `✅ Good news notifications sent\\!\n\n`;
+    const pages = paginateLines(bodyParts.join('\n\n').split('\n'), 0);
     for (const adminId of adminIds) {
       try {
-        await bot.api.sendMessage(adminId, summary, { parse_mode: 'MarkdownV2' });
+        await bot.api.sendMessage(adminId, summaryHeader + pages[0], { parse_mode: 'MarkdownV2' });
+        for (let i = 1; i < pages.length; i++) {
+          await bot.api.sendMessage(adminId, pages[i], { parse_mode: 'MarkdownV2' });
+        }
       } catch (err) {
         console.error(`[Cron] GN summary failed for admin ${adminId}:`, err.message);
       }
