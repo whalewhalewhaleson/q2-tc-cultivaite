@@ -2447,7 +2447,7 @@ cron.schedule('55 1 * * 1', async () => {
     }
     const msg = count === 0
       ? `✅ 10AM nudge fires in 5 min — everyone has already submitted this week\\.`
-      : `👋 10AM nudge fires in 5 min — ${e(String(count))} ${count === 1 ? 'person hasn\'t' : 'people haven\\'t'} submitted yet\\.`;
+      : `👋 10AM nudge fires in 5 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
     for (const adminId of adminIds) {
       try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
     }
@@ -2468,7 +2468,7 @@ cron.schedule('55 6 * * 1', async () => {
     }
     const msg = count === 0
       ? `✅ 3PM 1\\-hour warning fires in 5 min — everyone has already submitted\\.`
-      : `⏰ 3PM 1\\-hour warning fires in 5 min — ${e(String(count))} ${count === 1 ? 'person hasn\'t' : 'people haven\\'t'} submitted yet\\.`;
+      : `⏰ 3PM 1\\-hour warning fires in 5 min — ${e(String(count))} ${count === 1 ? "person hasn't" : "people haven't"} submitted yet\\.`;
     for (const adminId of adminIds) {
       try { await bot.api.sendMessage(adminId, msg, { parse_mode: 'MarkdownV2' }); } catch {}
     }
