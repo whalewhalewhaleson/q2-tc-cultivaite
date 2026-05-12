@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>CultivAIte</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body {
+      height: 100%; background: #F8F3EB;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    /* ── LOADING / ERROR SCREENS ── */
+    .screen {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 14px;
+      background: #F8F3EB; z-index: 100;
+    }
+    .screen-icon { font-size: 48px; }
+    .screen-title { font-size: 17px; font-weight: 800; color: #1D3D2A; }
+    .screen-sub   { font-size: 13px; color: #93A898; text-align: center; max-width: 260px; line-height: 1.5; }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid rgba(76,175,110,0.2);
+      border-top-color: #4CAF6E; border-radius: 50%; animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── APP SHELL ── */
+    #app { height: 100%; display: flex; flex-direction: column; display: none; }
+
+    /* ── MINI HEADER ── */
+    .mini-header {
+      flex-shrink: 0; overflow: hidden;
+      max-height: 0; opacity: 0;
+      background: white; border-bottom: 1px solid rgba(0,0,0,0.08);
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0 20px;
+      transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+    }
+    .garden-hidden .mini-header { max-height: 52px; opacity: 1; }
+    .mh-title { font-size: 15px; font-weight: 800; color: #1D3D2A; letter-spacing: -0.2px; }
+    .mh-week  { font-size: 11px; font-weight: 600; color: white; background: #4CAF6E; padding: 4px 11px; border-radius: 12px; }
+
+    /* ── GARDEN WRAP ── */
+    .garden-wrap {
+      flex-shrink: 0; overflow: hidden;
+      max-height: 430px;
+      transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
+    }
+    .garden-hidden .garden-wrap { max-height: 0; opacity: 0; }
+
+    /* ── GARDEN SCENE ── */
+    .garden-scene { position: relative; height: 360px; overflow: hidden; }
+    .sky {
+      position: absolute; top: 0; left: 0; right: 0; height: 168px;
+      background: linear-gradient(180deg, #6EB0E8 0%, #90C8F0 30%, #B8DDF8 60%, #CCEAC0 85%, #BCDCAA 100%);
+    }
+    .sun {
+      position: absolute; top: 54px; right: 52px; width: 40px; height: 40px;
+      background: radial-gradient(circle, #FFFDE0 15%, #FFE040 55%, #FFBF00);
+      border-radius: 50%;
+      box-shadow: 0 0 0 11px rgba(255,224,64,0.13), 0 0 55px rgba(255,200,30,0.36);
+    }
+    .cloud { position: absolute; }
+    .cloud .b { background: rgba(255,255,255,0.86); border-radius: 60px; position: absolute; }
+    .cloud .p { background: rgba(255,255,255,0.86); border-radius: 50%; position: absolute; }
+    .c1 { top: 72px; left: 20px; }
+    .c1 .b { width: 78px; height: 21px; top: 18px; }
+    .c1 .p:nth-child(2) { width: 33px; height: 33px; top: 3px; left: 11px; }
+    .c1 .p:nth-child(3) { width: 25px; height: 25px; top: 7px; left: 35px; }
+    .c2 { top: 96px; left: 188px; opacity: 0.52; }
+    .c2 .b { width: 58px; height: 14px; top: 14px; }
+    .c2 .p:nth-child(2) { width: 23px; height: 23px; top: 2px; left: 8px; }
+    .c2 .p:nth-child(3) { width: 18px; height: 18px; top: 5px; left: 27px; }
+    .mountains { position: absolute; top: 96px; left: 0; right: 0; height: 58px; z-index: 2; }
+    .mt { position: absolute; bottom: 0; clip-path: polygon(0% 100%, 50% 0%, 100% 100%); }
+    .mt-b1 { width: 230px; height: 36px; left: -30px; background: #8CB880; opacity: 0.65; }
+    .mt-b2 { width: 200px; height: 32px; right: -20px; background: #86B27A; opacity: 0.65; }
+    .mt-b3 { width: 170px; height: 28px; left: 100px; background: #80AA74; opacity: 0.65; }
+    .mt-f1 { width: 190px; height: 30px; left: -10px; background: #4A7A42; }
+    .mt-f2 { width: 175px; height: 34px; right: 10px; background: #467040; }
+    .mt-f3 { width: 155px; height: 26px; left: 120px; background: #42683C; }
+    .mt-fade { position: absolute; bottom: 0; left: 0; right: 0; height: 18px; background: linear-gradient(180deg, transparent, #7A500E); }
+    .soil { position: absolute; top: 150px; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at 50% 30%, #A07228 0%, #8B5E14 45%, #7A500E 100%); }
+    .garden-scene::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 110px;
+      background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, transparent 100%); z-index: 9;
+    }
+    .g-header {
+      position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0;
+      display: flex; justify-content: space-between; align-items: center; z-index: 10;
+    }
+    .g-title { font-size: 15px; font-weight: 800; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.2px; }
+    .g-week  { font-size: 11px; font-weight: 600; color: white; background: rgba(0,0,0,0.28); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
+    .plant-grid {
+      position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3;
+      display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 8px 10px;
+    }
+    .prow { display: flex; justify-content: space-evenly; align-items: center; }
+    .prow:nth-child(even) { padding: 0 16px; }
+    .pe { font-size: 22px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
+
+    /* ── STATS STRIP ── */
+    .stats-wrap {
+      flex-shrink: 0; overflow: hidden; max-height: 70px;
+      transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
+    }
+    .garden-hidden .stats-wrap { max-height: 0; opacity: 0; }
+    .stats-strip {
+      display: flex; gap: 8px; padding: 10px 16px;
+      background: #F8F3EB; border-bottom: 1px solid rgba(0,0,0,0.07);
+    }
+    .stat-card { flex: 1; background: white; border-radius: 12px; padding: 8px 10px; display: flex; align-items: center; gap: 7px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+    .stat-icon { font-size: 16px; flex-shrink: 0; }
+    .stat-val  { font-size: 14px; font-weight: 800; color: #1D3D2A; line-height: 1; }
+    .stat-lbl  { font-size: 9px; color: #93A898; font-weight: 500; line-height: 1; margin-top: 2px; }
+
+    /* ── CONTENT ── */
+    .content { flex: 1; position: relative; overflow: hidden; }
+    .panel { position: absolute; inset: 0; display: none; flex-direction: column; }
+    .panel.active { display: flex; }
+    .panel-scroll { flex: 1; overflow-y: auto; padding: 12px 14px 16px; background: #EDE8DF; }
+    .panel-scroll::-webkit-scrollbar { display: none; }
+
+    /* ── PLACEHOLDER ── */
+    .placeholder {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 8px;
+      background: #EDE8DF; padding: 40px 24px;
+    }
+    .placeholder-icon { font-size: 36px; }
+    .placeholder-title { font-size: 15px; font-weight: 800; color: #1D3D2A; }
+    .placeholder-sub { font-size: 13px; color: #93A898; text-align: center; line-height: 1.5; }
+
+    /* ── SHARED CARD ATOMS ── */
+    .week-pill { font-size: 10px; font-weight: 700; background: #E8F5EC; color: #4CAF6E; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+
+    /* ── REFLECTION CARDS ── */
+    .rcard { background: white; border-radius: 14px; padding: 14px 14px 12px; margin-bottom: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
+    .rcard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+    .rcard-date { font-size: 11px; color: #93A898; }
+    .rcard-section { margin-bottom: 9px; }
+    .rcard-section:last-child { margin-bottom: 0; }
+    .rcard-qlabel { font-size: 10px; font-weight: 700; color: #93A898; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+    .rcard-qtext { font-size: 13px; color: #1D3D2A; line-height: 1.55; }
+
+    /* ── GOOD NEWS CARDS ── */
+    .gn-section-hd { font-size: 11px; font-weight: 700; color: #93A898; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 2px 8px; }
+    .gn-section-hd:not(:first-child) { margin-top: 6px; }
+    .gncard { background: white; border-radius: 14px; padding: 12px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); border-left: 4px solid; }
+    .gncard-received { border-left-color: #4CAF6E; }
+    .gncard-sent     { border-left-color: #F5A623; }
+    .gncard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: 8px; }
+    .gncard-who { font-size: 12px; font-weight: 700; color: #1D3D2A; }
+    .gncard-msg { font-size: 13px; color: #1D3D2A; line-height: 1.5; margin-bottom: 6px; }
+    .gncard-pts { font-size: 11px; font-weight: 700; color: #93A898; }
+
+    /* ── LEADERBOARD ── */
+    .lb-tabs { display: flex; gap: 6px; padding: 10px 14px 6px; background: #EDE8DF; flex-shrink: 0; }
+    .lb-tab { flex: 1; padding: 8px 0; font-size: 12px; font-weight: 700; border: none; border-radius: 10px; background: rgba(0,0,0,0.06); color: #93A898; cursor: pointer; transition: all 0.15s; }
+    .lb-tab.active { background: white; color: #1D3D2A; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .lb-row { display: flex; align-items: center; gap: 10px; background: white; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .lb-row.me { background: #E8F5EC; border: 1.5px solid #4CAF6E; }
+    .lb-rank { font-size: 13px; font-weight: 800; color: #B8C0B8; width: 26px; text-align: center; flex-shrink: 0; }
+    .lb-rank.gold { color: #F5A623; }
+    .lb-emoji { font-size: 18px; flex-shrink: 0; }
+    .lb-name { flex: 1; font-size: 13px; font-weight: 600; color: #1D3D2A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lb-pts { font-size: 12px; font-weight: 800; color: #4CAF6E; flex-shrink: 0; }
+    .lb-star { font-size: 11px; color: #4CAF6E; margin-left: 2px; }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      height: 62px; background: white; border-top: 1px solid rgba(0,0,0,0.08);
+      display: flex; flex-shrink: 0; padding-bottom: 4px;
+    }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: transparent; cursor: pointer; transition: all 0.15s; position: relative; }
+    .nav-icon  { font-size: 20px; line-height: 1; }
+    .nav-label { font-size: 10px; font-weight: 600; color: #B8C0B8; transition: color 0.15s; }
+    .nav-btn.active .nav-label { color: #4CAF6E; }
+    .nav-btn.active::after { content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; background: #4CAF6E; border-radius: 50%; }
+  </style>
+</head>
+<body>
+
+<!-- Loading screen -->
+<div class="screen" id="screen-loading">
+  <div class="spinner"></div>
+  <div class="screen-title">Loading your garden…</div>
+</div>
+
+<!-- Error screen -->
+<div class="screen" id="screen-error" style="display:none">
+  <div class="screen-icon">🌱</div>
+  <div class="screen-title">Can't open garden</div>
+  <p class="screen-sub" id="error-msg">Open this from the CultivAIte bot in Telegram.</p>
+</div>
+
+<!-- App shell -->
+<div id="app">
+
+  <div class="mini-header">
+    <div class="mh-title">🌱 TC CultivAIte Garden</div>
+    <div class="mh-week" id="mh-week">—</div>
+  </div>
+
+  <div class="garden-wrap">
+    <div class="garden-scene">
+      <div class="sky"></div>
+      <div class="sun"></div>
+      <div class="cloud c1"><div class="p"></div><div class="p"></div><div class="b"></div></div>
+      <div class="cloud c2"><div class="p"></div><div class="p"></div><div class="b"></div></div>
+      <div class="mountains">
+        <div class="mt mt-b1"></div><div class="mt mt-b2"></div><div class="mt mt-b3"></div>
+        <div class="mt mt-f1"></div><div class="mt mt-f2"></div><div class="mt mt-f3"></div>
+        <div class="mt-fade"></div>
+      </div>
+      <div class="soil"></div>
+      <div class="g-header">
+        <div class="g-title">🌱 TC CultivAIte Garden</div>
+        <div class="g-week" id="g-week">—</div>
+      </div>
+      <div class="plant-grid" id="plant-grid"></div>
+    </div>
+  </div>
+
+  <div class="stats-wrap">
+    <div class="stats-strip">
+      <div class="stat-card">
+        <span class="stat-icon">⭐</span>
+        <div><div class="stat-val" id="stat-points">—</div><div class="stat-lbl">Points</div></div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🔥</span>
+        <div><div class="stat-val" id="stat-streak">—</div><div class="stat-lbl">Streak</div></div>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🏆</span>
+        <div><div class="stat-val" id="stat-rank">—</div><div class="stat-lbl">Company</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="content">
+    <div class="panel active" id="panel-reflections"></div>
+    <div class="panel" id="panel-goodnews"></div>
+    <div class="panel" id="panel-leaderboard"></div>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="switchTab('reflections',this)">
+      <span class="nav-icon">📝</span><span class="nav-label">Reflections</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('goodnews',this)">
+      <span class="nav-icon">💌</span><span class="nav-label">Good News</span>
+    </button>
+    <button class="nav-btn" onclick="switchTab('leaderboard',this)">
+      <span class="nav-icon">🏆</span><span class="nav-label">Leaderboard</span>
+    </button>
+  </div>
+
+</div>
+
+<script>
+  const tg = window.Telegram?.WebApp;
+  if (tg) { tg.ready(); tg.expand(); }
+
+  // Global leaderboard HTML cache for company/dept tab switching
+  const _lbHtml = { company: '', dept: '' };
+
+  function esc(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    return new Date(d + 'T12:00:00+08:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+  }
+
+  function stageEmoji(pts) {
+    if (pts >= 116) return '🍎';
+    if (pts >= 86)  return '🌼';
+    if (pts >= 51)  return '🌳';
+    if (pts >= 21)  return '🌿';
+    return '🌱';
+  }
+
+  function showError(msg) {
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('error-msg').textContent = msg;
+    document.getElementById('screen-error').style.display = 'flex';
+  }
+
+  // ── GARDEN ──
+  function renderGarden(garden) {
+    const isoWeek = 'Week ' + garden.isoWeek;
+    document.getElementById('g-week').textContent  = isoWeek;
+    document.getElementById('mh-week').textContent = isoWeek;
+
+    const plants = [...garden.users].sort(() => Math.random() - 0.5);
+    const grid   = document.getElementById('plant-grid');
+    grid.innerHTML = '';
+    const layout = [9, 8, 9, 7, 9, 8];
+    let idx = 0;
+    for (const count of layout) {
+      if (idx >= plants.length) break;
+      const row = document.createElement('div');
+      row.className = 'prow';
+      for (let i = 0; i < count && idx < plants.length; i++, idx++) {
+        const span = document.createElement('span');
+        span.className = 'pe';
+        span.textContent = stageEmoji(plants[idx].totalPoints);
+        row.appendChild(span);
+      }
+      if (row.children.length) grid.appendChild(row);
+    }
+  }
+
+  // ── STATS STRIP ──
+  function renderStatsStrip(garden, myName) {
+    const me = garden.users.find(u => u.realName === myName);
+    if (!me) return;
+    document.getElementById('stat-points').textContent = me.totalPoints;
+    document.getElementById('stat-streak').textContent = me.streak + ' wk' + (me.streak !== 1 ? 's' : '');
+    document.getElementById('stat-rank').textContent   = '#' + me.rank;
+  }
+
+  // ── REFLECTIONS TAB ──
+  function renderReflections(reflections) {
+    const panel = document.getElementById('panel-reflections');
+    if (!reflections || !reflections.length) {
+      panel.innerHTML = '<div class="placeholder">' +
+        '<div class="placeholder-icon">📝</div>' +
+        '<div class="placeholder-title">No reflections yet</div>' +
+        '<p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p>' +
+        '</div>';
+      return;
+    }
+    let html = '<div class="panel-scroll">';
+    for (const r of reflections) {
+      html += '<div class="rcard">';
+      html += '<div class="rcard-head">';
+      html += '<span class="week-pill">W' + r.isoWeek + '</span>';
+      html += '<span class="rcard-date">' + esc(formatDate(r.date)) + '</span>';
+      html += '</div>';
+      html += '<div class="rcard-section">';
+      html += '<div class="rcard-qlabel">TC Values</div>';
+      html += '<div class="rcard-qtext">' + esc(r.q1) + '</div>';
+      html += '</div>';
+      html += '<div class="rcard-section">';
+      html += '<div class="rcard-qlabel">Role Check-in</div>';
+      html += '<div class="rcard-qtext">' + esc(r.q2) + '</div>';
+      html += '</div>';
+      if (r.q3 && r.q3.trim()) {
+        html += '<div class="rcard-section">';
+        html += '<div class="rcard-qlabel">Shoutout</div>';
+        html += '<div class="rcard-qtext">' + esc(r.q3) + '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  // ── GOOD NEWS TAB ──
+  function renderGoodNews(gnData) {
+    const panel = document.getElementById('panel-goodnews');
+    const received = gnData && gnData.received ? gnData.received : [];
+    const sent     = gnData && gnData.sent     ? gnData.sent     : [];
+    if (!received.length && !sent.length) {
+      panel.innerHTML = '<div class="placeholder">' +
+        '<div class="placeholder-icon">💌</div>' +
+        '<div class="placeholder-title">No good news yet</div>' +
+        '<p class="placeholder-sub">Share someone\'s good news with /reflect and it\'ll appear here once approved.</p>' +
+        '</div>';
+      return;
+    }
+    let html = '<div class="panel-scroll">';
+    if (received.length) {
+      html += '<div class="gn-section-hd">Received (' + received.length + ')</div>';
+      for (const gn of received) {
+        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        html += '<div class="gncard gncard-received">';
+        html += '<div class="gncard-head">';
+        html += '<span class="gncard-who">From ' + esc(gn.from) + '</span>';
+        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        html += '</div>';
+        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
+        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '</div>';
+      }
+    }
+    if (sent.length) {
+      html += '<div class="gn-section-hd">Sent (' + sent.length + ')</div>';
+      for (const gn of sent) {
+        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        html += '<div class="gncard gncard-sent">';
+        html += '<div class="gncard-head">';
+        html += '<span class="gncard-who">You shared</span>';
+        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        html += '</div>';
+        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
+        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  // ── LEADERBOARD TAB ──
+  function _lbRowHtml(u, rankNum, myName) {
+    const isMe = u.realName === myName;
+    return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
+      '<span class="lb-rank' + (rankNum <= 3 ? ' gold' : '') + '">#' + rankNum + '</span>' +
+      '<span class="lb-emoji">' + stageEmoji(u.totalPoints) + '</span>' +
+      '<span class="lb-name">' + esc(u.realName) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
+      '<span class="lb-pts">' + u.totalPoints + ' pts</span>' +
+      '</div>';
+  }
+
+  function renderLeaderboard(users, myDept, myName) {
+    const panel = document.getElementById('panel-leaderboard');
+    const ranked = [...users].sort((a, b) => a.rank - b.rank || b.totalPoints - a.totalPoints);
+
+    _lbHtml.company = ranked.map(u => _lbRowHtml(u, u.rank, myName)).join('');
+
+    const deptRanked = myDept ? ranked.filter(u => u.department === myDept) : [];
+    _lbHtml.dept = deptRanked.length
+      ? deptRanked.map((u, i) => _lbRowHtml(u, i + 1, myName)).join('')
+      : '<div class="placeholder"><p class="placeholder-sub">No department data.</p></div>';
+
+    const deptLabel = myDept ? esc(myDept) : 'My Dept';
+    panel.innerHTML =
+      '<div class="lb-tabs">' +
+        '<button class="lb-tab active" onclick="switchLbTab(\'company\',this)">🏢 Company</button>' +
+        '<button class="lb-tab" onclick="switchLbTab(\'dept\',this)">👥 ' + deptLabel + '</button>' +
+      '</div>' +
+      '<div class="panel-scroll" id="scroll-leaderboard">' + _lbHtml.company + '</div>';
+  }
+
+  function switchLbTab(name, btn) {
+    document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('scroll-leaderboard').innerHTML = _lbHtml[name];
+  }
+
+  // ── INIT ──
+  async function init() {
+    if (!tg || !tg.initData) {
+      showError('Open this from the CultivAIte bot in Telegram.');
+      return;
+    }
+
+    let auth;
+    try {
+      const res = await fetch('/api/miniapp/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData }),
+      });
+      auth = await res.json();
+    } catch {
+      showError('Network error. Check your connection and try again.');
+      return;
+    }
+
+    if (!auth.ok) {
+      if (auth.reason === 'not_registered') {
+        showError('You\'re not in CultivAIte yet. Send /reflect to the bot to get started.');
+      } else {
+        showError('Open this from the CultivAIte bot in Telegram.');
+      }
+      return;
+    }
+
+    let garden, me;
+    try {
+      const token = encodeURIComponent(auth.token);
+      [garden, me] = await Promise.all([
+        fetch('/api/miniapp/garden?token=' + token).then(r => r.json()),
+        fetch('/api/miniapp/me?token='     + token).then(r => r.json()),
+      ]);
+    } catch {
+      showError('Couldn\'t load data. Try again in a moment.');
+      return;
+    }
+
+    renderGarden(garden);
+    renderStatsStrip(garden, auth.name);
+    renderReflections(me.reflections);
+    renderGoodNews(me.good_news);
+    renderLeaderboard(garden.users, auth.department, auth.name);
+
+    // Attach scroll listeners now that panels have real content
+    document.querySelectorAll('.panel-scroll').forEach(el =>
+      el.addEventListener('scroll', checkGarden)
+    );
+
+    document.getElementById('screen-loading').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+  }
+
+  function switchTab(name, btn) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + name).classList.add('active');
+    checkGarden();
+  }
+
+  function checkGarden() {
+    const activeScroll = document.querySelector('.panel.active .panel-scroll');
+    if (activeScroll) {
+      document.getElementById('app').classList.toggle('garden-hidden', activeScroll.scrollTop > 12);
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>

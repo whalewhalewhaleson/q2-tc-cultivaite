@@ -1049,3 +1049,49 @@ export async function getGoodNewsByDept(dept) {
     reviewed: (reviewed ?? []).map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] })),
   };
 }
+
+
+// ---------------------------------------------------------------------------
+// Mini-app user data — good news sent/received for /api/miniapp/me
+// ---------------------------------------------------------------------------
+
+export async function getSentGoodNewsForUser(realName) {
+  if (!realName) return [];
+  const { data } = await supabase
+    .from('good_news')
+    .select('id, message, week_number, pts_sharer')
+    .ilike('nominator_name', realName)
+    .eq('status', 'Approved')
+    .order('week_number', { ascending: false });
+  return (data ?? []).map(gn => ({
+    message: gn.message ?? '',
+    week:    gn.week_number ?? null,
+    pts:     gn.pts_sharer ?? 5,
+  }));
+}
+
+export async function getReceivedGoodNewsForUser(realName) {
+  if (!realName) return [];
+  const { data: awards } = await supabase
+    .from('good_news_awards')
+    .select('good_news_id, pts')
+    .ilike('recipient_name', realName)
+    .gt('pts', 0);
+  if (!awards?.length) return [];
+  const gnIds = awards.map(a => a.good_news_id);
+  const { data: gnRows } = await supabase
+    .from('good_news')
+    .select('id, nominator_name, message, week_number')
+    .in('id', gnIds)
+    .eq('status', 'Approved');
+  const gnMap = {};
+  for (const gn of (gnRows ?? [])) gnMap[gn.id] = gn;
+  return awards
+    .map(a => {
+      const gn = gnMap[a.good_news_id];
+      if (!gn) return null;
+      return { from: gn.nominator_name ?? '', message: gn.message ?? '', week: gn.week_number ?? null, pts: a.pts ?? 3 };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.week ?? 0) - (a.week ?? 0));
+}
