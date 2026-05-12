@@ -948,6 +948,15 @@ export async function clearChangelog() {
   }).eq('id', 1);
 }
 
+export async function getLastRecapWeek() {
+  const { data } = await supabase.from('recap_announcement').select('last_recap_week').eq('id', 1).maybeSingle();
+  return data?.last_recap_week ?? 0;
+}
+
+export async function setLastRecapWeek(week) {
+  await supabase.from('recap_announcement').update({ last_recap_week: week }).eq('id', 1);
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard access management
 // ---------------------------------------------------------------------------

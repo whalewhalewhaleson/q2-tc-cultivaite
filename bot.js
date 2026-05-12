@@ -12,7 +12,8 @@ import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDa
          getManager, addManager, removeManager, listManagers, getGoodNewsByDept,
          getUserByRealName, getUserByChatId, setGoodNewsWeek,
          getApprovedUnnotifiedGoodNews, markGoodNewsNotified,
-         getGoodNewsById, queueRejectedNotify } from './db.js';
+         getGoodNewsById, queueRejectedNotify,
+         getLastRecapWeek, setLastRecapWeek } from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -2556,6 +2557,8 @@ async function sendGoodNewsNotifications() {
   const noChat = [];
 
   for (const gn of entries) {
+    // Mark as notified before sending — prevents double-DM if Railway restarts mid-loop
+    await markGoodNewsNotified([gn.id]);
     const { nominator_name, message, pts_sharer, awards } = gn;
     const recipients = awards.length > 0 ? awards : [{ recipient_name: gn.nominee_name, pts: 3 }];
 
@@ -2602,7 +2605,6 @@ async function sendGoodNewsNotifications() {
     }
   }
 
-  await markGoodNewsNotified(entries.map(gn => gn.id));
   return { sent, noChat, count: entries.length };
 }
 
@@ -2615,6 +2617,8 @@ async function runRecapBroadcast() {
     console.log('[Recap] Skipping — outside Q2 window.');
     return;
   }
+  // Claim this week in DB before sending — prevents double-broadcast if Railway restarts mid-run
+  await setLastRecapWeek(week);
   console.log('[Recap] Running weekly recap...');
   try {
     const users = await sheets.getAllUsersWithChatId();
@@ -2665,6 +2669,13 @@ cron.schedule('30 7 * * 5', async () => {
   const week = currentQ2Week();
   if (lastRecapWeek >= week) {
     console.log('[Cron] Skipping Friday recap — already sent this week.');
+    return;
+  }
+  // Cold-start guard: if Railway restarted, in-memory lastRecapWeek is 0 — check DB
+  const dbWeek = await getLastRecapWeek();
+  if (dbWeek >= week) {
+    lastRecapWeek = dbWeek;
+    console.log('[Cron] Skipping Friday recap — DB confirms already sent this week.');
     return;
   }
   await runRecapBroadcast();
@@ -2769,22 +2780,6 @@ cron.schedule('15 2 * * 2', async () => {
 }, { timezone: 'UTC' });
 
 // ---------------------------------------------------------------------------
-// One-off: fire recap today (Thursday Apr 30, 2026) at 3:30 PM SGT
-// ---------------------------------------------------------------------------
-{
-  const now = new Date();
-  const todaySGT = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Singapore' });
-  if (todaySGT === '2026-04-30') {
-    const target = new Date('2026-04-30T07:30:00Z');
-    const delay = target.getTime() - now.getTime();
-    if (delay > 0) {
-      console.log(`[Cron] One-off Thursday recap scheduled in ${Math.round(delay / 60000)} minutes.`);
-      setTimeout(() => runRecapBroadcast(), delay);
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
 // HTTP server — serves the leadership dashboard + JSON API
 // Railway exposes PORT automatically.
 // ---------------------------------------------------------------------------
@@ -2796,7 +2791,8 @@ const AUTH_COOKIE     = 'dash_session';
 const BOT_USERNAME    = 'TC_CultivAIte_Bot';
 
 if (!COOKIE_SECRET) {
-  console.warn('⚠️  COOKIE_SECRET not set — dashboard auth disabled. Set it in .env / Railway env.');
+  console.error('❌ COOKIE_SECRET is not set — dashboard auth cannot function. Set it in Railway env vars and redeploy.');
+  process.exit(1);
 }
 
 async function getAllowedIds() {
@@ -2990,6 +2986,19 @@ http.createServer(async (req, res) => {
     return;
   }
 
+  // Revocation check — ensures removed admins/managers can't keep using their cookie
+  {
+    const [allowedIds, managerRecord] = await Promise.all([
+      getAllowedIds(),
+      user.role === 'manager' ? getManager(String(user.id)) : Promise.resolve(null),
+    ]);
+    if (!allowedIds.includes(String(user.id)) && !managerRecord) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' }));
+      return;
+    }
+  }
+
   try {
     // GET /api/me — returns role + dept from session cookie
     if (req.method === 'GET' && route === '/api/me') {
@@ -3127,9 +3136,9 @@ http.createServer(async (req, res) => {
     const subWeekM = route.match(/^\/api\/submissions\/(\d+)\/week$/);
     if (req.method === 'PATCH' && subWeekM) {
       const body = await parseBody(req);
-      const { weekNum } = body;
-      if (!weekNum) { res.writeHead(400); return res.end('Missing weekNum'); }
-      await sheets.setSubmissionWeek(parseInt(subWeekM[1]), parseInt(weekNum));
+      const weekNum = typeof body.weekNum === 'number' ? body.weekNum : parseInt(body.weekNum, 10);
+      if (!Number.isInteger(weekNum) || weekNum < 1 || weekNum > 13) { res.writeHead(400); return res.end('weekNum must be between 1 and 13'); }
+      await sheets.setSubmissionWeek(parseInt(subWeekM[1]), weekNum);
       return jsonRes(res, { ok: true });
     }
 
@@ -3138,9 +3147,9 @@ http.createServer(async (req, res) => {
     if (req.method === 'PATCH' && gnWeekM) {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
-      const { weekNum } = body;
-      if (!weekNum) { res.writeHead(400); return res.end('Missing weekNum'); }
-      await setGoodNewsWeek(parseInt(gnWeekM[1]), parseInt(weekNum));
+      const weekNum = typeof body.weekNum === 'number' ? body.weekNum : parseInt(body.weekNum, 10);
+      if (!Number.isInteger(weekNum) || weekNum < 1 || weekNum > 13) { res.writeHead(400); return res.end('weekNum must be between 1 and 13'); }
+      await setGoodNewsWeek(parseInt(gnWeekM[1]), weekNum);
       return jsonRes(res, { ok: true });
     }
 
