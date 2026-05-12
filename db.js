@@ -1095,3 +1095,8 @@ export async function getReceivedGoodNewsForUser(realName) {
     .filter(Boolean)
     .sort((a, b) => (b.week ?? 0) - (a.week ?? 0));
 }
+
+export async function getSubmissionById(id) {
+  const { data } = await supabase.from('submissions').select('id, real_name, q1, q2, q3').eq('id', id).maybeSingle();
+  return data ?? null;
+}

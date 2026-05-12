@@ -3072,7 +3072,13 @@ http.createServer(async (req, res) => {
         streak:      u.streak,
         rank:        u.rank,
       }));
-      return jsonRes(res, { weekNow: full.weekNow, isoWeek: full.weekNow + 13, users });
+      const sortedDepts = [...full.depts].sort((a, b) => b.avgPoints - a.avgPoints);
+      let dRank = 0;
+      const depts = sortedDepts.map((d, i) => {
+        if (i === 0 || d.avgPoints !== sortedDepts[i - 1].avgPoints) dRank++;
+        return { department: d.department, rank: dRank, avgPoints: d.avgPoints, stage: d.gardenStage, streak: d.deptStreak, count: d.count };
+      });
+      return jsonRes(res, { weekNow: full.weekNow, isoWeek: full.weekNow + 13, users, depts });
     } catch (err) {
       console.error('/api/miniapp/garden error:', err);
       return jsonRes(res, { error: 'server_error' }, 500);
@@ -3093,9 +3099,11 @@ http.createServer(async (req, res) => {
         sheets.getSentGoodNewsForUser(realName),
         sheets.getReceivedGoodNewsForUser(realName),
       ]);
+      const wkPtsMap = {};
+      for (const entry of (userStat?.weeklyBreakdown ?? [])) wkPtsMap[entry.week] = entry.pts;
       const reflections = rawSubs
         .filter(s => s.q1 !== '[Excused absence]')
-        .map(s => ({ week: s.weekNum, isoWeek: s.weekNum + 13, date: s.date, q1: s.q1, q2: s.q2, q3: s.q3 }))
+        .map(s => ({ id: s.rowIndex, week: s.weekNum, isoWeek: s.weekNum + 13, date: s.date, q1: s.q1, q2: s.q2, q3: s.q3, pts: wkPtsMap[s.weekNum] ?? 0 }))
         .reverse();
       return jsonRes(res, {
         user: {
@@ -3111,6 +3119,32 @@ http.createServer(async (req, res) => {
       });
     } catch (err) {
       console.error('/api/miniapp/me error:', err);
+      return jsonRes(res, { error: 'server_error' }, 500);
+    }
+  }
+
+  const reflPatchM = route.match(/^\/api\/miniapp\/reflections\/(\d+)$/);
+  if (req.method === 'PATCH' && reflPatchM) {
+    try {
+      const token = url_.searchParams.get('token');
+      const chatId = verifyMiniappToken(token);
+      if (!chatId) return jsonRes(res, { error: 'Unauthorized' }, 401);
+      const dbUser = await getUserByChatId(chatId).catch(() => null);
+      if (!dbUser?.realName) return jsonRes(res, { error: 'not_registered' }, 403);
+      const subId = parseInt(reflPatchM[1]);
+      const body = await parseBody(req);
+      const sub = await sheets.getSubmissionById(subId);
+      if (!sub || sub.real_name?.toLowerCase().trim() !== dbUser.realName.toLowerCase().trim()) {
+        return jsonRes(res, { error: 'Forbidden' }, 403);
+      }
+      const q1 = (body.q1 ?? '').trim();
+      const q2 = (body.q2 ?? '').trim();
+      if (!q1 || !q2) return jsonRes(res, { error: 'q1 and q2 required' }, 400);
+      await sheets.updateSubmission(subId, q1, q2);
+      sheets.invalidateStatsCache();
+      return jsonRes(res, { ok: true });
+    } catch (err) {
+      console.error('/api/miniapp/reflections PATCH error:', err);
       return jsonRes(res, { error: 'server_error' }, 500);
     }
   }

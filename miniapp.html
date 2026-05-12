@@ -135,7 +135,7 @@
     .placeholder-title { font-size: 15px; font-weight: 800; color: #1D3D2A; }
     .placeholder-sub { font-size: 13px; color: #93A898; text-align: center; line-height: 1.5; }
 
-    /* ── SHARED CARD ATOMS ── */
+    /* ── SHARED ATOMS ── */
     .week-pill { font-size: 10px; font-weight: 700; background: #E8F5EC; color: #4CAF6E; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
 
     /* ── REFLECTION CARDS ── */
@@ -146,6 +146,19 @@
     .rcard-section:last-child { margin-bottom: 0; }
     .rcard-qlabel { font-size: 10px; font-weight: 700; color: #93A898; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
     .rcard-qtext { font-size: 13px; color: #1D3D2A; line-height: 1.55; }
+    .rcard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(0,0,0,0.06); }
+    .rcard-pts-badge { font-size: 11px; font-weight: 700; color: #4CAF6E; background: #E8F5EC; padding: 3px 9px; border-radius: 10px; }
+    .rcard-edit-btn { font-size: 11px; font-weight: 700; color: #93A898; background: none; border: 1px solid #D8E0D8; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
+    .rcard-ta {
+      width: 100%; border: 1.5px solid #C8D8CC; border-radius: 8px; padding: 9px 10px;
+      font-size: 13px; color: #1D3D2A; line-height: 1.55; resize: vertical; min-height: 90px;
+      background: #F8FBF9; font-family: inherit; margin-bottom: 9px; display: block;
+    }
+    .rcard-ta:focus { outline: none; border-color: #4CAF6E; }
+    .rcard-form-btns { display: flex; gap: 8px; }
+    .rcard-cancel-btn { flex: 1; padding: 9px; font-size: 13px; font-weight: 700; background: none; border: 1.5px solid #D8E0D8; border-radius: 10px; color: #93A898; cursor: pointer; }
+    .rcard-save-btn  { flex: 2; padding: 9px; font-size: 13px; font-weight: 700; background: #4CAF6E; border: none; border-radius: 10px; color: white; cursor: pointer; }
+    .rcard-save-btn:disabled { opacity: 0.55; }
 
     /* ── GOOD NEWS CARDS ── */
     .gn-section-hd { font-size: 11px; font-weight: 700; color: #93A898; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 2px 8px; }
@@ -155,8 +168,9 @@
     .gncard-sent     { border-left-color: #F5A623; }
     .gncard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: 8px; }
     .gncard-who { font-size: 12px; font-weight: 700; color: #1D3D2A; }
-    .gncard-msg { font-size: 13px; color: #1D3D2A; line-height: 1.5; margin-bottom: 6px; }
-    .gncard-pts { font-size: 11px; font-weight: 700; color: #93A898; }
+    .gncard-msg { font-size: 13px; color: #1D3D2A; line-height: 1.55; margin-bottom: 6px; }
+    .gncard-footer { display: flex; justify-content: flex-start; }
+    .gncard-pts { font-size: 11px; font-weight: 700; color: #4CAF6E; background: #E8F5EC; padding: 3px 9px; border-radius: 10px; }
 
     /* ── LEADERBOARD ── */
     .lb-tabs { display: flex; gap: 6px; padding: 10px 14px 6px; background: #EDE8DF; flex-shrink: 0; }
@@ -169,7 +183,9 @@
     .lb-emoji { font-size: 18px; flex-shrink: 0; }
     .lb-name { flex: 1; font-size: 13px; font-weight: 600; color: #1D3D2A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .lb-pts { font-size: 12px; font-weight: 800; color: #4CAF6E; flex-shrink: 0; }
+    .lb-pts-label { font-size: 10px; font-weight: 500; color: #93A898; }
     .lb-star { font-size: 11px; color: #4CAF6E; margin-left: 2px; }
+    .lb-caption { font-size: 11px; color: #93A898; text-align: center; padding: 8px 0 4px; }
 
     /* ── BOTTOM NAV ── */
     .bottom-nav {
@@ -185,20 +201,17 @@
 </head>
 <body>
 
-<!-- Loading screen -->
 <div class="screen" id="screen-loading">
   <div class="spinner"></div>
   <div class="screen-title">Loading your garden…</div>
 </div>
 
-<!-- Error screen -->
 <div class="screen" id="screen-error" style="display:none">
   <div class="screen-icon">🌱</div>
   <div class="screen-title">Can't open garden</div>
   <p class="screen-sub" id="error-msg">Open this from the CultivAIte bot in Telegram.</p>
 </div>
 
-<!-- App shell -->
 <div id="app">
 
   <div class="mini-header">
@@ -267,18 +280,21 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
 
-  // Global leaderboard HTML cache for company/dept tab switching
+  let _token = '';
+  let _gardenHidden = false;
   const _lbHtml = { company: '', dept: '' };
 
+  // ── UTILS ──
   function esc(str) {
     return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-
+  function escBr(str) {
+    return esc(str).replace(/\n/g, '<br>');
+  }
   function formatDate(d) {
     if (!d) return '';
     return new Date(d + 'T12:00:00+08:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
   }
-
   function stageEmoji(pts) {
     if (pts >= 116) return '🍎';
     if (pts >= 86)  return '🌼';
@@ -286,7 +302,6 @@
     if (pts >= 21)  return '🌿';
     return '🌱';
   }
-
   function showError(msg) {
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('error-msg').textContent = msg;
@@ -298,7 +313,6 @@
     const isoWeek = 'Week ' + garden.isoWeek;
     document.getElementById('g-week').textContent  = isoWeek;
     document.getElementById('mh-week').textContent = isoWeek;
-
     const plants = [...garden.users].sort(() => Math.random() - 0.5);
     const grid   = document.getElementById('plant-grid');
     grid.innerHTML = '';
@@ -340,34 +354,90 @@
     }
     let html = '<div class="panel-scroll">';
     for (const r of reflections) {
+      const id = r.id;
       html += '<div class="rcard">';
       html += '<div class="rcard-head">';
       html += '<span class="week-pill">W' + r.isoWeek + '</span>';
       html += '<span class="rcard-date">' + esc(formatDate(r.date)) + '</span>';
       html += '</div>';
+      // Body (shown by default)
+      html += '<div id="rcard-body-' + id + '">';
       html += '<div class="rcard-section">';
       html += '<div class="rcard-qlabel">TC Values</div>';
-      html += '<div class="rcard-qtext">' + esc(r.q1) + '</div>';
+      html += '<div class="rcard-qtext" id="rcard-q1-text-' + id + '">' + escBr(r.q1) + '</div>';
       html += '</div>';
       html += '<div class="rcard-section">';
       html += '<div class="rcard-qlabel">Role Check-in</div>';
-      html += '<div class="rcard-qtext">' + esc(r.q2) + '</div>';
+      html += '<div class="rcard-qtext" id="rcard-q2-text-' + id + '">' + escBr(r.q2) + '</div>';
       html += '</div>';
       if (r.q3 && r.q3.trim()) {
         html += '<div class="rcard-section">';
         html += '<div class="rcard-qlabel">Shoutout</div>';
-        html += '<div class="rcard-qtext">' + esc(r.q3) + '</div>';
+        html += '<div class="rcard-qtext">' + escBr(r.q3) + '</div>';
         html += '</div>';
       }
+      html += '<div class="rcard-footer">';
+      html += '<span class="rcard-pts-badge">+' + r.pts + ' pts</span>';
+      html += '<button class="rcard-edit-btn" onclick="editReflection(' + id + ')">✏️ Edit</button>';
       html += '</div>';
+      html += '</div>'; // rcard-body
+      // Edit form (hidden by default)
+      html += '<div id="rcard-form-' + id + '" style="display:none">';
+      html += '<div class="rcard-qlabel" style="margin-bottom:5px">TC Values</div>';
+      html += '<textarea class="rcard-ta" id="rcard-q1-' + id + '">' + esc(r.q1) + '</textarea>';
+      html += '<div class="rcard-qlabel" style="margin-bottom:5px">Role Check-in</div>';
+      html += '<textarea class="rcard-ta" id="rcard-q2-' + id + '">' + esc(r.q2) + '</textarea>';
+      html += '<div class="rcard-form-btns">';
+      html += '<button class="rcard-cancel-btn" onclick="cancelEdit(' + id + ')">Cancel</button>';
+      html += '<button class="rcard-save-btn" id="rcard-save-' + id + '" onclick="saveReflection(' + id + ')">Save</button>';
+      html += '</div>';
+      html += '</div>'; // rcard-form
+      html += '</div>'; // rcard
     }
     html += '</div>';
     panel.innerHTML = html;
   }
 
+  function editReflection(id) {
+    document.getElementById('rcard-body-' + id).style.display = 'none';
+    const form = document.getElementById('rcard-form-' + id);
+    form.style.display = 'block';
+    form.querySelector('textarea').focus();
+  }
+
+  function cancelEdit(id) {
+    document.getElementById('rcard-form-' + id).style.display = 'none';
+    document.getElementById('rcard-body-' + id).style.display = 'block';
+  }
+
+  async function saveReflection(id) {
+    const q1  = document.getElementById('rcard-q1-' + id).value.trim();
+    const q2  = document.getElementById('rcard-q2-' + id).value.trim();
+    const btn = document.getElementById('rcard-save-' + id);
+    if (!q1 || !q2) return;
+    btn.textContent = 'Saving…';
+    btn.disabled = true;
+    try {
+      const res = await fetch('/api/miniapp/reflections/' + id + '?token=' + encodeURIComponent(_token), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q1, q2 }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error('server error');
+      document.getElementById('rcard-q1-text-' + id).innerHTML = escBr(q1);
+      document.getElementById('rcard-q2-text-' + id).innerHTML = escBr(q2);
+      cancelEdit(id);
+    } catch {
+      btn.textContent = 'Save';
+      btn.disabled = false;
+      alert('Save failed. Try again.');
+    }
+  }
+
   // ── GOOD NEWS TAB ──
   function renderGoodNews(gnData) {
-    const panel = document.getElementById('panel-goodnews');
+    const panel    = document.getElementById('panel-goodnews');
     const received = gnData && gnData.received ? gnData.received : [];
     const sent     = gnData && gnData.sent     ? gnData.sent     : [];
     if (!received.length && !sent.length) {
@@ -382,28 +452,28 @@
     if (received.length) {
       html += '<div class="gn-section-hd">Received (' + received.length + ')</div>';
       for (const gn of received) {
-        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        const wl = gn.week ? 'W' + (gn.week + 13) : '';
         html += '<div class="gncard gncard-received">';
         html += '<div class="gncard-head">';
         html += '<span class="gncard-who">From ' + esc(gn.from) + '</span>';
-        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        if (wl) html += '<span class="week-pill">' + wl + '</span>';
         html += '</div>';
-        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
-        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '<div class="gncard-msg">' + escBr(gn.message) + '</div>';
+        html += '<div class="gncard-footer"><span class="gncard-pts">+' + gn.pts + ' pts</span></div>';
         html += '</div>';
       }
     }
     if (sent.length) {
       html += '<div class="gn-section-hd">Sent (' + sent.length + ')</div>';
       for (const gn of sent) {
-        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        const wl = gn.week ? 'W' + (gn.week + 13) : '';
         html += '<div class="gncard gncard-sent">';
         html += '<div class="gncard-head">';
         html += '<span class="gncard-who">You shared</span>';
-        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        if (wl) html += '<span class="week-pill">' + wl + '</span>';
         html += '</div>';
-        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
-        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '<div class="gncard-msg">' + escBr(gn.message) + '</div>';
+        html += '<div class="gncard-footer"><span class="gncard-pts">+' + gn.pts + ' pts</span></div>';
         html += '</div>';
       }
     }
@@ -412,7 +482,7 @@
   }
 
   // ── LEADERBOARD TAB ──
-  function _lbRowHtml(u, rankNum, myName) {
+  function _personRowHtml(u, rankNum, myName) {
     const isMe = u.realName === myName;
     return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
       '<span class="lb-rank' + (rankNum <= 3 ? ' gold' : '') + '">#' + rankNum + '</span>' +
@@ -422,22 +492,40 @@
       '</div>';
   }
 
-  function renderLeaderboard(users, myDept, myName) {
-    const panel = document.getElementById('panel-leaderboard');
+  function _deptRowHtml(d, myDept) {
+    const isMe = d.department === myDept;
+    return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
+      '<span class="lb-rank' + (d.rank <= 3 ? ' gold' : '') + '">#' + d.rank + '</span>' +
+      '<span class="lb-emoji">' + d.stage + '</span>' +
+      '<span class="lb-name">' + esc(d.department) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
+      '<div style="text-align:right;flex-shrink:0"><div class="lb-pts">' + d.avgPoints + ' avg</div>' +
+      (d.streak > 0 ? '<div class="lb-pts-label">🔥 ' + d.streak + '-wk streak</div>' : '') + '</div>' +
+      '</div>';
+  }
+
+  function renderLeaderboard(users, depts, myDept, myName) {
+    const panel  = document.getElementById('panel-leaderboard');
     const ranked = [...users].sort((a, b) => a.rank - b.rank || b.totalPoints - a.totalPoints);
+    const myUser = ranked.find(u => u.realName === myName);
+    const myRank = myUser ? myUser.rank : Infinity;
 
-    _lbHtml.company = ranked.map(u => _lbRowHtml(u, u.rank, myName)).join('');
+    // Company: only show people ranked equal to or above the current user
+    const companyList = ranked.filter(u => u.rank <= myRank);
+    _lbHtml.company = companyList.map(u => _personRowHtml(u, u.rank, myName)).join('') +
+      (ranked.length > companyList.length
+        ? '<p class="lb-caption">Only showing those ranked above you.</p>'
+        : '');
 
-    const deptRanked = myDept ? ranked.filter(u => u.department === myDept) : [];
-    _lbHtml.dept = deptRanked.length
-      ? deptRanked.map((u, i) => _lbRowHtml(u, i + 1, myName)).join('')
+    // Departments: ranked by avg points
+    const sortedDepts = [...(depts || [])].sort((a, b) => a.rank - b.rank || b.avgPoints - a.avgPoints);
+    _lbHtml.dept = sortedDepts.length
+      ? sortedDepts.map(d => _deptRowHtml(d, myDept)).join('')
       : '<div class="placeholder"><p class="placeholder-sub">No department data.</p></div>';
 
-    const deptLabel = myDept ? esc(myDept) : 'My Dept';
     panel.innerHTML =
       '<div class="lb-tabs">' +
-        '<button class="lb-tab active" onclick="switchLbTab(\'company\',this)">🏢 Company</button>' +
-        '<button class="lb-tab" onclick="switchLbTab(\'dept\',this)">👥 ' + deptLabel + '</button>' +
+        '<button class="lb-tab active" onclick="switchLbTab(\'company\',this)">👤 Company</button>' +
+        '<button class="lb-tab" onclick="switchLbTab(\'dept\',this)">🏢 Departments</button>' +
       '</div>' +
       '<div class="panel-scroll" id="scroll-leaderboard">' + _lbHtml.company + '</div>';
   }
@@ -477,12 +565,14 @@
       return;
     }
 
+    _token = auth.token;
+
     let garden, me;
     try {
-      const token = encodeURIComponent(auth.token);
+      const tok = encodeURIComponent(auth.token);
       [garden, me] = await Promise.all([
-        fetch('/api/miniapp/garden?token=' + token).then(r => r.json()),
-        fetch('/api/miniapp/me?token='     + token).then(r => r.json()),
+        fetch('/api/miniapp/garden?token=' + tok).then(r => r.json()),
+        fetch('/api/miniapp/me?token='     + tok).then(r => r.json()),
       ]);
     } catch {
       showError('Couldn\'t load data. Try again in a moment.');
@@ -493,9 +583,8 @@
     renderStatsStrip(garden, auth.name);
     renderReflections(me.reflections);
     renderGoodNews(me.good_news);
-    renderLeaderboard(garden.users, auth.department, auth.name);
+    renderLeaderboard(garden.users, garden.depts, auth.department, auth.name);
 
-    // Attach scroll listeners now that panels have real content
     document.querySelectorAll('.panel-scroll').forEach(el =>
       el.addEventListener('scroll', checkGarden)
     );
@@ -504,18 +593,34 @@
     document.getElementById('app').style.display = 'flex';
   }
 
+  // ── TAB SWITCHING ──
   function switchTab(name, btn) {
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     checkGarden();
+    // Re-attach scroll listener to the newly active panel-scroll
+    const activeScroll = document.querySelector('.panel.active .panel-scroll');
+    if (activeScroll && !activeScroll._scrollBound) {
+      activeScroll.addEventListener('scroll', checkGarden);
+      activeScroll._scrollBound = true;
+    }
   }
 
+  // ── GARDEN COLLAPSE — hysteresis ──
+  // Hides garden after scrolling down 80px; restores only when near top (<20px)
   function checkGarden() {
     const activeScroll = document.querySelector('.panel.active .panel-scroll');
-    if (activeScroll) {
-      document.getElementById('app').classList.toggle('garden-hidden', activeScroll.scrollTop > 12);
+    if (!activeScroll) return;
+    const app = document.getElementById('app');
+    const st  = activeScroll.scrollTop;
+    if (!_gardenHidden && st > 80) {
+      _gardenHidden = true;
+      app.classList.add('garden-hidden');
+    } else if (_gardenHidden && st < 20) {
+      _gardenHidden = false;
+      app.classList.remove('garden-hidden');
     }
   }
 
