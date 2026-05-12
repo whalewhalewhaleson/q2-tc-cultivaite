@@ -615,10 +615,10 @@
     if (!activeScroll) return;
     const app = document.getElementById('app');
     const st  = activeScroll.scrollTop;
-    if (!_gardenHidden && st > 80) {
+    if (!_gardenHidden && st > 120) {
       _gardenHidden = true;
       app.classList.add('garden-hidden');
-    } else if (_gardenHidden && st < 20) {
+    } else if (_gardenHidden && st < 5) {
       _gardenHidden = false;
       app.classList.remove('garden-hidden');
     }
