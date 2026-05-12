@@ -3066,6 +3066,7 @@ http.createServer(async (req, res) => {
       const full = await sheets.getFullDashboardStats();
       const users = full.users.map(u => ({
         realName:    u.realName,
+        department:  u.department,
         totalPoints: u.totalPoints,
         plantStage:  u.plantStage,
         streak:      u.streak,
@@ -3074,6 +3075,42 @@ http.createServer(async (req, res) => {
       return jsonRes(res, { weekNow: full.weekNow, isoWeek: full.weekNow + 13, users });
     } catch (err) {
       console.error('/api/miniapp/garden error:', err);
+      return jsonRes(res, { error: 'server_error' }, 500);
+    }
+  }
+
+  if (route === '/api/miniapp/me' && req.method === 'GET') {
+    try {
+      const token = url_.searchParams.get('token');
+      const chatId = verifyMiniappToken(token);
+      if (!chatId) return jsonRes(res, { error: 'Unauthorized' }, 401);
+      const dbUser = await getUserByChatId(chatId).catch(() => null);
+      if (!dbUser?.realName) return jsonRes(res, { error: 'not_registered' }, 403);
+      const realName = dbUser.realName;
+      const [userStat, rawSubs, sent, received] = await Promise.all([
+        sheets.getStatsForUser(realName),
+        sheets.getSubmissionsForUser(realName, 999),
+        sheets.getSentGoodNewsForUser(realName),
+        sheets.getReceivedGoodNewsForUser(realName),
+      ]);
+      const reflections = rawSubs
+        .filter(s => s.q1 !== '[Excused absence]')
+        .map(s => ({ week: s.weekNum, isoWeek: s.weekNum + 13, date: s.date, q1: s.q1, q2: s.q2, q3: s.q3 }))
+        .reverse();
+      return jsonRes(res, {
+        user: {
+          realName:   userStat?.realName ?? realName,
+          department: dbUser.department ?? '',
+          points:     userStat?.totalPoints ?? 0,
+          streak:     userStat?.streak ?? 0,
+          rank:       userStat?.rank ?? null,
+          stage:      userStat?.plantStage ?? '\u{1F331}',
+        },
+        reflections,
+        good_news: { received, sent },
+      });
+    } catch (err) {
+      console.error('/api/miniapp/me error:', err);
       return jsonRes(res, { error: 'server_error' }, 500);
     }
   }

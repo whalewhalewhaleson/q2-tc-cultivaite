@@ -29,11 +29,9 @@
     @keyframes spin { to { transform: rotate(360deg); } }
 
     /* ── APP SHELL ── */
-    #app {
-      height: 100%; display: flex; flex-direction: column; display: none;
-    }
+    #app { height: 100%; display: flex; flex-direction: column; display: none; }
 
-    /* ── MINI HEADER — shows when garden scrolled away ── */
+    /* ── MINI HEADER ── */
     .mini-header {
       flex-shrink: 0; overflow: hidden;
       max-height: 0; opacity: 0;
@@ -46,7 +44,7 @@
     .mh-title { font-size: 15px; font-weight: 800; color: #1D3D2A; letter-spacing: -0.2px; }
     .mh-week  { font-size: 11px; font-weight: 600; color: white; background: #4CAF6E; padding: 4px 11px; border-radius: 12px; }
 
-    /* ── GARDEN WRAP — collapses on scroll ── */
+    /* ── GARDEN WRAP ── */
     .garden-wrap {
       flex-shrink: 0; overflow: hidden;
       max-height: 430px;
@@ -55,9 +53,7 @@
     .garden-hidden .garden-wrap { max-height: 0; opacity: 0; }
 
     /* ── GARDEN SCENE ── */
-    .garden-scene {
-      position: relative; height: 360px; overflow: hidden;
-    }
+    .garden-scene { position: relative; height: 360px; overflow: hidden; }
     .sky {
       position: absolute; top: 0; left: 0; right: 0; height: 168px;
       background: linear-gradient(180deg, #6EB0E8 0%, #90C8F0 30%, #B8DDF8 60%, #CCEAC0 85%, #BCDCAA 100%);
@@ -79,9 +75,7 @@
     .c2 .b { width: 58px; height: 14px; top: 14px; }
     .c2 .p:nth-child(2) { width: 23px; height: 23px; top: 2px; left: 8px; }
     .c2 .p:nth-child(3) { width: 18px; height: 18px; top: 5px; left: 27px; }
-    .mountains {
-      position: absolute; top: 96px; left: 0; right: 0; height: 58px; z-index: 2;
-    }
+    .mountains { position: absolute; top: 96px; left: 0; right: 0; height: 58px; z-index: 2; }
     .mt { position: absolute; bottom: 0; clip-path: polygon(0% 100%, 50% 0%, 100% 100%); }
     .mt-b1 { width: 230px; height: 36px; left: -30px; background: #8CB880; opacity: 0.65; }
     .mt-b2 { width: 200px; height: 32px; right: -20px; background: #86B27A; opacity: 0.65; }
@@ -89,30 +83,21 @@
     .mt-f1 { width: 190px; height: 30px; left: -10px; background: #4A7A42; }
     .mt-f2 { width: 175px; height: 34px; right: 10px; background: #467040; }
     .mt-f3 { width: 155px; height: 26px; left: 120px; background: #42683C; }
-    .mt-fade {
-      position: absolute; bottom: 0; left: 0; right: 0; height: 18px;
-      background: linear-gradient(180deg, transparent, #7A500E);
-    }
-    .soil {
-      position: absolute; top: 150px; left: 0; right: 0; bottom: 0;
-      background: radial-gradient(ellipse at 50% 30%, #A07228 0%, #8B5E14 45%, #7A500E 100%);
-    }
+    .mt-fade { position: absolute; bottom: 0; left: 0; right: 0; height: 18px; background: linear-gradient(180deg, transparent, #7A500E); }
+    .soil { position: absolute; top: 150px; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at 50% 30%, #A07228 0%, #8B5E14 45%, #7A500E 100%); }
     .garden-scene::before {
       content: ''; position: absolute; top: 0; left: 0; right: 0; height: 110px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, transparent 100%);
-      z-index: 9;
+      background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, transparent 100%); z-index: 9;
     }
     .g-header {
-      position: absolute; top: 0; left: 0; right: 0;
-      padding: 50px 20px 0;
+      position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0;
       display: flex; justify-content: space-between; align-items: center; z-index: 10;
     }
     .g-title { font-size: 15px; font-weight: 800; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.2px; }
     .g-week  { font-size: 11px; font-weight: 600; color: white; background: rgba(0,0,0,0.28); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
     .plant-grid {
       position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3;
-      display: flex; flex-direction: column; justify-content: space-evenly;
-      padding: 6px 8px 10px;
+      display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 8px 10px;
     }
     .prow { display: flex; justify-content: space-evenly; align-items: center; }
     .prow:nth-child(even) { padding: 0 16px; }
@@ -149,6 +134,42 @@
     .placeholder-icon { font-size: 36px; }
     .placeholder-title { font-size: 15px; font-weight: 800; color: #1D3D2A; }
     .placeholder-sub { font-size: 13px; color: #93A898; text-align: center; line-height: 1.5; }
+
+    /* ── SHARED CARD ATOMS ── */
+    .week-pill { font-size: 10px; font-weight: 700; background: #E8F5EC; color: #4CAF6E; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+
+    /* ── REFLECTION CARDS ── */
+    .rcard { background: white; border-radius: 14px; padding: 14px 14px 12px; margin-bottom: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
+    .rcard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+    .rcard-date { font-size: 11px; color: #93A898; }
+    .rcard-section { margin-bottom: 9px; }
+    .rcard-section:last-child { margin-bottom: 0; }
+    .rcard-qlabel { font-size: 10px; font-weight: 700; color: #93A898; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
+    .rcard-qtext { font-size: 13px; color: #1D3D2A; line-height: 1.55; }
+
+    /* ── GOOD NEWS CARDS ── */
+    .gn-section-hd { font-size: 11px; font-weight: 700; color: #93A898; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 2px 8px; }
+    .gn-section-hd:not(:first-child) { margin-top: 6px; }
+    .gncard { background: white; border-radius: 14px; padding: 12px 14px 10px; margin-bottom: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); border-left: 4px solid; }
+    .gncard-received { border-left-color: #4CAF6E; }
+    .gncard-sent     { border-left-color: #F5A623; }
+    .gncard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: 8px; }
+    .gncard-who { font-size: 12px; font-weight: 700; color: #1D3D2A; }
+    .gncard-msg { font-size: 13px; color: #1D3D2A; line-height: 1.5; margin-bottom: 6px; }
+    .gncard-pts { font-size: 11px; font-weight: 700; color: #93A898; }
+
+    /* ── LEADERBOARD ── */
+    .lb-tabs { display: flex; gap: 6px; padding: 10px 14px 6px; background: #EDE8DF; flex-shrink: 0; }
+    .lb-tab { flex: 1; padding: 8px 0; font-size: 12px; font-weight: 700; border: none; border-radius: 10px; background: rgba(0,0,0,0.06); color: #93A898; cursor: pointer; transition: all 0.15s; }
+    .lb-tab.active { background: white; color: #1D3D2A; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+    .lb-row { display: flex; align-items: center; gap: 10px; background: white; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .lb-row.me { background: #E8F5EC; border: 1.5px solid #4CAF6E; }
+    .lb-rank { font-size: 13px; font-weight: 800; color: #B8C0B8; width: 26px; text-align: center; flex-shrink: 0; }
+    .lb-rank.gold { color: #F5A623; }
+    .lb-emoji { font-size: 18px; flex-shrink: 0; }
+    .lb-name { flex: 1; font-size: 13px; font-weight: 600; color: #1D3D2A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .lb-pts { font-size: 12px; font-weight: 800; color: #4CAF6E; flex-shrink: 0; }
+    .lb-star { font-size: 11px; color: #4CAF6E; margin-left: 2px; }
 
     /* ── BOTTOM NAV ── */
     .bottom-nav {
@@ -223,34 +244,9 @@
   </div>
 
   <div class="content">
-
-    <!-- Reflections (Phase 2) -->
-    <div class="panel active" id="panel-reflections">
-      <div class="placeholder">
-        <div class="placeholder-icon">📝</div>
-        <div class="placeholder-title">Reflections</div>
-        <p class="placeholder-sub">Your weekly reflections will appear here.<br>Coming soon.</p>
-      </div>
-    </div>
-
-    <!-- Good News (Phase 3) -->
-    <div class="panel" id="panel-goodnews">
-      <div class="placeholder">
-        <div class="placeholder-icon">💌</div>
-        <div class="placeholder-title">Good News</div>
-        <p class="placeholder-sub">Shoutouts you've given and received will appear here.<br>Coming soon.</p>
-      </div>
-    </div>
-
-    <!-- Leaderboard (Phase 4) -->
-    <div class="panel" id="panel-leaderboard">
-      <div class="placeholder">
-        <div class="placeholder-icon">🏆</div>
-        <div class="placeholder-title">Leaderboard</div>
-        <p class="placeholder-sub">Company and department rankings will appear here.<br>Coming soon.</p>
-      </div>
-    </div>
-
+    <div class="panel active" id="panel-reflections"></div>
+    <div class="panel" id="panel-goodnews"></div>
+    <div class="panel" id="panel-leaderboard"></div>
   </div>
 
   <div class="bottom-nav">
@@ -271,7 +267,18 @@
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
 
-  // Plant stage from points (5 healthy stages only — no dying/dead per plan decision)
+  // Global leaderboard HTML cache for company/dept tab switching
+  const _lbHtml = { company: '', dept: '' };
+
+  function esc(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatDate(d) {
+    if (!d) return '';
+    return new Date(d + 'T12:00:00+08:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
+  }
+
   function stageEmoji(pts) {
     if (pts >= 116) return '🍎';
     if (pts >= 86)  return '🌼';
@@ -286,16 +293,15 @@
     document.getElementById('screen-error').style.display = 'flex';
   }
 
+  // ── GARDEN ──
   function renderGarden(garden) {
-    const isoWeek = `Week ${garden.isoWeek}`;
-    document.getElementById('g-week').textContent   = isoWeek;
-    document.getElementById('mh-week').textContent  = isoWeek;
+    const isoWeek = 'Week ' + garden.isoWeek;
+    document.getElementById('g-week').textContent  = isoWeek;
+    document.getElementById('mh-week').textContent = isoWeek;
 
     const plants = [...garden.users].sort(() => Math.random() - 0.5);
     const grid   = document.getElementById('plant-grid');
     grid.innerHTML = '';
-
-    // Row layout: alternating dense/sparse to fill soil area naturally
     const layout = [9, 8, 9, 7, 9, 8];
     let idx = 0;
     for (const count of layout) {
@@ -312,14 +318,137 @@
     }
   }
 
+  // ── STATS STRIP ──
   function renderStatsStrip(garden, myName) {
     const me = garden.users.find(u => u.realName === myName);
     if (!me) return;
     document.getElementById('stat-points').textContent = me.totalPoints;
-    document.getElementById('stat-streak').textContent = `${me.streak} wk${me.streak !== 1 ? 's' : ''}`;
-    document.getElementById('stat-rank').textContent   = `#${me.rank}`;
+    document.getElementById('stat-streak').textContent = me.streak + ' wk' + (me.streak !== 1 ? 's' : '');
+    document.getElementById('stat-rank').textContent   = '#' + me.rank;
   }
 
+  // ── REFLECTIONS TAB ──
+  function renderReflections(reflections) {
+    const panel = document.getElementById('panel-reflections');
+    if (!reflections || !reflections.length) {
+      panel.innerHTML = '<div class="placeholder">' +
+        '<div class="placeholder-icon">📝</div>' +
+        '<div class="placeholder-title">No reflections yet</div>' +
+        '<p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p>' +
+        '</div>';
+      return;
+    }
+    let html = '<div class="panel-scroll">';
+    for (const r of reflections) {
+      html += '<div class="rcard">';
+      html += '<div class="rcard-head">';
+      html += '<span class="week-pill">W' + r.isoWeek + '</span>';
+      html += '<span class="rcard-date">' + esc(formatDate(r.date)) + '</span>';
+      html += '</div>';
+      html += '<div class="rcard-section">';
+      html += '<div class="rcard-qlabel">TC Values</div>';
+      html += '<div class="rcard-qtext">' + esc(r.q1) + '</div>';
+      html += '</div>';
+      html += '<div class="rcard-section">';
+      html += '<div class="rcard-qlabel">Role Check-in</div>';
+      html += '<div class="rcard-qtext">' + esc(r.q2) + '</div>';
+      html += '</div>';
+      if (r.q3 && r.q3.trim()) {
+        html += '<div class="rcard-section">';
+        html += '<div class="rcard-qlabel">Shoutout</div>';
+        html += '<div class="rcard-qtext">' + esc(r.q3) + '</div>';
+        html += '</div>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  // ── GOOD NEWS TAB ──
+  function renderGoodNews(gnData) {
+    const panel = document.getElementById('panel-goodnews');
+    const received = gnData && gnData.received ? gnData.received : [];
+    const sent     = gnData && gnData.sent     ? gnData.sent     : [];
+    if (!received.length && !sent.length) {
+      panel.innerHTML = '<div class="placeholder">' +
+        '<div class="placeholder-icon">💌</div>' +
+        '<div class="placeholder-title">No good news yet</div>' +
+        '<p class="placeholder-sub">Share someone\'s good news with /reflect and it\'ll appear here once approved.</p>' +
+        '</div>';
+      return;
+    }
+    let html = '<div class="panel-scroll">';
+    if (received.length) {
+      html += '<div class="gn-section-hd">Received (' + received.length + ')</div>';
+      for (const gn of received) {
+        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        html += '<div class="gncard gncard-received">';
+        html += '<div class="gncard-head">';
+        html += '<span class="gncard-who">From ' + esc(gn.from) + '</span>';
+        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        html += '</div>';
+        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
+        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '</div>';
+      }
+    }
+    if (sent.length) {
+      html += '<div class="gn-section-hd">Sent (' + sent.length + ')</div>';
+      for (const gn of sent) {
+        const weekLabel = gn.week ? 'W' + (gn.week + 13) : '';
+        html += '<div class="gncard gncard-sent">';
+        html += '<div class="gncard-head">';
+        html += '<span class="gncard-who">You shared</span>';
+        if (weekLabel) html += '<span class="week-pill">' + weekLabel + '</span>';
+        html += '</div>';
+        html += '<div class="gncard-msg">' + esc(gn.message) + '</div>';
+        html += '<div class="gncard-pts">+' + gn.pts + ' pts</div>';
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+    panel.innerHTML = html;
+  }
+
+  // ── LEADERBOARD TAB ──
+  function _lbRowHtml(u, rankNum, myName) {
+    const isMe = u.realName === myName;
+    return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
+      '<span class="lb-rank' + (rankNum <= 3 ? ' gold' : '') + '">#' + rankNum + '</span>' +
+      '<span class="lb-emoji">' + stageEmoji(u.totalPoints) + '</span>' +
+      '<span class="lb-name">' + esc(u.realName) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
+      '<span class="lb-pts">' + u.totalPoints + ' pts</span>' +
+      '</div>';
+  }
+
+  function renderLeaderboard(users, myDept, myName) {
+    const panel = document.getElementById('panel-leaderboard');
+    const ranked = [...users].sort((a, b) => a.rank - b.rank || b.totalPoints - a.totalPoints);
+
+    _lbHtml.company = ranked.map(u => _lbRowHtml(u, u.rank, myName)).join('');
+
+    const deptRanked = myDept ? ranked.filter(u => u.department === myDept) : [];
+    _lbHtml.dept = deptRanked.length
+      ? deptRanked.map((u, i) => _lbRowHtml(u, i + 1, myName)).join('')
+      : '<div class="placeholder"><p class="placeholder-sub">No department data.</p></div>';
+
+    const deptLabel = myDept ? esc(myDept) : 'My Dept';
+    panel.innerHTML =
+      '<div class="lb-tabs">' +
+        '<button class="lb-tab active" onclick="switchLbTab(\'company\',this)">🏢 Company</button>' +
+        '<button class="lb-tab" onclick="switchLbTab(\'dept\',this)">👥 ' + deptLabel + '</button>' +
+      '</div>' +
+      '<div class="panel-scroll" id="scroll-leaderboard">' + _lbHtml.company + '</div>';
+  }
+
+  function switchLbTab(name, btn) {
+    document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('scroll-leaderboard').innerHTML = _lbHtml[name];
+  }
+
+  // ── INIT ──
   async function init() {
     if (!tg || !tg.initData) {
       showError('Open this from the CultivAIte bot in Telegram.');
@@ -348,21 +477,31 @@
       return;
     }
 
-    let garden;
+    let garden, me;
     try {
-      const res = await fetch(`/api/miniapp/garden?token=${encodeURIComponent(auth.token)}`);
-      garden = await res.json();
+      const token = encodeURIComponent(auth.token);
+      [garden, me] = await Promise.all([
+        fetch('/api/miniapp/garden?token=' + token).then(r => r.json()),
+        fetch('/api/miniapp/me?token='     + token).then(r => r.json()),
+      ]);
     } catch {
-      showError('Couldn\'t load garden data. Try again in a moment.');
+      showError('Couldn\'t load data. Try again in a moment.');
       return;
     }
 
     renderGarden(garden);
     renderStatsStrip(garden, auth.name);
+    renderReflections(me.reflections);
+    renderGoodNews(me.good_news);
+    renderLeaderboard(garden.users, auth.department, auth.name);
+
+    // Attach scroll listeners now that panels have real content
+    document.querySelectorAll('.panel-scroll').forEach(el =>
+      el.addEventListener('scroll', checkGarden)
+    );
 
     document.getElementById('screen-loading').style.display = 'none';
-    const app = document.getElementById('app');
-    app.style.display = 'flex';
+    document.getElementById('app').style.display = 'flex';
   }
 
   function switchTab(name, btn) {
@@ -379,7 +518,6 @@
       document.getElementById('app').classList.toggle('garden-hidden', activeScroll.scrollTop > 12);
     }
   }
-  document.querySelectorAll('.panel-scroll').forEach(el => el.addEventListener('scroll', checkGarden));
 
   init();
 </script>
