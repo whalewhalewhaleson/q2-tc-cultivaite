@@ -2239,7 +2239,7 @@ bot.command('nick', async (ctx) => {
 bot.command('miniapp', async (ctx) => {
   const miniappUrl = (process.env.DASHBOARD_URL ?? '').replace(/\/dashboard\/?$/, '') + '/miniapp';
   const keyboard = new InlineKeyboard().webApp('🌱 Open Garden', miniappUrl);
-  await ctx.reply('🌱 Tap to open your garden\:', { reply_markup: keyboard, parse_mode: 'MarkdownV2' });
+  await ctx.reply('🌱 Tap to open your garden:', { reply_markup: keyboard });
 });
 
 // ---------------------------------------------------------------------------
@@ -2263,7 +2263,7 @@ bot.command('help', async (ctx) => {
     `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
     `/editreflection — ✏️ Update your most recent reflection \\(Q1, Q2, or Q3 good news\\)\n` +
     `/editgoodnews — ✏️ Edit your most recent Pending good news submission\n` +
-    `/miniapp — 🌱 Open the garden mini\-app\n` +
+    `/miniapp — 🌱 Open the garden mini\\-app\n` +
     `/cancel — ❌ Cancel whatever's in progress\n` +
     `/help — Show this message\n`;
 
