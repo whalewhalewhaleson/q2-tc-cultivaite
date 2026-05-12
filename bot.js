@@ -3050,9 +3050,9 @@ http.createServer(async (req, res) => {
       const chatId = String(tgUser.id ?? '');
       if (!chatId) return jsonRes(res, { ok: false, reason: 'no_user' }, 400);
       const user = await getUserByChatId(chatId).catch(() => null);
-      if (!user?.real_name) return jsonRes(res, { ok: false, reason: 'not_registered' });
+      if (!user?.realName) return jsonRes(res, { ok: false, reason: 'not_registered' });
       const token = signMiniappToken(chatId);
-      return jsonRes(res, { ok: true, chat_id: chatId, name: user.real_name, department: user.department ?? '', token });
+      return jsonRes(res, { ok: true, chat_id: chatId, name: user.realName, department: user.department ?? '', token });
     } catch (err) {
       console.error('/api/miniapp/auth error:', err);
       return jsonRes(res, { ok: false, reason: 'server_error' }, 500);
