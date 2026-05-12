@@ -2233,6 +2233,16 @@ bot.command('nick', async (ctx) => {
 });
 
 // ---------------------------------------------------------------------------
+// /miniapp — open the garden mini-app
+// ---------------------------------------------------------------------------
+
+bot.command('miniapp', async (ctx) => {
+  const miniappUrl = (process.env.DASHBOARD_URL ?? '').replace(/\/dashboard\/?$/, '') + '/miniapp';
+  const keyboard = new InlineKeyboard().webApp('🌱 Open Garden', miniappUrl);
+  await ctx.reply('🌱 Tap to open your garden\:', { reply_markup: keyboard, parse_mode: 'MarkdownV2' });
+});
+
+// ---------------------------------------------------------------------------
 // /help
 // ---------------------------------------------------------------------------
 
@@ -2253,6 +2263,7 @@ bot.command('help', async (ctx) => {
     `/1, /2\\.\\.\\. — 📖 Read a specific reflection\n` +
     `/editreflection — ✏️ Update your most recent reflection \\(Q1, Q2, or Q3 good news\\)\n` +
     `/editgoodnews — ✏️ Edit your most recent Pending good news submission\n` +
+    `/miniapp — 🌱 Open the garden mini\-app\n` +
     `/cancel — ❌ Cancel whatever's in progress\n` +
     `/help — Show this message\n`;
 
@@ -2786,6 +2797,7 @@ cron.schedule('15 2 * * 2', async () => {
 
 const PORT            = process.env.PORT ?? 3000;
 const DASHBOARD_FILE  = path.join(__dirname, 'dashboard.html');
+const MINIAPP_FILE    = path.join(__dirname, 'miniapp.html');
 const COOKIE_SECRET   = process.env.COOKIE_SECRET;
 const AUTH_COOKIE     = 'dash_session';
 const BOT_USERNAME    = 'TC_CultivAIte_Bot';
@@ -2814,6 +2826,43 @@ function verifyTelegramLogin(params) {
   const authDate = parseInt(data.auth_date ?? '0');
   if (Date.now() / 1000 - authDate > 300) return false;
   return true;
+}
+
+function verifyWebAppData(initData) {
+  // Telegram Mini App HMAC: key = HMAC-SHA256(key='WebAppData', data=bot_token)
+  const params = new URLSearchParams(initData);
+  const hash = params.get('hash');
+  if (!hash) return false;
+  params.delete('hash');
+  const pairs = [...params.entries()].sort(([a], [b]) => a.localeCompare(b));
+  const checkString = pairs.map(([k, v]) => `${k}=${v}`).join('\n');
+  const secretKey = crypto.createHmac('sha256', 'WebAppData').update(process.env.BOT_TOKEN).digest();
+  const computed = crypto.createHmac('sha256', secretKey).update(checkString).digest('hex');
+  if (computed !== hash) return false;
+  const authDate = parseInt(params.get('auth_date') ?? '0');
+  if (Date.now() / 1000 - authDate > 86400) return false;  // 24h window for mini-app
+  return true;
+}
+
+function signMiniappToken(chatId) {
+  const ts = Date.now();
+  const payload = `${chatId}|${ts}`;
+  const sig = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
+  return `${Buffer.from(payload).toString('base64url')}.${sig}`;
+}
+
+function verifyMiniappToken(token) {
+  if (!token || !COOKIE_SECRET) return null;
+  const [b64, sig] = token.split('.');
+  if (!b64 || !sig) return null;
+  try {
+    const payload = Buffer.from(b64, 'base64url').toString();
+    const expected = crypto.createHmac('sha256', COOKIE_SECRET).update(payload).digest('hex');
+    if (sig !== expected) return null;
+    const [chatId, tsStr] = payload.split('|');
+    if (Date.now() - parseInt(tsStr) > 86400000) return null;  // 24h expiry
+    return chatId;
+  } catch { return null; }
 }
 
 function signCookie(userId, firstName, role = 'admin', dept = null, dept2 = null) {
@@ -2975,8 +3024,58 @@ http.createServer(async (req, res) => {
     return;
   }
 
+  // Serve mini-app HTML (no session required — Telegram handles identity via HMAC)
+  if (req.method === 'GET' && route === '/miniapp') {
+    fs.readFile(MINIAPP_FILE, 'utf8', (err, html) => {
+      if (err) { res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return; }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(html);
+    });
+    return;
+  }
+
   if (!route.startsWith('/api/')) {
     res.writeHead(404, { 'Content-Type': 'text/plain' }); res.end('Not found'); return;
+  }
+
+  // Mini-app API endpoints — before session check, use Telegram HMAC token auth
+  if (route === '/api/miniapp/auth' && req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      if (!body.initData || !verifyWebAppData(body.initData)) {
+        return jsonRes(res, { ok: false, reason: 'invalid_auth' }, 401);
+      }
+      const params = new URLSearchParams(body.initData);
+      const tgUser = JSON.parse(params.get('user') ?? '{}');
+      const chatId = String(tgUser.id ?? '');
+      if (!chatId) return jsonRes(res, { ok: false, reason: 'no_user' }, 400);
+      const user = await getUserByChatId(chatId).catch(() => null);
+      if (!user?.real_name) return jsonRes(res, { ok: false, reason: 'not_registered' });
+      const token = signMiniappToken(chatId);
+      return jsonRes(res, { ok: true, chat_id: chatId, name: user.real_name, department: user.department ?? '', token });
+    } catch (err) {
+      console.error('/api/miniapp/auth error:', err);
+      return jsonRes(res, { ok: false, reason: 'server_error' }, 500);
+    }
+  }
+
+  if (route === '/api/miniapp/garden' && req.method === 'GET') {
+    try {
+      const token = url_.searchParams.get('token');
+      if (!verifyMiniappToken(token)) return jsonRes(res, { error: 'Unauthorized' }, 401);
+      const full = await sheets.getFullDashboardStats();
+      const users = full.users.map(u => ({
+        realName:    u.realName,
+        totalPoints: u.totalPoints,
+        plantStage:  u.plantStage,
+        streak:      u.streak,
+        rank:        u.rank,
+      }));
+      return jsonRes(res, { weekNow: full.weekNow, isoWeek: full.weekNow + 13, users });
+    } catch (err) {
+      console.error('/api/miniapp/garden error:', err);
+      return jsonRes(res, { error: 'server_error' }, 500);
+    }
   }
 
   const user = getSessionUser(req);
