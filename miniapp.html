@@ -33,11 +33,9 @@
 
     /* ── MINI HEADER ── */
     .mini-header {
-      flex-shrink: 0; overflow: hidden;
-      max-height: 0; opacity: 0;
+      flex-shrink: 0; overflow: hidden; max-height: 0; opacity: 0;
       background: white; border-bottom: 1px solid rgba(0,0,0,0.08);
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 0 20px;
+      display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
       transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
     }
     .garden-hidden .mini-header { max-height: 52px; opacity: 1; }
@@ -46,24 +44,15 @@
 
     /* ── GARDEN WRAP ── */
     .garden-wrap {
-      flex-shrink: 0; overflow: hidden;
-      max-height: 430px;
+      flex-shrink: 0; overflow: hidden; max-height: 430px;
       transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
     }
     .garden-hidden .garden-wrap { max-height: 0; opacity: 0; }
 
     /* ── GARDEN SCENE ── */
     .garden-scene { position: relative; height: 360px; overflow: hidden; }
-    .sky {
-      position: absolute; top: 0; left: 0; right: 0; height: 168px;
-      background: linear-gradient(180deg, #6EB0E8 0%, #90C8F0 30%, #B8DDF8 60%, #CCEAC0 85%, #BCDCAA 100%);
-    }
-    .sun {
-      position: absolute; top: 54px; right: 52px; width: 40px; height: 40px;
-      background: radial-gradient(circle, #FFFDE0 15%, #FFE040 55%, #FFBF00);
-      border-radius: 50%;
-      box-shadow: 0 0 0 11px rgba(255,224,64,0.13), 0 0 55px rgba(255,200,30,0.36);
-    }
+    .sky { position: absolute; top: 0; left: 0; right: 0; height: 168px; background: linear-gradient(180deg, #6EB0E8 0%, #90C8F0 30%, #B8DDF8 60%, #CCEAC0 85%, #BCDCAA 100%); }
+    .sun { position: absolute; top: 54px; right: 52px; width: 40px; height: 40px; background: radial-gradient(circle, #FFFDE0 15%, #FFE040 55%, #FFBF00); border-radius: 50%; box-shadow: 0 0 0 11px rgba(255,224,64,0.13), 0 0 55px rgba(255,200,30,0.36); }
     .cloud { position: absolute; }
     .cloud .b { background: rgba(255,255,255,0.86); border-radius: 60px; position: absolute; }
     .cloud .p { background: rgba(255,255,255,0.86); border-radius: 50%; position: absolute; }
@@ -85,34 +74,19 @@
     .mt-f3 { width: 155px; height: 26px; left: 120px; background: #42683C; }
     .mt-fade { position: absolute; bottom: 0; left: 0; right: 0; height: 18px; background: linear-gradient(180deg, transparent, #7A500E); }
     .soil { position: absolute; top: 150px; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse at 50% 30%, #A07228 0%, #8B5E14 45%, #7A500E 100%); }
-    .garden-scene::before {
-      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 110px;
-      background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, transparent 100%); z-index: 9;
-    }
-    .g-header {
-      position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0;
-      display: flex; justify-content: space-between; align-items: center; z-index: 10;
-    }
+    .garden-scene::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 110px; background: linear-gradient(180deg, rgba(0,0,0,0.38) 0%, transparent 100%); z-index: 9; }
+    .g-header { position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
     .g-title { font-size: 15px; font-weight: 800; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.2px; }
     .g-week  { font-size: 11px; font-weight: 600; color: white; background: rgba(0,0,0,0.28); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
-    .plant-grid {
-      position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3;
-      display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 8px 10px;
-    }
+    .plant-grid { position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 8px 10px; }
     .prow { display: flex; justify-content: space-evenly; align-items: center; }
     .prow:nth-child(even) { padding: 0 16px; }
     .pe { font-size: 22px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
 
     /* ── STATS STRIP ── */
-    .stats-wrap {
-      flex-shrink: 0; overflow: hidden; max-height: 70px;
-      transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease;
-    }
+    .stats-wrap { flex-shrink: 0; overflow: hidden; max-height: 70px; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease; }
     .garden-hidden .stats-wrap { max-height: 0; opacity: 0; }
-    .stats-strip {
-      display: flex; gap: 8px; padding: 10px 16px;
-      background: #F8F3EB; border-bottom: 1px solid rgba(0,0,0,0.07);
-    }
+    .stats-strip { display: flex; gap: 8px; padding: 10px 16px; background: #F8F3EB; border-bottom: 1px solid rgba(0,0,0,0.07); }
     .stat-card { flex: 1; background: white; border-radius: 12px; padding: 8px 10px; display: flex; align-items: center; gap: 7px; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
     .stat-icon { font-size: 16px; flex-shrink: 0; }
     .stat-val  { font-size: 14px; font-weight: 800; color: #1D3D2A; line-height: 1; }
@@ -126,11 +100,7 @@
     .panel-scroll::-webkit-scrollbar { display: none; }
 
     /* ── PLACEHOLDER ── */
-    .placeholder {
-      flex: 1; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 8px;
-      background: #EDE8DF; padding: 40px 24px;
-    }
+    .placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; background: #EDE8DF; padding: 40px 24px; }
     .placeholder-icon { font-size: 36px; }
     .placeholder-title { font-size: 15px; font-weight: 800; color: #1D3D2A; }
     .placeholder-sub { font-size: 13px; color: #93A898; text-align: center; line-height: 1.5; }
@@ -143,22 +113,11 @@
     .rcard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
     .rcard-date { font-size: 11px; color: #93A898; }
     .rcard-section { margin-bottom: 9px; }
-    .rcard-section:last-child { margin-bottom: 0; }
     .rcard-qlabel { font-size: 10px; font-weight: 700; color: #93A898; letter-spacing: 0.4px; text-transform: uppercase; margin-bottom: 4px; }
     .rcard-qtext { font-size: 13px; color: #1D3D2A; line-height: 1.55; }
     .rcard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(0,0,0,0.06); }
     .rcard-pts-badge { font-size: 11px; font-weight: 700; color: #4CAF6E; background: #E8F5EC; padding: 3px 9px; border-radius: 10px; }
     .rcard-edit-btn { font-size: 11px; font-weight: 700; color: #93A898; background: none; border: 1px solid #D8E0D8; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
-    .rcard-ta {
-      width: 100%; border: 1.5px solid #C8D8CC; border-radius: 8px; padding: 9px 10px;
-      font-size: 13px; color: #1D3D2A; line-height: 1.55; resize: vertical; min-height: 90px;
-      background: #F8FBF9; font-family: inherit; margin-bottom: 9px; display: block;
-    }
-    .rcard-ta:focus { outline: none; border-color: #4CAF6E; }
-    .rcard-form-btns { display: flex; gap: 8px; }
-    .rcard-cancel-btn { flex: 1; padding: 9px; font-size: 13px; font-weight: 700; background: none; border: 1.5px solid #D8E0D8; border-radius: 10px; color: #93A898; cursor: pointer; }
-    .rcard-save-btn  { flex: 2; padding: 9px; font-size: 13px; font-weight: 700; background: #4CAF6E; border: none; border-radius: 10px; color: white; cursor: pointer; }
-    .rcard-save-btn:disabled { opacity: 0.55; }
 
     /* ── GOOD NEWS CARDS ── */
     .gn-section-hd { font-size: 11px; font-weight: 700; color: #93A898; text-transform: uppercase; letter-spacing: 0.5px; padding: 4px 2px 8px; }
@@ -169,7 +128,7 @@
     .gncard-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; gap: 8px; }
     .gncard-who { font-size: 12px; font-weight: 700; color: #1D3D2A; }
     .gncard-msg { font-size: 13px; color: #1D3D2A; line-height: 1.55; margin-bottom: 6px; }
-    .gncard-footer { display: flex; justify-content: flex-start; }
+    .gncard-footer { display: flex; }
     .gncard-pts { font-size: 11px; font-weight: 700; color: #4CAF6E; background: #E8F5EC; padding: 3px 9px; border-radius: 10px; }
 
     /* ── LEADERBOARD ── */
@@ -188,15 +147,45 @@
     .lb-caption { font-size: 11px; color: #93A898; text-align: center; padding: 8px 0 4px; }
 
     /* ── BOTTOM NAV ── */
-    .bottom-nav {
-      height: 62px; background: white; border-top: 1px solid rgba(0,0,0,0.08);
-      display: flex; flex-shrink: 0; padding-bottom: 4px;
-    }
+    .bottom-nav { height: 62px; background: white; border-top: 1px solid rgba(0,0,0,0.08); display: flex; flex-shrink: 0; padding-bottom: 4px; }
     .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: transparent; cursor: pointer; transition: all 0.15s; position: relative; }
     .nav-icon  { font-size: 20px; line-height: 1; }
     .nav-label { font-size: 10px; font-weight: 600; color: #B8C0B8; transition: color 0.15s; }
     .nav-btn.active .nav-label { color: #4CAF6E; }
     .nav-btn.active::after { content: ''; position: absolute; bottom: 6px; width: 4px; height: 4px; background: #4CAF6E; border-radius: 50%; }
+
+    /* ── EDIT SHEET (slide-up) ── */
+    .edit-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(0,0,0,0); pointer-events: none;
+      display: flex; align-items: flex-end;
+      transition: background 0.25s ease;
+    }
+    .edit-overlay.open { background: rgba(0,0,0,0.45); pointer-events: all; }
+    .edit-sheet {
+      background: #F8F3EB; border-radius: 20px 20px 0 0; width: 100%;
+      padding: 12px 16px calc(env(safe-area-inset-bottom, 0px) + 28px);
+      max-height: 88vh; overflow-y: auto;
+      transform: translateY(100%);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .edit-overlay.open .edit-sheet { transform: translateY(0); }
+    .edit-handle { width: 36px; height: 4px; background: rgba(0,0,0,0.12); border-radius: 2px; margin: 0 auto 16px; }
+    .edit-hd { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .edit-hd-title { font-size: 16px; font-weight: 800; color: #1D3D2A; }
+    .edit-hd-close { width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,0.07); border: none; font-size: 13px; color: #93A898; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+    .edit-lbl { font-size: 10px; font-weight: 700; color: #93A898; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 5px; }
+    .edit-ta {
+      width: 100%; border: 1.5px solid #C8D8CC; border-radius: 10px; padding: 10px 12px;
+      font-size: 16px; /* 16px prevents iOS auto-zoom */
+      color: #1D3D2A; line-height: 1.55; min-height: 110px;
+      background: white; font-family: inherit; margin-bottom: 14px; display: block; resize: none;
+    }
+    .edit-ta:focus { outline: none; border-color: #4CAF6E; }
+    .edit-btns { display: flex; gap: 8px; }
+    .edit-cancel { flex: 1; padding: 13px; font-size: 15px; font-weight: 700; background: white; border: 1.5px solid #D8E0D8; border-radius: 12px; color: #93A898; cursor: pointer; }
+    .edit-save   { flex: 2; padding: 13px; font-size: 15px; font-weight: 700; background: #4CAF6E; border: none; border-radius: 12px; color: white; cursor: pointer; }
+    .edit-save:disabled { opacity: 0.55; }
   </style>
 </head>
 <body>
@@ -213,16 +202,13 @@
 </div>
 
 <div id="app">
-
   <div class="mini-header">
     <div class="mh-title">🌱 TC CultivAIte Garden</div>
     <div class="mh-week" id="mh-week">—</div>
   </div>
-
   <div class="garden-wrap">
     <div class="garden-scene">
-      <div class="sky"></div>
-      <div class="sun"></div>
+      <div class="sky"></div><div class="sun"></div>
       <div class="cloud c1"><div class="p"></div><div class="p"></div><div class="b"></div></div>
       <div class="cloud c2"><div class="p"></div><div class="p"></div><div class="b"></div></div>
       <div class="mountains">
@@ -238,59 +224,59 @@
       <div class="plant-grid" id="plant-grid"></div>
     </div>
   </div>
-
   <div class="stats-wrap">
     <div class="stats-strip">
-      <div class="stat-card">
-        <span class="stat-icon">⭐</span>
-        <div><div class="stat-val" id="stat-points">—</div><div class="stat-lbl">Points</div></div>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon">🔥</span>
-        <div><div class="stat-val" id="stat-streak">—</div><div class="stat-lbl">Streak</div></div>
-      </div>
-      <div class="stat-card">
-        <span class="stat-icon">🏆</span>
-        <div><div class="stat-val" id="stat-rank">—</div><div class="stat-lbl">Company</div></div>
-      </div>
+      <div class="stat-card"><span class="stat-icon">⭐</span><div><div class="stat-val" id="stat-points">—</div><div class="stat-lbl">Points</div></div></div>
+      <div class="stat-card"><span class="stat-icon">🔥</span><div><div class="stat-val" id="stat-streak">—</div><div class="stat-lbl">Streak</div></div></div>
+      <div class="stat-card"><span class="stat-icon">🏆</span><div><div class="stat-val" id="stat-rank">—</div><div class="stat-lbl">Company</div></div></div>
     </div>
   </div>
-
   <div class="content">
     <div class="panel active" id="panel-reflections"></div>
     <div class="panel" id="panel-goodnews"></div>
     <div class="panel" id="panel-leaderboard"></div>
   </div>
-
   <div class="bottom-nav">
-    <button class="nav-btn active" onclick="switchTab('reflections',this)">
-      <span class="nav-icon">📝</span><span class="nav-label">Reflections</span>
-    </button>
-    <button class="nav-btn" onclick="switchTab('goodnews',this)">
-      <span class="nav-icon">💌</span><span class="nav-label">Good News</span>
-    </button>
-    <button class="nav-btn" onclick="switchTab('leaderboard',this)">
-      <span class="nav-icon">🏆</span><span class="nav-label">Leaderboard</span>
-    </button>
+    <button class="nav-btn active" onclick="switchTab('reflections',this)"><span class="nav-icon">📝</span><span class="nav-label">Reflections</span></button>
+    <button class="nav-btn" onclick="switchTab('goodnews',this)"><span class="nav-icon">💌</span><span class="nav-label">Good News</span></button>
+    <button class="nav-btn" onclick="switchTab('leaderboard',this)"><span class="nav-icon">🏆</span><span class="nav-label">Leaderboard</span></button>
   </div>
+</div>
 
+<!-- Edit sheet — slides up over everything -->
+<div class="edit-overlay" id="edit-overlay">
+  <div class="edit-sheet">
+    <div class="edit-handle"></div>
+    <div class="edit-hd">
+      <span class="edit-hd-title" id="edit-week-label">—</span>
+      <button class="edit-hd-close" onclick="closeEditSheet()">✕</button>
+    </div>
+    <div class="edit-lbl">TC Values</div>
+    <textarea class="edit-ta" id="edit-q1" placeholder="What TC values did you live out?"></textarea>
+    <div class="edit-lbl">Role Check-in</div>
+    <textarea class="edit-ta" id="edit-q2" placeholder="How did you do in your role?"></textarea>
+    <div class="edit-btns">
+      <button class="edit-cancel" onclick="closeEditSheet()">Cancel</button>
+      <button class="edit-save" id="edit-save-btn" onclick="saveEditSheet()">Save</button>
+    </div>
+  </div>
 </div>
 
 <script>
   const tg = window.Telegram?.WebApp;
   if (tg) { tg.ready(); tg.expand(); }
 
-  let _token = '';
+  let _token        = '';
+  let _editingId    = null;
   let _gardenHidden = false;
-  const _lbHtml = { company: '', dept: '' };
+  const _reflData   = {}; // id → { q1, q2, isoWeek } — source of truth for edit sheet
+  const _lbHtml     = { company: '', dept: '' };
 
   // ── UTILS ──
   function esc(str) {
     return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
-  function escBr(str) {
-    return esc(str).replace(/\n/g, '<br>');
-  }
+  function escBr(str) { return esc(str).replace(/\n/g, '<br>'); }
   function formatDate(d) {
     if (!d) return '';
     return new Date(d + 'T12:00:00+08:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
@@ -341,80 +327,55 @@
     document.getElementById('stat-rank').textContent   = '#' + me.rank;
   }
 
-  // ── REFLECTIONS TAB ──
+  // ── REFLECTIONS ──
   function renderReflections(reflections) {
     const panel = document.getElementById('panel-reflections');
     if (!reflections || !reflections.length) {
-      panel.innerHTML = '<div class="placeholder">' +
-        '<div class="placeholder-icon">📝</div>' +
-        '<div class="placeholder-title">No reflections yet</div>' +
-        '<p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p>' +
-        '</div>';
+      panel.innerHTML = '<div class="placeholder"><div class="placeholder-icon">📝</div><div class="placeholder-title">No reflections yet</div><p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p></div>';
       return;
     }
     let html = '<div class="panel-scroll">';
     for (const r of reflections) {
-      const id = r.id;
+      _reflData[r.id] = { q1: r.q1, q2: r.q2, isoWeek: r.isoWeek };
       html += '<div class="rcard">';
-      html += '<div class="rcard-head">';
-      html += '<span class="week-pill">W' + r.isoWeek + '</span>';
-      html += '<span class="rcard-date">' + esc(formatDate(r.date)) + '</span>';
-      html += '</div>';
-      // Body (shown by default)
-      html += '<div id="rcard-body-' + id + '">';
-      html += '<div class="rcard-section">';
-      html += '<div class="rcard-qlabel">TC Values</div>';
-      html += '<div class="rcard-qtext" id="rcard-q1-text-' + id + '">' + escBr(r.q1) + '</div>';
-      html += '</div>';
-      html += '<div class="rcard-section">';
-      html += '<div class="rcard-qlabel">Role Check-in</div>';
-      html += '<div class="rcard-qtext" id="rcard-q2-text-' + id + '">' + escBr(r.q2) + '</div>';
-      html += '</div>';
+      html += '<div class="rcard-head"><span class="week-pill">W' + r.isoWeek + '</span><span class="rcard-date">' + esc(formatDate(r.date)) + '</span></div>';
+      html += '<div class="rcard-section"><div class="rcard-qlabel">TC Values</div><div class="rcard-qtext" id="rcard-q1-text-' + r.id + '">' + escBr(r.q1) + '</div></div>';
+      html += '<div class="rcard-section"><div class="rcard-qlabel">Role Check-in</div><div class="rcard-qtext" id="rcard-q2-text-' + r.id + '">' + escBr(r.q2) + '</div></div>';
       if (r.q3 && r.q3.trim()) {
-        html += '<div class="rcard-section">';
-        html += '<div class="rcard-qlabel">Shoutout</div>';
-        html += '<div class="rcard-qtext">' + escBr(r.q3) + '</div>';
-        html += '</div>';
+        html += '<div class="rcard-section"><div class="rcard-qlabel">Shoutout</div><div class="rcard-qtext">' + escBr(r.q3) + '</div></div>';
       }
-      html += '<div class="rcard-footer">';
-      html += '<span class="rcard-pts-badge">+' + r.pts + ' pts</span>';
-      html += '<button class="rcard-edit-btn" onclick="editReflection(' + id + ')">✏️ Edit</button>';
+      html += '<div class="rcard-footer"><span class="rcard-pts-badge">+' + r.pts + ' pts</span><button class="rcard-edit-btn" onclick="editReflection(' + r.id + ')">✏️ Edit</button></div>';
       html += '</div>';
-      html += '</div>'; // rcard-body
-      // Edit form (hidden by default)
-      html += '<div id="rcard-form-' + id + '" style="display:none">';
-      html += '<div class="rcard-qlabel" style="margin-bottom:5px">TC Values</div>';
-      html += '<textarea class="rcard-ta" id="rcard-q1-' + id + '">' + esc(r.q1) + '</textarea>';
-      html += '<div class="rcard-qlabel" style="margin-bottom:5px">Role Check-in</div>';
-      html += '<textarea class="rcard-ta" id="rcard-q2-' + id + '">' + esc(r.q2) + '</textarea>';
-      html += '<div class="rcard-form-btns">';
-      html += '<button class="rcard-cancel-btn" onclick="cancelEdit(' + id + ')">Cancel</button>';
-      html += '<button class="rcard-save-btn" id="rcard-save-' + id + '" onclick="saveReflection(' + id + ')">Save</button>';
-      html += '</div>';
-      html += '</div>'; // rcard-form
-      html += '</div>'; // rcard
     }
     html += '</div>';
     panel.innerHTML = html;
   }
 
+  // ── EDIT SHEET ──
   function editReflection(id) {
-    document.getElementById('rcard-body-' + id).style.display = 'none';
-    const form = document.getElementById('rcard-form-' + id);
-    form.style.display = 'block';
-    form.querySelector('textarea').focus();
+    const d = _reflData[id];
+    if (!d) return;
+    _editingId = id;
+    document.getElementById('edit-week-label').textContent = 'Editing W' + d.isoWeek;
+    document.getElementById('edit-q1').value = d.q1;
+    document.getElementById('edit-q2').value = d.q2;
+    const btn = document.getElementById('edit-save-btn');
+    btn.textContent = 'Save';
+    btn.disabled = false;
+    document.getElementById('edit-overlay').classList.add('open');
   }
 
-  function cancelEdit(id) {
-    document.getElementById('rcard-form-' + id).style.display = 'none';
-    document.getElementById('rcard-body-' + id).style.display = 'block';
+  function closeEditSheet() {
+    document.getElementById('edit-overlay').classList.remove('open');
+    _editingId = null;
   }
 
-  async function saveReflection(id) {
-    const q1  = document.getElementById('rcard-q1-' + id).value.trim();
-    const q2  = document.getElementById('rcard-q2-' + id).value.trim();
-    const btn = document.getElementById('rcard-save-' + id);
-    if (!q1 || !q2) return;
+  async function saveEditSheet() {
+    const id  = _editingId;
+    const q1  = document.getElementById('edit-q1').value.trim();
+    const q2  = document.getElementById('edit-q2').value.trim();
+    const btn = document.getElementById('edit-save-btn');
+    if (!q1 || !q2 || !id) return;
     btn.textContent = 'Saving…';
     btn.disabled = true;
     try {
@@ -423,11 +384,12 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ q1, q2 }),
       });
-      const data = await res.json();
-      if (!data.ok) throw new Error('server error');
+      if (!(await res.json()).ok) throw new Error();
+      _reflData[id].q1 = q1;
+      _reflData[id].q2 = q2;
       document.getElementById('rcard-q1-text-' + id).innerHTML = escBr(q1);
       document.getElementById('rcard-q2-text-' + id).innerHTML = escBr(q2);
-      cancelEdit(id);
+      closeEditSheet();
     } catch {
       btn.textContent = 'Save';
       btn.disabled = false;
@@ -435,29 +397,26 @@
     }
   }
 
-  // ── GOOD NEWS TAB ──
+  // Close sheet when tapping the dim overlay
+  document.getElementById('edit-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeEditSheet();
+  });
+
+  // ── GOOD NEWS ──
   function renderGoodNews(gnData) {
     const panel    = document.getElementById('panel-goodnews');
     const received = gnData && gnData.received ? gnData.received : [];
     const sent     = gnData && gnData.sent     ? gnData.sent     : [];
     if (!received.length && !sent.length) {
-      panel.innerHTML = '<div class="placeholder">' +
-        '<div class="placeholder-icon">💌</div>' +
-        '<div class="placeholder-title">No good news yet</div>' +
-        '<p class="placeholder-sub">Share someone\'s good news with /reflect and it\'ll appear here once approved.</p>' +
-        '</div>';
+      panel.innerHTML = '<div class="placeholder"><div class="placeholder-icon">💌</div><div class="placeholder-title">No good news yet</div><p class="placeholder-sub">Share someone\'s good news with /reflect and it\'ll appear here once approved.</p></div>';
       return;
     }
     let html = '<div class="panel-scroll">';
     if (received.length) {
       html += '<div class="gn-section-hd">Received (' + received.length + ')</div>';
       for (const gn of received) {
-        const wl = gn.week ? 'W' + (gn.week + 13) : '';
         html += '<div class="gncard gncard-received">';
-        html += '<div class="gncard-head">';
-        html += '<span class="gncard-who">From ' + esc(gn.from) + '</span>';
-        if (wl) html += '<span class="week-pill">' + wl + '</span>';
-        html += '</div>';
+        html += '<div class="gncard-head"><span class="gncard-who">From ' + esc(gn.from) + '</span>' + (gn.week ? '<span class="week-pill">W' + (gn.week + 13) + '</span>' : '') + '</div>';
         html += '<div class="gncard-msg">' + escBr(gn.message) + '</div>';
         html += '<div class="gncard-footer"><span class="gncard-pts">+' + gn.pts + ' pts</span></div>';
         html += '</div>';
@@ -466,12 +425,8 @@
     if (sent.length) {
       html += '<div class="gn-section-hd">Sent (' + sent.length + ')</div>';
       for (const gn of sent) {
-        const wl = gn.week ? 'W' + (gn.week + 13) : '';
         html += '<div class="gncard gncard-sent">';
-        html += '<div class="gncard-head">';
-        html += '<span class="gncard-who">You shared</span>';
-        if (wl) html += '<span class="week-pill">' + wl + '</span>';
-        html += '</div>';
+        html += '<div class="gncard-head"><span class="gncard-who">You shared</span>' + (gn.week ? '<span class="week-pill">W' + (gn.week + 13) + '</span>' : '') + '</div>';
         html += '<div class="gncard-msg">' + escBr(gn.message) + '</div>';
         html += '<div class="gncard-footer"><span class="gncard-pts">+' + gn.pts + ' pts</span></div>';
         html += '</div>';
@@ -481,7 +436,7 @@
     panel.innerHTML = html;
   }
 
-  // ── LEADERBOARD TAB ──
+  // ── LEADERBOARD ──
   function _personRowHtml(u, rankNum, myName) {
     const isMe = u.realName === myName;
     return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
@@ -491,7 +446,6 @@
       '<span class="lb-pts">' + u.totalPoints + ' pts</span>' +
       '</div>';
   }
-
   function _deptRowHtml(d, myDept) {
     const isMe = d.department === myDept;
     return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
@@ -499,37 +453,25 @@
       '<span class="lb-emoji">' + d.stage + '</span>' +
       '<span class="lb-name">' + esc(d.department) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
       '<div style="text-align:right;flex-shrink:0"><div class="lb-pts">' + d.avgPoints + ' avg</div>' +
-      (d.streak > 0 ? '<div class="lb-pts-label">🔥 ' + d.streak + '-wk streak</div>' : '') + '</div>' +
+      (d.streak > 0 ? '<div class="lb-pts-label">🔥 ' + d.streak + '-wk</div>' : '') + '</div>' +
       '</div>';
   }
-
   function renderLeaderboard(users, depts, myDept, myName) {
     const panel  = document.getElementById('panel-leaderboard');
     const ranked = [...users].sort((a, b) => a.rank - b.rank || b.totalPoints - a.totalPoints);
     const myUser = ranked.find(u => u.realName === myName);
     const myRank = myUser ? myUser.rank : Infinity;
-
-    // Company: only show people ranked equal to or above the current user
     const companyList = ranked.filter(u => u.rank <= myRank);
     _lbHtml.company = companyList.map(u => _personRowHtml(u, u.rank, myName)).join('') +
-      (ranked.length > companyList.length
-        ? '<p class="lb-caption">Only showing those ranked above you.</p>'
-        : '');
-
-    // Departments: ranked by avg points
+      (ranked.length > companyList.length ? '<p class="lb-caption">Only showing those ranked above you.</p>' : '');
     const sortedDepts = [...(depts || [])].sort((a, b) => a.rank - b.rank || b.avgPoints - a.avgPoints);
     _lbHtml.dept = sortedDepts.length
       ? sortedDepts.map(d => _deptRowHtml(d, myDept)).join('')
       : '<div class="placeholder"><p class="placeholder-sub">No department data.</p></div>';
-
     panel.innerHTML =
-      '<div class="lb-tabs">' +
-        '<button class="lb-tab active" onclick="switchLbTab(\'company\',this)">👤 Company</button>' +
-        '<button class="lb-tab" onclick="switchLbTab(\'dept\',this)">🏢 Departments</button>' +
-      '</div>' +
+      '<div class="lb-tabs"><button class="lb-tab active" onclick="switchLbTab(\'company\',this)">👤 Company</button><button class="lb-tab" onclick="switchLbTab(\'dept\',this)">🏢 Departments</button></div>' +
       '<div class="panel-scroll" id="scroll-leaderboard">' + _lbHtml.company + '</div>';
   }
-
   function switchLbTab(name, btn) {
     document.querySelectorAll('.lb-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
@@ -538,35 +480,19 @@
 
   // ── INIT ──
   async function init() {
-    if (!tg || !tg.initData) {
-      showError('Open this from the CultivAIte bot in Telegram.');
-      return;
-    }
-
+    if (!tg || !tg.initData) { showError('Open this from the CultivAIte bot in Telegram.'); return; }
     let auth;
     try {
-      const res = await fetch('/api/miniapp/auth', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData: tg.initData }),
-      });
+      const res = await fetch('/api/miniapp/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData }) });
       auth = await res.json();
-    } catch {
-      showError('Network error. Check your connection and try again.');
-      return;
-    }
-
+    } catch { showError('Network error. Check your connection and try again.'); return; }
     if (!auth.ok) {
-      if (auth.reason === 'not_registered') {
-        showError('You\'re not in CultivAIte yet. Send /reflect to the bot to get started.');
-      } else {
-        showError('Open this from the CultivAIte bot in Telegram.');
-      }
+      showError(auth.reason === 'not_registered'
+        ? 'You\'re not in CultivAIte yet. Send /reflect to the bot to get started.'
+        : 'Open this from the CultivAIte bot in Telegram.');
       return;
     }
-
     _token = auth.token;
-
     let garden, me;
     try {
       const tok = encodeURIComponent(auth.token);
@@ -574,21 +500,13 @@
         fetch('/api/miniapp/garden?token=' + tok).then(r => r.json()),
         fetch('/api/miniapp/me?token='     + tok).then(r => r.json()),
       ]);
-    } catch {
-      showError('Couldn\'t load data. Try again in a moment.');
-      return;
-    }
-
+    } catch { showError('Couldn\'t load data. Try again in a moment.'); return; }
     renderGarden(garden);
     renderStatsStrip(garden, auth.name);
     renderReflections(me.reflections);
     renderGoodNews(me.good_news);
     renderLeaderboard(garden.users, garden.depts, auth.department, auth.name);
-
-    document.querySelectorAll('.panel-scroll').forEach(el =>
-      el.addEventListener('scroll', checkGarden)
-    );
-
+    document.querySelectorAll('.panel-scroll').forEach(el => el.addEventListener('scroll', checkGarden));
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
   }
@@ -600,28 +518,18 @@
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     document.getElementById('panel-' + name).classList.add('active');
     checkGarden();
-    // Re-attach scroll listener to the newly active panel-scroll
-    const activeScroll = document.querySelector('.panel.active .panel-scroll');
-    if (activeScroll && !activeScroll._scrollBound) {
-      activeScroll.addEventListener('scroll', checkGarden);
-      activeScroll._scrollBound = true;
-    }
+    const s = document.querySelector('.panel.active .panel-scroll');
+    if (s && !s._sb) { s.addEventListener('scroll', checkGarden); s._sb = true; }
   }
 
   // ── GARDEN COLLAPSE — hysteresis ──
-  // Hides garden after scrolling down 80px; restores only when near top (<20px)
   function checkGarden() {
-    const activeScroll = document.querySelector('.panel.active .panel-scroll');
-    if (!activeScroll) return;
+    const s = document.querySelector('.panel.active .panel-scroll');
+    if (!s) return;
     const app = document.getElementById('app');
-    const st  = activeScroll.scrollTop;
-    if (!_gardenHidden && st > 120) {
-      _gardenHidden = true;
-      app.classList.add('garden-hidden');
-    } else if (_gardenHidden && st < 5) {
-      _gardenHidden = false;
-      app.classList.remove('garden-hidden');
-    }
+    const st  = s.scrollTop;
+    if (!_gardenHidden && st > 120) { _gardenHidden = true;  app.classList.add('garden-hidden'); }
+    else if (_gardenHidden && st < 5) { _gardenHidden = false; app.classList.remove('garden-hidden'); }
   }
 
   init();
