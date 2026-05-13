@@ -137,8 +137,8 @@
     .lb-tab.active { background: white; color: #1D3D2A; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
     .lb-row { display: flex; align-items: center; gap: 10px; background: white; border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
     .lb-row.me { background: #E8F5EC; border: 1.5px solid #4CAF6E; }
-    .lb-rank { font-size: 13px; font-weight: 800; color: #B8C0B8; width: 26px; text-align: center; flex-shrink: 0; }
-    .lb-rank.gold { color: #F5A623; }
+    .lb-rank { font-size: 13px; font-weight: 800; color: #B8C0B8; width: 28px; text-align: center; flex-shrink: 0; }
+    .lb-rank.medal { font-size: 17px; color: inherit; }
     .lb-emoji { font-size: 18px; flex-shrink: 0; }
     .lb-name { flex: 1; font-size: 13px; font-weight: 600; color: #1D3D2A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .lb-pts { font-size: 12px; font-weight: 800; color: #4CAF6E; flex-shrink: 0; }
@@ -439,10 +439,13 @@
   }
 
   // ── LEADERBOARD ──
+  function rankLabel(n) {
+    return n === 1 ? '🥇' : n === 2 ? '🥈' : n === 3 ? '🥉' : '#' + n;
+  }
   function _personRowHtml(u, rankNum, myName) {
     const isMe = u.realName === myName;
     return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
-      '<span class="lb-rank' + (rankNum <= 3 ? ' gold' : '') + '">#' + rankNum + '</span>' +
+      '<span class="lb-rank' + (rankNum <= 3 ? ' medal' : '') + '">' + rankLabel(rankNum) + '</span>' +
       '<span class="lb-emoji">' + stageEmoji(u.totalPoints) + '</span>' +
       '<span class="lb-name">' + esc(u.realName) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
       '<span class="lb-pts">' + u.totalPoints + ' pts</span>' +
@@ -451,7 +454,7 @@
   function _deptRowHtml(d, myDept) {
     const isMe = d.department === myDept;
     return '<div class="lb-row' + (isMe ? ' me' : '') + '">' +
-      '<span class="lb-rank' + (d.rank <= 3 ? ' gold' : '') + '">#' + d.rank + '</span>' +
+      '<span class="lb-rank' + (d.rank <= 3 ? ' medal' : '') + '">' + rankLabel(d.rank) + '</span>' +
       '<span class="lb-emoji">' + d.stage + '</span>' +
       '<span class="lb-name">' + esc(d.department) + (isMe ? '<span class="lb-star"> ★</span>' : '') + '</span>' +
       '<div style="text-align:right;flex-shrink:0"><div class="lb-pts">' + d.avgPoints + ' avg</div>' +
