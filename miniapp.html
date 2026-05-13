@@ -35,10 +35,10 @@
     .mini-header {
       flex-shrink: 0; overflow: hidden; max-height: 0; opacity: 0;
       background: white; border-bottom: 1px solid rgba(0,0,0,0.08);
-      display: flex; justify-content: space-between; align-items: center; padding: 28px 20px;
+      display: flex; justify-content: space-between; align-items: center; padding: 18px 20px;
       transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
     }
-    .garden-hidden .mini-header { max-height: 120px; opacity: 1; }
+    .garden-hidden .mini-header { max-height: 100px; opacity: 1; }
     .mh-title { font-size: 18px; font-weight: 800; color: #1D3D2A; letter-spacing: -0.3px; }
     .mh-week  { font-size: 13px; font-weight: 600; color: white; background: #4CAF6E; padding: 5px 13px; border-radius: 12px; }
 
@@ -549,6 +549,7 @@
 
   // Two-gesture reveal: scroll to top (primes), then swipe up again to show garden
   function setupScrollReveal(el) {
+    // Touch (mobile)
     let startY = 0;
     el.addEventListener('touchstart', e => {
       startY = _primed && _gardenHidden ? e.touches[0].clientY : 0;
@@ -558,6 +559,10 @@
       if (e.touches[0].clientY - startY > 40) { startY = 0; showGarden(); }
     }, { passive: true });
     el.addEventListener('touchend', () => { startY = 0; }, { passive: true });
+    // Wheel (desktop/laptop): scrolling up while primed reveals garden
+    el.addEventListener('wheel', e => {
+      if (_primed && _gardenHidden && el.scrollTop === 0 && e.deltaY < 0) showGarden();
+    }, { passive: true });
   }
 
   init();
