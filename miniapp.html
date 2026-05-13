@@ -37,10 +37,11 @@
       background: white; border-bottom: 1px solid rgba(0,0,0,0.08);
       display: flex; justify-content: space-between; align-items: center; padding: 0 20px;
       transition: max-height 0.32s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+      cursor: pointer; -webkit-tap-highlight-color: rgba(0,0,0,0.04);
     }
-    .garden-hidden .mini-header { max-height: 52px; opacity: 1; }
-    .mh-title { font-size: 15px; font-weight: 800; color: #1D3D2A; letter-spacing: -0.2px; }
-    .mh-week  { font-size: 11px; font-weight: 600; color: white; background: #4CAF6E; padding: 4px 11px; border-radius: 12px; }
+    .garden-hidden .mini-header { max-height: 68px; opacity: 1; }
+    .mh-title { font-size: 18px; font-weight: 800; color: #1D3D2A; letter-spacing: -0.3px; }
+    .mh-week  { font-size: 13px; font-weight: 600; color: white; background: #4CAF6E; padding: 5px 13px; border-radius: 12px; }
 
     /* ── GARDEN WRAP ── */
     .garden-wrap {
@@ -506,7 +507,8 @@
     renderReflections(me.reflections);
     renderGoodNews(me.good_news);
     renderLeaderboard(garden.users, garden.depts, auth.department, auth.name);
-    document.querySelectorAll('.panel-scroll').forEach(el => el.addEventListener('scroll', checkGarden));
+    document.querySelectorAll('.panel-scroll').forEach(el => { el.addEventListener('scroll', checkGarden); setupPullToReveal(el); });
+    document.querySelector('.mini-header').addEventListener('click', showGarden);
     document.getElementById('screen-loading').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
   }
@@ -519,17 +521,39 @@
     document.getElementById('panel-' + name).classList.add('active');
     checkGarden();
     const s = document.querySelector('.panel.active .panel-scroll');
-    if (s && !s._sb) { s.addEventListener('scroll', checkGarden); s._sb = true; }
+    if (s && !s._sb) { s.addEventListener('scroll', checkGarden); setupPullToReveal(s); s._sb = true; }
   }
 
-  // ── GARDEN COLLAPSE — hysteresis ──
+  // ── GARDEN COLLAPSE — hide on scroll, tap mini-header or pull-down to reveal ──
   function checkGarden() {
     const s = document.querySelector('.panel.active .panel-scroll');
     if (!s) return;
     const app = document.getElementById('app');
     const st  = s.scrollTop;
-    if (!_gardenHidden && st > 120) { _gardenHidden = true;  app.classList.add('garden-hidden'); }
-    else if (_gardenHidden && st < 5) { _gardenHidden = false; app.classList.remove('garden-hidden'); }
+    if (!_gardenHidden && st > 120) { _gardenHidden = true; app.classList.add('garden-hidden'); }
+    // No auto-reveal on scroll-back; user taps mini-header or pull-downs to show garden
+  }
+
+  function showGarden() {
+    if (!_gardenHidden) return;
+    _gardenHidden = false;
+    document.getElementById('app').classList.remove('garden-hidden');
+    const s = document.querySelector('.panel.active .panel-scroll');
+    if (s) s.scrollTop = 0;
+  }
+
+  // Pull-to-reveal: when at scroll top and user drags down, show garden
+  function setupPullToReveal(el) {
+    let startY = 0;
+    el.addEventListener('touchstart', e => {
+      if (el.scrollTop === 0 && _gardenHidden) startY = e.touches[0].clientY;
+      else startY = 0;
+    }, { passive: true });
+    el.addEventListener('touchmove', e => {
+      if (!startY || !_gardenHidden || el.scrollTop !== 0) return;
+      if (e.touches[0].clientY - startY > 64) { startY = 0; showGarden(); }
+    }, { passive: true });
+    el.addEventListener('touchend', () => { startY = 0; }, { passive: true });
   }
 
   init();
