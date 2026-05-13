@@ -1035,21 +1035,26 @@ function renderReflections() {
   if (!_stats) return;
 
   // Build userMap + deptMembersMap first (needed for secondary-dept lookups below)
+  const LT_DEPT = 'LT & Core Team';
   const userMap = {};
   const deptMembersMap = {};
   for (const u of (_stats.users ?? [])) {
     userMap[u.realName.toLowerCase().trim()] = u;
-    for (const d of [u.department, u.secondaryDepartment].filter(Boolean)) {
+    const uDepts = [u.department, u.secondaryDepartment].filter(Boolean);
+    const effDepts = uDepts.includes(LT_DEPT) ? [LT_DEPT] : uDepts;
+    for (const d of effDepts) {
       if (!deptMembersMap[d]) deptMembersMap[d] = [];
       deptMembersMap[d].push(u.realName);
     }
   }
 
-  // Filter: match primary dept OR secondary dept
+  // Filter: treat LT & Core Team as exclusive — those members only appear there
   const subs = (_reflCache[_reflWeek] ?? []).filter(s => {
     if (_reflDept === 'All') return true;
-    if (s.department === _reflDept) return true;
-    return userMap[s.real_name?.toLowerCase().trim()]?.secondaryDepartment === _reflDept;
+    const u = userMap[s.real_name?.toLowerCase().trim()];
+    const uDepts = [s.department, u?.secondaryDepartment].filter(Boolean);
+    const effDepts = uDepts.includes(LT_DEPT) ? [LT_DEPT] : uDepts;
+    return effDepts.includes(_reflDept);
   });
 
   // Week options
@@ -1057,22 +1062,24 @@ function renderReflections() {
     .map(w => `<option value="${w}" ${w===_reflWeek?'selected':''}>Week ${toISOWeek(w)}${w===_stats.weekNow?' (Current)':''}</option>`)
     .join('');
 
-  // Dept chips — include secondary depts so dual-dept depts appear as filter options
+  // Dept chips — LT & Core Team members only appear under that chip
   const allDepts = [...new Set((_reflCache[_reflWeek] ?? []).flatMap(s => {
     const u = userMap[s.real_name?.toLowerCase().trim()];
-    return [s.department, u?.secondaryDepartment].filter(Boolean);
+    const sDepts = [s.department, u?.secondaryDepartment].filter(Boolean);
+    return sDepts.includes(LT_DEPT) ? [LT_DEPT] : sDepts;
   }))].sort();
   const chips = ['All', ...allDepts].map(d =>
     `<div class="filter-chip ${d===_reflDept?'active':''}" onclick="setReflDept('${esc(d)}')">${esc(d)}</div>`
   ).join('');
 
-  // Group by dept — bucket under primary AND secondary dept
+  // Group by dept — LT & Core Team members only appear under that section
   const byDept = {};
   for (const s of subs) {
     const primaryDept = s.department || 'Unknown';
     const u = userMap[s.real_name?.toLowerCase().trim()];
-    const depts = [primaryDept];
+    let depts = [primaryDept];
     if (u?.secondaryDepartment && u.secondaryDepartment !== primaryDept) depts.push(u.secondaryDepartment);
+    if (depts.includes(LT_DEPT)) depts = [LT_DEPT];
     for (const d of depts) {
       if (!byDept[d]) byDept[d] = [];
       byDept[d].push(s);
