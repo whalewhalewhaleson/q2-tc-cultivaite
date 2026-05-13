@@ -270,6 +270,7 @@
   let _editingId    = null;
   let _gardenHidden = false;
   let _primed       = false; // true once scroll reaches top — next upward swipe reveals garden
+  let _primedAt     = 0;     // timestamp when _primed was set — prevents same wheel gesture triggering reveal
   const _reflData   = {}; // id → { q1, q2, isoWeek } — source of truth for edit sheet
   const _lbHtml     = { company: '', dept: '' };
 
@@ -533,7 +534,7 @@
       _gardenHidden = true; _primed = false;
       app.classList.add('garden-hidden');
     } else if (_gardenHidden && st <= 2) {
-      _primed = true;   // reached top — next upward swipe will reveal
+      if (!_primed) { _primed = true; _primedAt = Date.now(); }
     } else if (_gardenHidden && st > 20) {
       _primed = false;  // scrolled back down before swiping — reset
     }
@@ -559,9 +560,10 @@
       if (e.touches[0].clientY - startY > 40) { startY = 0; showGarden(); }
     }, { passive: true });
     el.addEventListener('touchend', () => { startY = 0; }, { passive: true });
-    // Wheel (desktop/laptop): scrolling up while primed reveals garden
+    // Wheel (desktop/laptop): scrolling up while primed reveals garden.
+    // 300ms guard ensures the gesture that reached the top can't immediately trigger reveal.
     el.addEventListener('wheel', e => {
-      if (_primed && _gardenHidden && el.scrollTop === 0 && e.deltaY < 0) showGarden();
+      if (_primed && _gardenHidden && el.scrollTop === 0 && e.deltaY < 0 && Date.now() - _primedAt > 300) showGarden();
     }, { passive: true });
   }
 
