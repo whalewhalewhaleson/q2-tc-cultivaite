@@ -1080,6 +1080,7 @@ function renderReflections() {
     let depts = [primaryDept];
     if (u?.secondaryDepartment && u.secondaryDepartment !== primaryDept) depts.push(u.secondaryDepartment);
     if (depts.includes(LT_DEPT)) depts = [LT_DEPT];
+    if (_reflDept !== 'All' && depts.includes(_reflDept)) depts = [_reflDept];
     for (const d of depts) {
       if (!byDept[d]) byDept[d] = [];
       byDept[d].push(s);
