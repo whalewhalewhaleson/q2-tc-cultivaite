@@ -714,7 +714,8 @@ async function goodNewsConversation(conversation, ctx) {
   await safeReply(ctx,
     `${bold('Got someone to shout out? ⭐️')}\n\n` +
     `${italic('Did someone display our core values, go the extra mile, or show great character? Tell us who and what happened — the more specific, the better!')}\n\n` +
-    `${italic('You can shout out more than one person.')}`,
+    `${italic('You can shout out more than one person.')}\n\n` +
+    `📬 ${italic('FYI: the people you shout out will receive a notification once the team reviews it.')}`,
     { parse_mode: 'MarkdownV2' }
   );
 

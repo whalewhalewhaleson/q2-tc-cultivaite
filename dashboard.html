@@ -696,12 +696,18 @@ function renderOverview() {
   const cumulEndWk = Math.max(launchWkOv, s.weekNow - 1);
   const weeksElapsed = Math.max(1, cumulEndWk - launchWkOv + 1);
   let totalSubmissions = 0;
+  let onTimeSubmissions = 0;
   for (let w = launchWkOv; w <= cumulEndWk; w++) {
     for (const u of s.users) {
-      if (u.weekHistory?.[w]?.submitted) totalSubmissions++;
+      const entry = u.weekHistory?.[w];
+      if (entry?.submitted) {
+        totalSubmissions++;
+        if (!entry.late) onTimeSubmissions++;
+      }
     }
   }
   const cumulPct = s.totalUsers ? Math.round(totalSubmissions / (s.totalUsers * weeksElapsed) * 100) : 0;
+  const onTimePct = s.totalUsers ? Math.round(onTimeSubmissions / (s.totalUsers * weeksElapsed) * 100) : 0;
   const cumulTarget = Math.ceil(s.totalUsers * weeksElapsed * 0.8);
   const pctCls = cumulPct >= 80 ? 'pct-green' : cumulPct >= 60 ? 'pct-amber' : 'pct-red';
   const barCls = cumulPct >= 60 ? 'bar-green' : 'bar-amber';
@@ -795,7 +801,7 @@ function renderOverview() {
     <div class="target-bar-card">
       <div class="target-bar-top">
         <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(cumulEndWk)}</div>
-        <div class="target-pct ${pctCls}">${cumulPct}%</div>
+        <div class="target-pct ${pctCls}">${cumulPct}% <span style="font-size:0.5em;font-weight:600;color:#7a8a7a">(${onTimePct}% on-time)</span></div>
       </div>
       <div class="bar-track">
         <div class="bar-fill ${barCls}" style="width:${Math.min(cumulPct,100)}%"></div>
@@ -803,7 +809,7 @@ function renderOverview() {
         <div class="target-marker-label">Target 80%</div>
       </div>
       <div class="bar-meta">
-        <span>✅ <strong>${totalSubmissions}</strong> total submissions</span>
+        <span>✅ <strong>${totalSubmissions}</strong> total submissions <span style="color:#7a8a7a">(${onTimeSubmissions} on-time)</span></span>
         <span>📊 <strong>${s.totalUsers * weeksElapsed}</strong> possible (${s.totalUsers} × ${weeksElapsed} weeks)</span>
         ${cumulPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, cumulTarget - totalSubmissions)}</strong> more to hit 80%</span>` : '<span>✅ On target!</span>'}
       </div>
