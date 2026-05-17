@@ -688,8 +688,11 @@ function renderOverview() {
 
   // Compute submission count for the selected week from weekHistory
   const isSubmitted = (u) => isCurrent ? u.submittedThisWeek : (u.weekHistory[wk]?.submitted && !u.weekHistory[wk]?.late);
-  const submittedCount = s.users.filter(isSubmitted).length;
+  const onTimeCount = s.users.filter(isSubmitted).length;
+  const lateCount = s.users.filter(u => !!(u.weekHistory?.[wk]?.submitted && u.weekHistory?.[wk]?.late)).length;
+  const submittedCount = onTimeCount + lateCount;
   const subPct = s.totalUsers ? Math.round(submittedCount / s.totalUsers * 100) : 0;
+  const onTimeWkPct = s.totalUsers ? Math.round(onTimeCount / s.totalUsers * 100) : 0;
 
   // Cumulative Q2 rate — lagged 1 week (submissions trickle in Fri–Mon)
   const launchWkOv = s.launchWeek ?? 1;
@@ -777,8 +780,8 @@ function renderOverview() {
       </div>
       <div class="kpi-card" style="border-color:#d4a017;background:#fffef5">
         <div class="kpi-label">📨 ${isCurrent ? 'This Week' : `Week ${toISOWeek(wk)}`}</div>
-        <div class="kpi-value ${subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red'}">${subPct}%</div>
-        <div class="kpi-sub">${submittedCount} of ${s.totalUsers} submitted</div>
+        <div class="kpi-value ${subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red'}"><span style="font-size:0.47em;font-weight:600;color:#7a8a7a">(${onTimeWkPct}% on-time) </span>${subPct}%</div>
+        <div class="kpi-sub">${submittedCount} of ${s.totalUsers} submitted <span style="color:#7a8a7a">(${onTimeCount} on-time)</span></div>
       </div>
       <div class="kpi-card green">
         <div class="kpi-label">🌱 Registered</div>
@@ -801,7 +804,7 @@ function renderOverview() {
     <div class="target-bar-card">
       <div class="target-bar-top">
         <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(cumulEndWk)}</div>
-        <div class="target-pct ${pctCls}">${cumulPct}% <span style="font-size:0.5em;font-weight:600;color:#7a8a7a">(${onTimePct}% on-time)</span></div>
+        <div class="target-pct ${pctCls}"><span style="font-size:0.5em;font-weight:600;color:#7a8a7a">(${onTimePct}% on-time) </span>${cumulPct}%</div>
       </div>
       <div class="bar-track">
         <div class="bar-fill ${barCls}" style="width:${Math.min(cumulPct,100)}%"></div>
