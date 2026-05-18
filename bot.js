@@ -2594,6 +2594,7 @@ async function sendGoodNewsNotifications() {
         console.error(`[GN notify] Failed → ${award.recipient_name}:`, err.message);
         noChat.push(award.recipient_name);
       }
+      await new Promise(r => setTimeout(r, 200));
     }
 
     // Notify nominator — skip for notify_anyway (rejected) entries, it wasn't approved
@@ -2613,6 +2614,7 @@ async function sendGoodNewsNotifications() {
         } catch (err) {
           console.error(`[GN notify] Failed → nominator ${nominator_name}:`, err.message);
         }
+        await new Promise(r => setTimeout(r, 200));
       }
     }
   }
