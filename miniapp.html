@@ -8,10 +8,11 @@
   <style>
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body {
-      height: 100%; background: #F8F3EB;
+      height: 100%; background: #6EB0E8;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
       overflow: hidden;
     }
+    #screen-loading, #screen-error { background: #F8F3EB; }
 
     /* ── LOADING / ERROR SCREENS ── */
     .screen {
@@ -44,13 +45,13 @@
 
     /* ── GARDEN WRAP ── */
     .garden-wrap {
-      flex-shrink: 0; overflow: hidden; max-height: 430px;
+      flex-shrink: 0; overflow: hidden; max-height: 470px;
       transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.28s ease;
     }
     .garden-hidden .garden-wrap { max-height: 0; opacity: 0; }
 
     /* ── GARDEN SCENE ── */
-    .garden-scene { position: relative; height: 360px; overflow: hidden; }
+    .garden-scene { position: relative; height: 400px; overflow: hidden; }
     .sky { position: absolute; top: 0; left: 0; right: 0; height: 168px; background: linear-gradient(180deg, #6EB0E8 0%, #90C8F0 30%, #B8DDF8 60%, #CCEAC0 85%, #BCDCAA 100%); }
     .sun { position: absolute; top: 54px; right: 52px; width: 40px; height: 40px; background: radial-gradient(circle, #FFFDE0 15%, #FFE040 55%, #FFBF00); border-radius: 50%; box-shadow: 0 0 0 11px rgba(255,224,64,0.13), 0 0 55px rgba(255,200,30,0.36); }
     .cloud { position: absolute; }
@@ -78,10 +79,10 @@
     .g-header { position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
     .g-title { font-size: 15px; font-weight: 800; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.2px; }
     .g-week  { font-size: 11px; font-weight: 600; color: white; background: rgba(0,0,0,0.28); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
-    .plant-grid { position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; justify-content: space-evenly; padding: 4px 6px 8px; }
-    .prow { display: flex; justify-content: space-evenly; align-items: center; }
+    .plant-grid { position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; justify-content: space-evenly; padding: 10px 6px; gap: 4px; }
+    .prow { display: flex; justify-content: space-evenly; align-items: center; flex: 1; }
     .prow:nth-child(even) { padding: 0 12px; }
-    .pe { font-size: 15px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
+    .pe { font-size: 16px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
 
     /* ── STATS STRIP ── */
     .stats-wrap { flex-shrink: 0; overflow: hidden; max-height: 70px; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease; }
@@ -107,6 +108,28 @@
 
     /* ── SHARED ATOMS ── */
     .week-pill { font-size: 10px; font-weight: 700; background: #E8F5EC; color: #4CAF6E; padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+
+    /* ── GOAL BANNER (reflections tab) ── */
+    .goal-banner {
+      background: linear-gradient(135deg, #4CAF6E 0%, #3D9159 100%);
+      border-radius: 14px; padding: 14px 16px; margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(76,175,110,0.25);
+      color: white;
+    }
+    .goal-banner-lbl {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
+      text-transform: uppercase; opacity: 0.85; margin-bottom: 6px;
+    }
+    .goal-banner-text {
+      font-size: 14px; font-weight: 600; line-height: 1.5;
+      font-style: italic;
+    }
+    .goal-banner-empty {
+      background: white; color: #1D3D2A;
+      border: 1.5px dashed #C8D8CC; box-shadow: none;
+    }
+    .goal-banner-empty .goal-banner-lbl { color: #93A898; opacity: 1; }
+    .goal-banner-empty .goal-banner-text { color: #93A898; font-weight: 500; font-style: normal; }
 
     /* ── REFLECTION CARDS ── */
     .rcard { background: white; border-radius: 14px; padding: 14px 14px 12px; margin-bottom: 10px; box-shadow: 0 1px 5px rgba(0,0,0,0.07); }
@@ -264,7 +287,13 @@
 
 <script>
   const tg = window.Telegram?.WebApp;
-  if (tg) { tg.ready(); tg.expand(); }
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    // Match Telegram's chrome with the sky so there's no white bar above the garden
+    try { tg.setHeaderColor('#6EB0E8'); } catch {}
+    try { tg.setBackgroundColor('#6EB0E8'); } catch {}
+  }
 
   let _token        = '';
   let _editingId    = null;
@@ -330,13 +359,27 @@
   }
 
   // ── REFLECTIONS ──
-  function renderReflections(reflections) {
+  function goalBannerHtml(goal) {
+    if (goal && goal.trim()) {
+      return '<div class="goal-banner">' +
+        '<div class="goal-banner-lbl">🎯 Your Q2 Goal · Who you want to be</div>' +
+        '<div class="goal-banner-text">“' + esc(goal.trim()) + '”</div>' +
+        '</div>';
+    }
+    return '<div class="goal-banner goal-banner-empty">' +
+      '<div class="goal-banner-lbl">🎯 Your Q2 Goal · Who you want to be</div>' +
+      '<div class="goal-banner-text">Not set yet — send /setgoal to the bot to lock it in.</div>' +
+      '</div>';
+  }
+
+  function renderReflections(reflections, goal) {
     const panel = document.getElementById('panel-reflections');
     if (!reflections || !reflections.length) {
-      panel.innerHTML = '<div class="placeholder"><div class="placeholder-icon">📝</div><div class="placeholder-title">No reflections yet</div><p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p></div>';
+      panel.innerHTML = '<div class="panel-scroll">' + goalBannerHtml(goal) +
+        '<div class="placeholder"><div class="placeholder-icon">📝</div><div class="placeholder-title">No reflections yet</div><p class="placeholder-sub">Send /reflect to the bot to submit your first weekly reflection.</p></div></div>';
       return;
     }
-    let html = '<div class="panel-scroll">';
+    let html = '<div class="panel-scroll">' + goalBannerHtml(goal);
     for (const r of reflections) {
       _reflData[r.id] = { q1: r.q1, q2: r.q2, isoWeek: r.isoWeek };
       html += '<div class="rcard">';
@@ -508,7 +551,7 @@
     } catch { showError('Couldn\'t load data. Try again in a moment.'); return; }
     renderGarden(garden);
     renderStatsStrip(garden, auth.name);
-    renderReflections(me.reflections);
+    renderReflections(me.reflections, me.user && me.user.goal);
     renderGoodNews(me.good_news);
     renderLeaderboard(garden.users, garden.depts, auth.department, auth.name);
     document.querySelectorAll('.panel-scroll').forEach(el => { el.addEventListener('scroll', checkGarden); setupScrollReveal(el); });

@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { Bot, session, InlineKeyboard } from 'grammy';
+import { Bot, session, InlineKeyboard, Keyboard } from 'grammy';
 import { conversations, createConversation } from '@grammyjs/conversations';
 import cron from 'node-cron';
 import crypto from 'crypto';
@@ -2043,7 +2043,7 @@ bot.command('mystats', async (ctx) => {
       }
     }
 
-    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
   } catch (err) {
     console.error('/mystats error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
@@ -2319,7 +2319,7 @@ bot.command('help', async (ctx) => {
 
   msg += `\n${italic('Reflect weekly. Grow together.')}`;
 
-  await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(msg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
 });
 
 // ---------------------------------------------------------------------------
@@ -2335,6 +2335,19 @@ bot.command('cancel', async (ctx) => {
 // /start
 // ---------------------------------------------------------------------------
 
+// Persistent main keyboard — appears at the bottom of every chat and stays put.
+// Attached to /start, /help, /mystats, and the weekly Monday nudge so it shows
+// up for everyone (incl. users who already started) the next time the bot replies.
+const MAIN_KB_REFLECT_LABEL  = '📝 Reflect';
+const MAIN_KB_GOODNEWS_LABEL = '💌 Good News';
+function mainReplyKb() {
+  return new Keyboard()
+    .text(MAIN_KB_REFLECT_LABEL)
+    .text(MAIN_KB_GOODNEWS_LABEL)
+    .resized()
+    .persistent();
+}
+
 bot.command('start', async (ctx) => {
   try {
     const chatId = ctx.from?.id;
@@ -2349,12 +2362,35 @@ bot.command('start', async (ctx) => {
       `Hey there\\! 🤟 Heard you're ${bold(user?.realName ?? 'you')} — ready to grow this quarter? I'm here to help you out\\!\n\n` +
       `🌱 ▸ This is your plant, and the goal is for it to bear many fruits 🍎\\! Water it weekly with a /reflect and watch it grow with you\\! 🌳\n\n` +
       `Type /tutorial for a quick crash course, /help to explore all the commands available to you\\! 🙂`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
     await ctx.conversation.enter('setupConversation');
   } catch (err) {
     console.error('/start error:', err);
     await ctx.reply('Hmm, something went wrong on my end 😅 Text @whalewhalewhalee if this keeps happening!');
+  }
+});
+
+// Persistent keyboard taps — "📝 Reflect" / "💌 Good News" come through as plain text.
+// These hears handlers only fire when no conversation is active (conversations consume input first),
+// so mid-reflection taps land naturally as answers — exactly the behaviour we want.
+bot.hears(MAIN_KB_REFLECT_LABEL, async (ctx) => {
+  try {
+    try { await ctx.conversation.exit(); } catch {}
+    await ctx.conversation.enter('reflectConversation');
+  } catch (err) {
+    console.error('hears reflect error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Try /reflect directly!');
+  }
+});
+
+bot.hears(MAIN_KB_GOODNEWS_LABEL, async (ctx) => {
+  try {
+    try { await ctx.conversation.exit(); } catch {}
+    await ctx.conversation.enter('goodNewsConversation');
+  } catch (err) {
+    console.error('hears goodnews error:', err);
+    await ctx.reply('Hmm, something went wrong on my end 😅 Try /goodnews directly!');
   }
 });
 
@@ -2399,7 +2435,7 @@ cron.schedule('0 2 * * 1', async () => {
             nudgeMsg = `Hey ${e(displayName)}\\! Your ${stats.plantStage} is waiting for water — /reflect on your week\\! Deadline 4PM\\.`;
           }
 
-          await bot.api.sendMessage(chatId, nudgeMsg, { parse_mode: 'MarkdownV2' });
+          await bot.api.sendMessage(chatId, nudgeMsg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
           await new Promise(r => setTimeout(r, 200));
         }
       } catch (userErr) {
@@ -3116,6 +3152,7 @@ http.createServer(async (req, res) => {
           streak:     userStat?.streak ?? 0,
           rank:       userStat?.rank ?? null,
           stage:      userStat?.plantStage ?? '\u{1F331}',
+          goal:       userStat?.goal ?? null,
         },
         reflections,
         good_news: { received, sent },
