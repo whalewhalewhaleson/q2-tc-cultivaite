@@ -552,7 +552,11 @@ async function refresh() {
   if (active === 'reflections') await loadReflections();
 }
 
-setInterval(refresh, 60000);
+setInterval(() => {
+  // Skip auto-refresh while editing a Good News card — re-render would wipe the in-progress recipients form
+  if (document.querySelector('.gn-card.editing')) return;
+  refresh();
+}, 60000);
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function switchTab(name, el) {
