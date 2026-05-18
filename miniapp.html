@@ -78,10 +78,10 @@
     .g-header { position: absolute; top: 0; left: 0; right: 0; padding: 50px 20px 0; display: flex; justify-content: space-between; align-items: center; z-index: 10; }
     .g-title { font-size: 15px; font-weight: 800; color: white; text-shadow: 0 1px 10px rgba(0,0,0,0.55), 0 2px 4px rgba(0,0,0,0.3); letter-spacing: -0.2px; }
     .g-week  { font-size: 11px; font-weight: 600; color: white; background: rgba(0,0,0,0.28); backdrop-filter: blur(8px); padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.2); }
-    .plant-grid { position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; justify-content: space-evenly; padding: 6px 8px 10px; }
+    .plant-grid { position: absolute; top: 168px; left: 0; right: 0; bottom: 0; z-index: 3; display: flex; flex-direction: column; justify-content: space-evenly; padding: 4px 6px 8px; }
     .prow { display: flex; justify-content: space-evenly; align-items: center; }
-    .prow:nth-child(even) { padding: 0 16px; }
-    .pe { font-size: 22px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
+    .prow:nth-child(even) { padding: 0 12px; }
+    .pe { font-size: 15px; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.3)); }
 
     /* ── STATS STRIP ── */
     .stats-wrap { flex-shrink: 0; overflow: hidden; max-height: 70px; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1), opacity 0.25s ease; }
@@ -304,10 +304,9 @@
     const plants = [...garden.users].sort(() => Math.random() - 0.5);
     const grid   = document.getElementById('plant-grid');
     grid.innerHTML = '';
-    const layout = [9, 8, 9, 7, 9, 8];
-    let idx = 0;
-    for (const count of layout) {
-      if (idx >= plants.length) break;
+    let idx = 0, rowIdx = 0;
+    while (idx < plants.length) {
+      const count = rowIdx % 2 === 0 ? 10 : 9;
       const row = document.createElement('div');
       row.className = 'prow';
       for (let i = 0; i < count && idx < plants.length; i++, idx++) {
@@ -316,7 +315,8 @@
         span.textContent = stageEmoji(plants[idx].totalPoints);
         row.appendChild(span);
       }
-      if (row.children.length) grid.appendChild(row);
+      grid.appendChild(row);
+      rowIdx++;
     }
   }
 
