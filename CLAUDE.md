@@ -60,7 +60,8 @@ dashboard.html (~2000 lines)
 
 ## Plant Stages (by cumulative points)
 
-0→🌱 Seedling | 21→🌿 Sprout | 51→🌳 Sapling | 86→🌼 Flowering | 116→🍎 Fruiting
+0→🌱 Seedling | 21→🌿 Sprout | 51→🌳 Sapling | 86→🌼 Flowering
+116→🍎 Apple | 150→🍊 Orange | 190→🍋 Lemon | 235→🍉 Watermelon | 285→🏵 Rosette
 1 consecutive miss → 🍂 Dying | 2+ consecutive misses → 🥀 Dead
 
 ## Data Flow for Dashboard

@@ -313,6 +313,10 @@
     return new Date(d + 'T12:00:00+08:00').toLocaleDateString('en-SG', { day: 'numeric', month: 'short' });
   }
   function stageEmoji(pts) {
+    if (pts >= 285) return '🏵';
+    if (pts >= 235) return '🍉';
+    if (pts >= 190) return '🍋';
+    if (pts >= 150) return '🍊';
     if (pts >= 116) return '🍎';
     if (pts >= 86)  return '🌼';
     if (pts >= 51)  return '🌳';

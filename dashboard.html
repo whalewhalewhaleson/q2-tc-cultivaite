@@ -331,9 +331,9 @@
 
 <script>
 // ── Constants ──────────────────────────────────────────────────────────────
-const STAGE_NAMES = { '🌱':'Seedling','🌿':'Sprout','🌳':'Sapling','🌼':'Flowering','🍎':'Fruiting','🍂':'Dying','🥀':'Dead' };
-const STAGE_THRESHOLDS = [0, 21, 51, 86, 116];
-const HEALTHY_STAGES   = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+const STAGE_NAMES = { '🌱':'Seedling','🌿':'Sprout','🌳':'Sapling','🌼':'Flowering','🍎':'Apple','🍊':'Orange','🍋':'Lemon','🍉':'Watermelon','🏵':'Rosette','🍂':'Dying','🥀':'Dead' };
+const STAGE_THRESHOLDS = [0, 21, 51, 86, 116, 150, 190, 235, 285];
+const HEALTHY_STAGES   = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍊', '🍋', '🍉', '🏵'];
 const Q2_START_SGT  = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT — used for currentWeek logic
 const WEEK_MS_D = 7 * 24 * 60 * 60 * 1000;
 
@@ -600,8 +600,8 @@ function updateGNBadge() {
 
 // ── Stage distribution builder ────────────────────────────────────────────
 function buildStageDistribution(s) {
-  const STAGES = ['🌱','🌿','🌳','🌼','🍎'];
-  const STAGE_COLORS = { '🌱':'#b7e4c7','🌿':'#74c69d','🌳':'#52b788','🌼':'#f9c74f','🍎':'#e76f51' };
+  const STAGES = ['🌱','🌿','🌳','🌼','🍎','🍊','🍋','🍉','🏵'];
+  const STAGE_COLORS = { '🌱':'#b7e4c7','🌿':'#74c69d','🌳':'#52b788','🌼':'#f9c74f','🍎':'#e76f51','🍊':'#ff9f1c','🍋':'#fcdc4d','🍉':'#ef476f','🏵':'#d4af37' };
   const counts = {};
   let dying = 0, dead = 0;
   for (const u of s.users) {

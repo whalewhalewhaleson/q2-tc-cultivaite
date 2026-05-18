@@ -44,7 +44,7 @@ Stats loop: `for (let wk = launchWeek; wk <= weekNow; wk++)` — weeks before `l
 | Good news recipient | +3 pts (admin approval required) |
 | Dept 2× multiplier | Applied when dept hits 4+ consecutive 100% weeks |
 
-**Stage thresholds:** 0 / 21 / 51 / 86 / 116 pts → 🌱 🌿 🌳 🌼 🍎  
+**Stage thresholds:** 0 / 21 / 51 / 86 / 116 / 150 / 190 / 235 / 285 pts → 🌱 🌿 🌳 🌼 🍎 🍊 🍋 🍉 🏵  
 **Dying/dead display:** based on `consecutiveMisses` (1 miss = 🍂, 2+ = 🥀), not points.
 
 Excused absences (`[Excused absence]`) via `/skipweek` preserve streak but earn 0 pts.
@@ -80,7 +80,7 @@ Cache TTLs: `users` = 5 min, `stats` = 30 sec. Cache is invalidated immediately 
 | Shift when points start counting | `db.js:30` | `LAUNCH_DATE` |
 | Change Q2 duration | `db.js:32-42` | Clamp max in week functions |
 | Change base points per reflection | `db.js:~220` | `let weekPts = 10 + ...` |
-| Change stage thresholds | `db.js:80-81` | `STAGE_THRESHOLDS` |
+| Change stage thresholds | `db.js:98-99` | `STAGE_THRESHOLDS` + `HEALTHY_STAGES` |
 | Change nudge timing | `bot.js:1335` | Cron expression |
 | Change nudge skip condition | `bot.js:1337` | `currentQ2Week() === 1` check |
 | Change reflection questions | `bot.js:354-372` | Q1/Q2 prompt strings |

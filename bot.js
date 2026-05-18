@@ -60,19 +60,23 @@ function paginateLines(lines, reservedTail = 0, maxChars = 3500) {
 // Growth helpers
 // ---------------------------------------------------------------------------
 
-const STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍂', '🥀'];
+const STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍊', '🍋', '🍉', '🏵', '🍂', '🥀'];
 const STAGE_NAMES = {
   '🌱': 'Seedling',
   '🌿': 'Sprout',
   '🌳': 'Sapling',
   '🌼': 'Flowering',
-  '🍎': 'Fruiting',
+  '🍎': 'Apple',
+  '🍊': 'Orange',
+  '🍋': 'Lemon',
+  '🍉': 'Watermelon',
+  '🏵': 'Rosette',
   '🍂': 'Dying',
   '🥀': 'Dead',
 };
-const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+const HEALTHY_STAGES = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍊', '🍋', '🍉', '🏵'];
 // Points lower-bound per stage (mirrors apps-script.gs CONFIG.STAGE_THRESHOLDS)
-const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116];
+const STAGE_THRESHOLDS_PTS = [0, 21, 51, 86, 116, 150, 190, 235, 285];
 const shoutedDepts = new Set();
 let firstShoutoutFiredThisWeek = false;
 let lastRecapWeek = 0;
@@ -181,7 +185,7 @@ function buildPlantCard(stage, pct, streak, submittedThisWeek, totalPoints, cons
   if (nextEmoji) {
     card += `Next ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
   } else {
-    card += `Next ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
+    card += `Next ▸ ${bar} ${italic('Full bloom! 🏵')}\n`;
   }
 
   card += `\n🔥 Streak ▸ ${streakStr}\n`;
@@ -997,7 +1001,7 @@ function buildDeptBlock(deptName, deptStats, memberData) {
   if (nextEmoji) {
     block += `Growth ▸ ${bar} ${e(String(ptsNeeded))} pts to ${nextEmoji}\n`;
   } else {
-    block += `Growth ▸ ${bar} ${italic('Full bloom! 🍎')}\n`;
+    block += `Growth ▸ ${bar} ${italic('Full bloom! 🏵')}\n`;
   }
 
   block +=
@@ -2207,7 +2211,11 @@ bot.command('tutorial', async (ctx) => {
     `🌿 Sprout ▸ 21–50 pts\n` +
     `🌳 Sapling ▸ 51–85 pts\n` +
     `🌼 Flowering ▸ 86–115 pts\n` +
-    `🍎 Fruiting ▸ 116\\+ pts\n\n` +
+    `🍎 Apple ▸ 116–149 pts\n` +
+    `🍊 Orange ▸ 150–189 pts\n` +
+    `🍋 Lemon ▸ 190–234 pts\n` +
+    `🍉 Watermelon ▸ 235–284 pts\n` +
+    `🏵 Rosette ▸ 285\\+ pts\n\n` +
 
     `${bold('🍂 If You Miss a Week')}\n` +
     `• Miss 1 week ▸ plant goes 🍂 Dying\n` +

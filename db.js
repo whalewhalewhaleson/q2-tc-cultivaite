@@ -95,8 +95,8 @@ export function invalidateStatsCache() {
 // Result cached for 30 seconds; busted immediately after each reflection.
 // ---------------------------------------------------------------------------
 
-const STAGE_THRESHOLDS = [0, 21, 51, 86, 116];
-const HEALTHY_STAGES   = ['🌱', '🌿', '🌳', '🌼', '🍎'];
+const STAGE_THRESHOLDS = [0, 21, 51, 86, 116, 150, 190, 235, 285];
+const HEALTHY_STAGES   = ['🌱', '🌿', '🌳', '🌼', '🍎', '🍊', '🍋', '🍉', '🏵'];
 
 function pointsToStage(pts) {
   let stage = HEALTHY_STAGES[0];

@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garden Bug Mockup — 90 plants</title>
+<style>
+  *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#1F2A24; color:#E8EAE5; font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif; padding:24px 16px 48px; min-height:100vh; }
+  .wrap { max-width:1400px; margin:0 auto; }
+  h1 { font-size:22px; font-weight:800; margin-bottom:6px; }
+  .sub { font-size:13px; color:#9CA89E; margin-bottom:18px; }
+  .toggle-row { display:flex; gap:8px; margin-bottom:22px; flex-wrap:wrap; }
+  .tbtn { padding:9px 14px; background:#2E3B33; color:#E8EAE5; border:1.5px solid transparent; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; font-family:inherit; }
+  .tbtn:hover { background:#3A483F; }
+  .tbtn.active { background:#4CAF6E; border-color:#6FCC8D; color:#fff; }
+
+  .frame-row { display:flex; gap:32px; flex-wrap:wrap; align-items:flex-start; }
+  .phone-col { display:flex; flex-direction:column; align-items:center; }
+  .phone-label { font-size:12px; font-weight:700; color:#9CA89E; margin-bottom:10px; text-transform:uppercase; letter-spacing:.5px; }
+  .phone { width:380px; height:720px; background:#F8F3EB; border-radius:32px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.45); border:8px solid #111; position:relative; display:flex; flex-direction:column; }
+
+  /* ── BUGGY (CURRENT, broken) ── */
+  .badge-bad  { position:absolute; top:14px; right:14px; z-index:50; background:#D94545; color:#fff; font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; letter-spacing:.4px; }
+  .badge-fix  { position:absolute; top:14px; right:14px; z-index:50; background:#4CAF6E; color:#fff; font-size:10px; font-weight:800; padding:4px 8px; border-radius:6px; letter-spacing:.4px; }
+
+  /* ── GARDEN SCENE (matches production) ── */
+  .garden-wrap { flex-shrink:0; overflow:hidden; }
+  .garden-scene { position:relative; overflow:hidden; }
+  .sky { position:absolute; top:0; left:0; right:0; height:168px; background:linear-gradient(180deg,#6EB0E8 0%,#90C8F0 30%,#B8DDF8 60%,#CCEAC0 85%,#BCDCAA 100%); }
+  .sun { position:absolute; top:54px; right:52px; width:40px; height:40px; background:radial-gradient(circle,#FFFDE0 15%,#FFE040 55%,#FFBF00); border-radius:50%; box-shadow:0 0 0 11px rgba(255,224,64,.13), 0 0 55px rgba(255,200,30,.36); }
+  .cloud { position:absolute; }
+  .cloud .b { background:rgba(255,255,255,.86); border-radius:60px; position:absolute; }
+  .cloud .p { background:rgba(255,255,255,.86); border-radius:50%; position:absolute; }
+  .c1 { top:72px; left:20px; }
+  .c1 .b { width:78px; height:21px; top:18px; }
+  .c1 .p:nth-child(2) { width:33px; height:33px; top:3px; left:11px; }
+  .c1 .p:nth-child(3) { width:25px; height:25px; top:7px; left:35px; }
+  .c2 { top:96px; left:208px; opacity:.52; }
+  .c2 .b { width:58px; height:14px; top:14px; }
+  .c2 .p:nth-child(2) { width:23px; height:23px; top:2px; left:8px; }
+  .c2 .p:nth-child(3) { width:18px; height:18px; top:5px; left:27px; }
+  .mountains { position:absolute; top:96px; left:0; right:0; height:58px; z-index:2; }
+  .mt { position:absolute; bottom:0; clip-path:polygon(0% 100%, 50% 0%, 100% 100%); }
+  .mt-b1 { width:230px; height:36px; left:-30px; background:#8CB880; opacity:.65; }
+  .mt-b2 { width:200px; height:32px; right:-20px; background:#86B27A; opacity:.65; }
+  .mt-b3 { width:170px; height:28px; left:110px; background:#80AA74; opacity:.65; }
+  .mt-f1 { width:190px; height:30px; left:-10px; background:#4A7A42; }
+  .mt-f2 { width:175px; height:34px; right:10px; background:#467040; }
+  .mt-f3 { width:155px; height:26px; left:130px; background:#42683C; }
+  .mt-fade { position:absolute; bottom:0; left:0; right:0; height:18px; background:linear-gradient(180deg,transparent,#7A500E); }
+  .soil { position:absolute; top:150px; left:0; right:0; bottom:0; background:radial-gradient(ellipse at 50% 30%,#A07228 0%,#8B5E14 45%,#7A500E 100%); }
+  .garden-scene::before { content:''; position:absolute; top:0; left:0; right:0; height:110px; background:linear-gradient(180deg,rgba(0,0,0,.38) 0%,transparent 100%); z-index:9; }
+  .g-header { position:absolute; top:0; left:0; right:0; padding:50px 20px 0; display:flex; justify-content:space-between; align-items:center; z-index:10; }
+  .g-title { font-size:15px; font-weight:800; color:#fff; text-shadow:0 1px 10px rgba(0,0,0,.55),0 2px 4px rgba(0,0,0,.3); letter-spacing:-.2px; }
+  .g-week { font-size:11px; font-weight:600; color:#fff; background:rgba(0,0,0,.28); padding:4px 10px; border-radius:20px; border:1px solid rgba(255,255,255,.2); }
+  .plant-grid { position:absolute; top:168px; left:0; right:0; bottom:0; z-index:3; display:flex; flex-direction:column; justify-content:space-evenly; padding:6px 8px 10px; }
+  .prow { display:flex; justify-content:space-evenly; align-items:center; }
+  .prow:nth-child(even) { padding:0 16px; }
+  .pe { line-height:1; filter:drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
+
+  /* ── per-mockup garden sizing ── */
+  .scene-current { height:360px; }
+  .scene-current .pe { font-size:22px; }
+
+  .scene-dense   { height:360px; }
+  .scene-dense .pe { font-size:15px; }
+  .scene-dense .plant-grid { padding:4px 6px 8px; }
+  .scene-dense .prow:nth-child(even) { padding:0 12px; }
+
+  .scene-tall    { height:500px; }
+  .scene-tall .pe { font-size:21px; }
+
+  /* ── STATS STRIP (just for layout context) ── */
+  .stats-strip { display:flex; gap:8px; padding:10px 16px; background:#F8F3EB; border-bottom:1px solid rgba(0,0,0,.07); flex-shrink:0; }
+  .stat-card { flex:1; background:#fff; border-radius:12px; padding:8px 10px; display:flex; align-items:center; gap:7px; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+  .stat-icon { font-size:16px; }
+  .stat-val { font-size:14px; font-weight:800; color:#1D3D2A; line-height:1; }
+  .stat-lbl { font-size:9px; color:#93A898; font-weight:500; margin-top:2px; }
+
+  /* content placeholder below garden */
+  .content-ph { flex:1; background:#EDE8DF; padding:14px; overflow:hidden; }
+  .ph-card { background:#fff; border-radius:14px; padding:14px; margin-bottom:8px; box-shadow:0 1px 5px rgba(0,0,0,.07); }
+  .ph-line { background:#E8E8E8; height:10px; border-radius:5px; margin-bottom:6px; }
+  .ph-line.short { width:60%; }
+
+  /* metrics row under each phone */
+  .meta { margin-top:14px; font-size:12px; color:#9CA89E; text-align:center; max-width:380px; line-height:1.5; }
+  .meta b { color:#E8EAE5; font-weight:700; }
+  .meta .ok { color:#6FCC8D; }
+  .meta .bad { color:#FF8585; }
+
+  /* visibility per option */
+  .opt-current .show-current,
+  .opt-dense   .show-dense,
+  .opt-tall    .show-tall,
+  .opt-dept    .show-dept { display:flex; }
+  .opt-current .show-dense, .opt-current .show-tall, .opt-current .show-dept,
+  .opt-dense   .show-current, .opt-dense .show-tall, .opt-dense .show-dept,
+  .opt-tall    .show-current, .opt-tall .show-dense, .opt-tall .show-dept,
+  .opt-dept    .show-current, .opt-dept .show-dense, .opt-dept .show-tall { display:none; }
+
+  /* dept clusters layout */
+  .dept-grid { position:absolute; top:168px; left:0; right:0; bottom:0; z-index:3; display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:8px 10px 10px; }
+  .dept-cluster { display:flex; flex-direction:column; align-items:flex-start; gap:2px; }
+  .dept-name { font-size:8px; font-weight:800; color:#FFF; text-shadow:0 1px 2px rgba(0,0,0,.6); text-transform:uppercase; letter-spacing:.3px; line-height:1; }
+  .dept-plants { display:flex; flex-wrap:wrap; gap:1px 4px; }
+  .dept-plants .pe { font-size:15px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🌱 CultivAIte Garden — 90-plant fix</h1>
+  <div class="sub">Current grid hard-codes 50 slots; ~40 people don't show. Pick an approach below to compare.</div>
+
+  <div class="toggle-row">
+    <button class="tbtn active" data-opt="current">🔴 Current bug (50 of 90)</button>
+    <button class="tbtn" data-opt="dense">🟢 Option A — Shrink + densify</button>
+    <button class="tbtn" data-opt="tall">🟢 Option B — Taller garden</button>
+    <button class="tbtn" data-opt="dept">🟢 Option C — Dept clusters</button>
+  </div>
+
+  <div class="frame-row" id="stage">
+    <!-- Phones rendered by JS below -->
+  </div>
+</div>
+
+<script>
+  // Plant stages mirror production
+  function stageEmoji(pts) {
+    if (pts >= 285) return '🏵';
+    if (pts >= 235) return '🍉';
+    if (pts >= 190) return '🍋';
+    if (pts >= 150) return '🍊';
+    if (pts >= 116) return '🍎';
+    if (pts >= 86)  return '🌼';
+    if (pts >= 51)  return '🌳';
+    if (pts >= 21)  return '🌿';
+    return '🌱';
+  }
+
+  // Realistic-ish point distribution for 90 users (skewed lower-mid, some high)
+  const TOTAL = 90;
+  const seed = [];
+  for (let i = 0; i < TOTAL; i++) {
+    // Skewed distribution: lots of 🌿/🌳, some 🌱, fewer high
+    const r = Math.random();
+    let pts;
+    if (r < 0.10)       pts = Math.floor(Math.random() * 20);          // 🌱
+    else if (r < 0.35)  pts = 21 + Math.floor(Math.random() * 30);     // 🌿
+    else if (r < 0.60)  pts = 51 + Math.floor(Math.random() * 35);     // 🌳
+    else if (r < 0.78)  pts = 86 + Math.floor(Math.random() * 30);     // 🌼
+    else if (r < 0.90)  pts = 116 + Math.floor(Math.random() * 34);    // 🍎
+    else if (r < 0.96)  pts = 150 + Math.floor(Math.random() * 40);    // 🍊
+    else if (r < 0.99)  pts = 190 + Math.floor(Math.random() * 45);    // 🍋
+    else                pts = 235 + Math.floor(Math.random() * 80);    // 🍉/🏵
+    seed.push({ pts });
+  }
+
+  // Fake departments for cluster view
+  const DEPTS = ['SOCIAL','BM','HR','PM','SH','SVA','OPS','CREATIVE'];
+  const deptAssign = seed.map((_, i) => DEPTS[i % DEPTS.length]);
+
+  function makeRow(items, opts={}) {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    for (const it of items) {
+      const s = document.createElement('span');
+      s.className = 'pe';
+      s.textContent = stageEmoji(it.pts);
+      row.appendChild(s);
+    }
+    return row;
+  }
+
+  function buildCurrent(grid) {
+    // Production-equivalent: 9,8,9,7,9,8 = 50 plants only
+    const shuffled = [...seed].sort(() => Math.random() - 0.5);
+    const layout = [9,8,9,7,9,8];
+    let idx = 0;
+    for (const c of layout) {
+      const slice = shuffled.slice(idx, idx + c);
+      idx += c;
+      grid.appendChild(makeRow(slice));
+    }
+  }
+
+  function buildDense(grid) {
+    // Dynamic: ~10 rows × 9-10 plants. Fits all 90 in same 192px garden floor with smaller emojis.
+    const shuffled = [...seed].sort(() => Math.random() - 0.5);
+    const layout = [10,9,10,9,10,9,10,9,10,4]; // 90 total
+    let idx = 0;
+    for (const c of layout) {
+      const slice = shuffled.slice(idx, idx + c);
+      if (!slice.length) break;
+      idx += c;
+      grid.appendChild(makeRow(slice));
+    }
+  }
+
+  function buildTall(grid) {
+    // Taller scene (500px): keep 22px emojis, ~9 rows × 10
+    const shuffled = [...seed].sort(() => Math.random() - 0.5);
+    const layout = [10,9,10,9,10,9,10,9,10,4]; // 90 total — extra vertical room
+    let idx = 0;
+    for (const c of layout) {
+      const slice = shuffled.slice(idx, idx + c);
+      if (!slice.length) break;
+      idx += c;
+      grid.appendChild(makeRow(slice));
+    }
+  }
+
+  function buildDept(deptGrid) {
+    // Group by dept into mini-clusters in a 2-col grid
+    const byDept = {};
+    seed.forEach((p, i) => {
+      const d = deptAssign[i];
+      (byDept[d] = byDept[d] || []).push(p);
+    });
+    for (const d of DEPTS) {
+      const wrap = document.createElement('div');
+      wrap.className = 'dept-cluster';
+      const lbl = document.createElement('div');
+      lbl.className = 'dept-name';
+      lbl.textContent = d;
+      wrap.appendChild(lbl);
+      const plants = document.createElement('div');
+      plants.className = 'dept-plants';
+      for (const p of byDept[d] || []) {
+        const s = document.createElement('span');
+        s.className = 'pe';
+        s.textContent = stageEmoji(p.pts);
+        plants.appendChild(s);
+      }
+      wrap.appendChild(plants);
+      deptGrid.appendChild(wrap);
+    }
+  }
+
+  function sceneHTML(klass, gridContent='') {
+    return `
+      <div class="garden-wrap">
+        <div class="garden-scene ${klass}">
+          <div class="sky"></div><div class="sun"></div>
+          <div class="cloud c1"><div class="p"></div><div class="p"></div><div class="b"></div></div>
+          <div class="cloud c2"><div class="p"></div><div class="p"></div><div class="b"></div></div>
+          <div class="mountains">
+            <div class="mt mt-b1"></div><div class="mt mt-b2"></div><div class="mt mt-b3"></div>
+            <div class="mt mt-f1"></div><div class="mt mt-f2"></div><div class="mt mt-f3"></div>
+            <div class="mt-fade"></div>
+          </div>
+          <div class="soil"></div>
+          <div class="g-header">
+            <div class="g-title">🌱 TC CultivAIte Garden</div>
+            <div class="g-week">Week 20</div>
+          </div>
+          ${gridContent}
+        </div>
+      </div>`;
+  }
+
+  function statsStripHTML() {
+    return `
+      <div class="stats-strip">
+        <div class="stat-card"><span class="stat-icon">⭐</span><div><div class="stat-val">62</div><div class="stat-lbl">Points</div></div></div>
+        <div class="stat-card"><span class="stat-icon">🔥</span><div><div class="stat-val">5 wks</div><div class="stat-lbl">Streak</div></div></div>
+        <div class="stat-card"><span class="stat-icon">🏅</span><div><div class="stat-val">#14</div><div class="stat-lbl">Rank</div></div></div>
+      </div>`;
+  }
+
+  function contentPlaceholder() {
+    return `
+      <div class="content-ph">
+        <div class="ph-card">
+          <div class="ph-line"></div><div class="ph-line"></div><div class="ph-line short"></div>
+        </div>
+        <div class="ph-card">
+          <div class="ph-line"></div><div class="ph-line short"></div>
+        </div>
+      </div>`;
+  }
+
+  function renderPhone(opt) {
+    const labels = {
+      current: 'Current — broken',
+      dense:   'Option A — Shrink + densify',
+      tall:    'Option B — Taller garden',
+      dept:    'Option C — Dept clusters'
+    };
+    const metas = {
+      current: '<span class="bad">50 / 90 plants shown</span> · 22px emoji · 360px garden · 6 hard-coded rows',
+      dense:   '<span class="ok">90 / 90 plants shown</span> · 15px emoji · 360px garden · 10 dynamic rows',
+      tall:    '<span class="ok">90 / 90 plants shown</span> · 21px emoji · 500px garden · 10 dynamic rows',
+      dept:    '<span class="ok">90 / 90 plants shown</span> · 15px emoji · 360px garden · grouped by dept (2-col)'
+    };
+
+    const col = document.createElement('div');
+    col.className = 'phone-col';
+    col.innerHTML = `
+      <div class="phone-label">${labels[opt]}</div>
+      <div class="phone">
+        ${opt === 'current' ? '<div class="badge-bad">🔴 BUG</div>' : '<div class="badge-fix">🟢 FIX</div>'}
+        <!-- garden injected here -->
+        <div data-garden></div>
+        ${statsStripHTML()}
+        ${contentPlaceholder()}
+      </div>
+      <div class="meta">${metas[opt]}</div>
+    `;
+    const slot = col.querySelector('[data-garden]');
+
+    let sceneClass, isGridDept = false;
+    if (opt === 'current') sceneClass = 'scene-current';
+    if (opt === 'dense')   sceneClass = 'scene-dense';
+    if (opt === 'tall')    sceneClass = 'scene-tall';
+    if (opt === 'dept')   { sceneClass = 'scene-dense'; isGridDept = true; }
+
+    slot.outerHTML = sceneHTML(sceneClass, isGridDept ? '<div class="dept-grid"></div>' : '<div class="plant-grid"></div>');
+
+    // After replaceWith, re-find the grid
+    setTimeout(() => {
+      const phone = col.querySelector('.phone');
+      const grid = phone.querySelector('.plant-grid');
+      const deptGrid = phone.querySelector('.dept-grid');
+      if (opt === 'current') buildCurrent(grid);
+      if (opt === 'dense')   buildDense(grid);
+      if (opt === 'tall')    buildTall(grid);
+      if (opt === 'dept')    buildDept(deptGrid);
+    }, 0);
+
+    return col;
+  }
+
+  const stage = document.getElementById('stage');
+  function render(opt) {
+    stage.innerHTML = '';
+    // Always show "Current" on the left for comparison, then the chosen fix
+    stage.appendChild(renderPhone('current'));
+    if (opt !== 'current') {
+      stage.appendChild(renderPhone(opt));
+    }
+  }
+
+  document.querySelectorAll('.tbtn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.tbtn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      render(b.dataset.opt);
+    });
+  });
+
+  render('current');
+</script>
+</body>
+</html>
