@@ -725,8 +725,18 @@ function renderOverview() {
     byDeptLate[d].push(u.realName);
   }
 
-  // Not submitted this week — group by dept (excludes late)
-  const notSub = s.users.filter(u => !isSubmitted(u) && !isLate(u));
+  // Excused this week — group by dept
+  const isExcused = (u) => !!u.weekHistory?.[wk]?.excused;
+  const excusedPeople = s.users.filter(isExcused);
+  const byDeptExc = {};
+  for (const u of excusedPeople) {
+    const d = u.department || 'Unknown';
+    if (!byDeptExc[d]) byDeptExc[d] = [];
+    byDeptExc[d].push(u.realName);
+  }
+
+  // Not submitted this week — group by dept (excludes late + excused)
+  const notSub = s.users.filter(u => !isSubmitted(u) && !isLate(u) && !isExcused(u));
   const byDept = {};
   for (const u of notSub) {
     const d = u.department || 'Unknown';
@@ -850,6 +860,17 @@ function renderOverview() {
     <div style="background:white;border-radius:16px;padding:16px 20px;border:1px solid #d9f0e0;border-left:4px solid #40916c;margin-top:16px">
       <div style="font-weight:700;font-size:13px;color:#2d6a4f">🎉 Everyone submitted this week!</div>
     </div>`}
+
+    ${excusedPeople.length ? `
+    <div class="section-header"><span class="section-title">🌿 Excused</span><span class="section-badge" style="background:#e0f2f1;color:#00695c;border-color:#b2dfdb">${excusedPeople.length} people · 0 pts · streak preserved</span></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">
+      ${Object.entries(byDeptExc).map(([d, ns]) => `
+        <div style="background:white;border-radius:16px;padding:14px 18px;border:1px solid #b2dfdb">
+          <div style="font-weight:700;font-size:12px;color:#1a2e1a;margin-bottom:8px">${esc(d)} <span style="color:#8a9a8a;font-weight:500">(${ns.length})</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">${ns.map(n => `<span style="background:#e0f2f1;color:#00695c;border-radius:8px;padding:3px 10px;font-size:12px;font-weight:600">${esc(n)}</span>`).join('')}</div>
+        </div>
+      `).join('')}
+    </div>` : ''}
 
     ${buildNotRegistered(s)}
   `;
