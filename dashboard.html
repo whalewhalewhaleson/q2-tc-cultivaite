@@ -780,8 +780,8 @@ function renderOverview() {
       </div>
       <div class="kpi-card" style="border-color:#d4a017;background:#fffef5">
         <div class="kpi-label">📨 ${isCurrent ? 'This Week' : `Week ${toISOWeek(wk)}`}</div>
-        <div class="kpi-value ${subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red'}"><span style="font-size:0.47em;font-weight:600;color:#7a8a7a">(${onTimeWkPct}% on-time) </span>${subPct}%</div>
-        <div class="kpi-sub">${submittedCount} of ${s.totalUsers} submitted <span style="color:#7a8a7a">(${onTimeCount} on-time)</span></div>
+        <div class="kpi-value ${subPct >= 80 ? 'pct-green' : subPct >= 60 ? 'pct-amber' : 'pct-red'}">${subPct}%</div>
+        <div class="kpi-sub">${submittedCount} of ${s.totalUsers} submitted${onTimeCount === submittedCount ? ' · all on-time' : `<br>${onTimeCount} on-time (${onTimeWkPct}%)`}</div>
       </div>
       <div class="kpi-card green">
         <div class="kpi-label">🌱 Registered</div>
@@ -804,7 +804,7 @@ function renderOverview() {
     <div class="target-bar-card">
       <div class="target-bar-top">
         <div class="target-label">Cumulative Submission Rate — W${toISOWeek(launchWkOv)} to W${toISOWeek(cumulEndWk)}</div>
-        <div class="target-pct ${pctCls}"><span style="font-size:0.5em;font-weight:600;color:#7a8a7a">(${onTimePct}% on-time) </span>${cumulPct}%</div>
+        <div class="target-pct ${pctCls}">${cumulPct}%</div>
       </div>
       <div class="bar-track">
         <div class="bar-fill ${barCls}" style="width:${Math.min(cumulPct,100)}%"></div>
@@ -812,7 +812,7 @@ function renderOverview() {
         <div class="target-marker-label">Target 80%</div>
       </div>
       <div class="bar-meta">
-        <span>✅ <strong>${totalSubmissions}</strong> total submissions <span style="color:#7a8a7a">(${onTimeSubmissions} on-time)</span></span>
+        <span>✅ <strong>${totalSubmissions}</strong> total submissions${onTimeSubmissions === totalSubmissions ? ' · <span style="color:#7a8a7a">all on-time</span>' : ` · <span style="color:#7a8a7a">${onTimeSubmissions} on-time (${onTimePct}%)</span>`}</span>
         <span>📊 <strong>${s.totalUsers * weeksElapsed}</strong> possible (${s.totalUsers} × ${weeksElapsed} weeks)</span>
         ${cumulPct < 80 ? `<span>⚠️ Need <strong>${Math.max(0, cumulTarget - totalSubmissions)}</strong> more to hit 80%</span>` : '<span>✅ On target!</span>'}
       </div>
