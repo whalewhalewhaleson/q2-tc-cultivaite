@@ -1,0 +1,1296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TC CultivAIte Bot — UI Mockup</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #0e1621;
+    color: #e8e8e8;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #17212b;
+    border-right: 1px solid #232e3c;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar-header {
+    padding: 18px 16px 14px;
+    border-bottom: 1px solid #232e3c;
+  }
+
+  #sidebar-header h1 {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+  }
+
+  #sidebar-header p {
+    font-size: 11px;
+    color: #7d8b99;
+    margin-top: 4px;
+  }
+
+  #nav {
+    overflow-y: auto;
+    flex: 1;
+    padding: 8px 0;
+  }
+
+  #nav::-webkit-scrollbar { width: 4px; }
+  #nav::-webkit-scrollbar-track { background: transparent; }
+  #nav::-webkit-scrollbar-thumb { background: #2b3847; border-radius: 2px; }
+
+  .nav-item {
+    display: block;
+    padding: 9px 16px;
+    font-size: 13px;
+    color: #a8b8c8;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: all 0.15s;
+    text-decoration: none;
+    line-height: 1.35;
+  }
+
+  .nav-item:hover { background: #1f2d3d; color: #fff; }
+
+  .nav-item.active {
+    background: #1f2d3d;
+    border-left-color: #5288c1;
+    color: #fff;
+  }
+
+  .nav-item .cmd {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5288c1;
+  }
+
+  .nav-item .label {
+    display: block;
+    font-size: 11px;
+    color: #7d8b99;
+    margin-top: 1px;
+  }
+
+  .nav-section-title {
+    padding: 10px 16px 4px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #4a5f74;
+  }
+
+  /* ── Main panel ── */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #0e1621;
+  }
+
+  #main-header {
+    background: #17212b;
+    border-bottom: 1px solid #232e3c;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .bot-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4a9c6b, #2d6e4a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  #main-header .bot-info h2 { font-size: 15px; font-weight: 600; color: #fff; }
+  #main-header .bot-info p { font-size: 12px; color: #6b8fa8; margin-top: 1px; }
+
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 0 40px;
+  }
+
+  #chat::-webkit-scrollbar { width: 6px; }
+  #chat::-webkit-scrollbar-track { background: transparent; }
+  #chat::-webkit-scrollbar-thumb { background: #2b3847; border-radius: 3px; }
+
+  /* ── Section dividers ── */
+  .section {
+    padding: 0 20px;
+    margin-bottom: 8px;
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 0 16px;
+  }
+
+  .section-header:first-child { margin-top: 8px; }
+
+  .section-header .section-line {
+    flex: 1;
+    height: 1px;
+    background: #232e3c;
+  }
+
+  .section-header .section-label {
+    font-size: 11px;
+    color: #4a5f74;
+    white-space: nowrap;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    background: #0e1621;
+    padding: 0 8px;
+  }
+
+  .section-header .section-badge {
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5288c1;
+    background: #1a2940;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+    border: 1px solid #2d4a6b;
+  }
+
+  .variant-label {
+    font-size: 11px;
+    color: #4a5f74;
+    font-style: italic;
+    margin: 12px 0 6px 6px;
+  }
+
+  /* ── Chat bubbles ── */
+  .row {
+    display: flex;
+    margin-bottom: 4px;
+    padding: 0 16px;
+  }
+
+  .row.bot { justify-content: flex-start; }
+  .row.user { justify-content: flex-end; }
+  .row.system { justify-content: center; }
+
+  .bubble {
+    max-width: 72%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+    position: relative;
+  }
+
+  .row.bot .bubble {
+    background: #182533;
+    border-bottom-left-radius: 4px;
+    color: #e8e8e8;
+  }
+
+  .row.user .bubble {
+    background: #2b5278;
+    border-bottom-right-radius: 4px;
+    color: #fff;
+  }
+
+  .row.system .bubble {
+    background: transparent;
+    color: #4a5f74;
+    font-size: 12px;
+    text-align: center;
+    padding: 4px 0;
+  }
+
+  /* last in a group gets pointy corner indicator */
+  .row.bot.last .bubble { border-bottom-left-radius: 4px; }
+  .row.user.last .bubble { border-bottom-right-radius: 4px; }
+
+  /* gap between groups */
+  .gap { height: 8px; }
+  .gap-lg { height: 16px; }
+
+  /* ── Bubble content formatting ── */
+  .bubble strong { font-weight: 700; }
+  .bubble em { font-style: italic; color: #c8d8e8; }
+  .bubble .user em { color: #d0e4f8; }
+
+  .bubble code {
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 13.5px;
+    background: rgba(0,0,0,0.25);
+    padding: 1px 5px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+  }
+
+  .bubble pre {
+    font-family: 'Courier New', Consolas, monospace;
+    font-size: 13px;
+    background: rgba(0,0,0,0.2);
+    padding: 8px 10px;
+    border-radius: 6px;
+    white-space: pre-wrap;
+    margin: 4px 0;
+    line-height: 1.6;
+  }
+
+  .bubble .line { display: block; margin: 1px 0; }
+  .bubble .line-gap { display: block; height: 6px; }
+  .bubble .cmd-link { color: #5a9fd4; text-decoration: none; cursor: default; }
+  .bubble .mention { color: #5a9fd4; }
+
+  .bubble .header { font-weight: 700; font-size: 15px; margin-bottom: 2px; }
+  .bubble .subheader { font-size: 12px; color: #7d9ab8; margin-bottom: 8px; }
+
+  /* Plant card styling */
+  .plant-card {
+    background: rgba(0,0,0,0.15);
+    border-left: 3px solid #4a9c6b;
+    padding: 8px 12px;
+    border-radius: 0 6px 6px 0;
+    margin: 4px 0;
+    font-size: 13.5px;
+    line-height: 1.7;
+  }
+
+  .plant-card .week-line {
+    font-size: 11px;
+    color: #7d9ab8;
+    margin-bottom: 2px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .plant-card .greeting {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .plant-card .already-note {
+    font-style: italic;
+    font-size: 12.5px;
+    color: #a8c0d8;
+    margin-top: 4px;
+  }
+
+  .progress-bar {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: #7ecf9e;
+  }
+
+  .rank-line { color: #f0c060; font-size: 13px; }
+
+  /* Auto message badge */
+  .auto-badge {
+    display: inline-block;
+    background: #1a3a5c;
+    border: 1px solid #2d5a8e;
+    color: #5a9fd4;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  /* Command user bubble styling */
+  .row.user .bubble.cmd-bubble {
+    font-family: 'Courier New', monospace;
+    font-size: 13.5px;
+    background: #1f3d5c;
+    border: 1px solid #2d5a8e;
+  }
+
+  /* Error bubble */
+  .row.bot .bubble.error {
+    border-left: 3px solid #c0392b;
+    background: #1f1a1a;
+  }
+
+  /* Admin badge */
+  .admin-badge {
+    display: inline-block;
+    background: #3a2a10;
+    border: 1px solid #8b6914;
+    color: #f0c060;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 6px;
+    margin-left: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════ SIDEBAR ═══════════════════════════════ -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>🌱 TC CultivAIte</h1>
+    <p>Bot UI Mockup — All Flows</p>
+  </div>
+  <div id="nav">
+
+    <div class="nav-section-title">Getting Started</div>
+    <a class="nav-item" href="#s1" onclick="setActive(this)">
+      <span class="cmd">/start</span>
+      <span class="label">Welcome message</span>
+    </a>
+    <a class="nav-item" href="#s2" onclick="setActive(this)">
+      <span class="cmd">/help</span>
+      <span class="label">Command list</span>
+    </a>
+    <a class="nav-item" href="#s3" onclick="setActive(this)">
+      <span class="cmd">/tutorial</span>
+      <span class="label">How it works</span>
+    </a>
+
+    <div class="nav-section-title">Goal Setting</div>
+    <a class="nav-item" href="#s4" onclick="setActive(this)">
+      <span class="cmd">/setgoal</span>
+      <span class="label">New user (no goal)</span>
+    </a>
+    <a class="nav-item" href="#s5" onclick="setActive(this)">
+      <span class="cmd">/setgoal</span>
+      <span class="label">Update existing goal</span>
+    </a>
+
+    <div class="nav-section-title">Weekly Reflection</div>
+    <a class="nav-item" href="#s6" onclick="setActive(this)">
+      <span class="cmd">/reflect</span>
+      <span class="label">Full normal flow</span>
+    </a>
+    <a class="nav-item" href="#s7" onclick="setActive(this)">
+      <span class="cmd">/reflect</span>
+      <span class="label">Level-up variant</span>
+    </a>
+    <a class="nav-item" href="#s8" onclick="setActive(this)">
+      <span class="cmd">/reflect</span>
+      <span class="label">Already submitted</span>
+    </a>
+    <a class="nav-item" href="#s9" onclick="setActive(this)">
+      <span class="cmd">/reflect</span>
+      <span class="label">With good news</span>
+    </a>
+    <a class="nav-item" href="#s10" onclick="setActive(this)">
+      <span class="cmd">/reflect</span>
+      <span class="label">User not in system</span>
+    </a>
+
+    <div class="nav-section-title">Stats & History</div>
+    <a class="nav-item" href="#s11" onclick="setActive(this)">
+      <span class="cmd">/mystats</span>
+      <span class="label">With stats</span>
+    </a>
+    <a class="nav-item" href="#s12" onclick="setActive(this)">
+      <span class="cmd">/mystats</span>
+      <span class="label">First-time user</span>
+    </a>
+    <a class="nav-item" href="#s13" onclick="setActive(this)">
+      <span class="cmd">/myreflections</span>
+      <span class="label">Past 5 entries</span>
+    </a>
+    <a class="nav-item" href="#s14" onclick="setActive(this)">
+      <span class="cmd">/editreflection</span>
+      <span class="label">Edit recent entry</span>
+    </a>
+
+    <div class="nav-section-title">Team View</div>
+    <a class="nav-item" href="#s15" onclick="setActive(this)">
+      <span class="cmd">/department</span>
+      <span class="label">Garden stats</span>
+    </a>
+    <a class="nav-item" href="#s16" onclick="setActive(this)">
+      <span class="cmd">/leaderboard</span>
+      <span class="label">All departments ranked</span>
+    </a>
+
+    <div class="nav-section-title">Other</div>
+    <a class="nav-item" href="#s17" onclick="setActive(this)">
+      <span class="cmd">/cancel</span>
+      <span class="label">Exit reflection</span>
+    </a>
+    <a class="nav-item" href="#s18" onclick="setActive(this)">
+      <span class="cmd">/skipweek</span>
+      <span class="label">Admin — excuse user</span>
+    </a>
+    <a class="nav-item" href="#s19" onclick="setActive(this)">
+      <span class="cmd">Auto</span>
+      <span class="label">Monday nudge (cron)</span>
+    </a>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ MAIN ═══════════════════════════════ -->
+<div id="main">
+  <div id="main-header">
+    <div class="bot-avatar">🌱</div>
+    <div class="bot-info">
+      <h2>TC CultivAIte Bot</h2>
+      <p>Q2 Reflection Companion · 19 flows</p>
+    </div>
+  </div>
+
+  <div id="chat">
+
+    <!-- ──────────────────── /start ──────────────────── -->
+    <div class="section" id="s1">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/start</span>
+        <span class="section-label">Welcome</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/start</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🌱 <strong>Welcome to TC CultivAIte!</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">This is your personal reflection companion for Q2.</span>
+          <span class="line-gap"></span>
+          <span class="line">Every week you reflect, your plant grows. Your department's garden blooms. Together, we build the TC Forest.</span>
+          <span class="line-gap"></span>
+          <span class="line">It only takes a few minutes — and every reflection counts.</span>
+          <span class="line-gap"></span>
+          <span class="line">Start by setting your Q2 goal with <a class="cmd-link">/setgoal</a>, then type <a class="cmd-link">/reflect</a> to begin. Or <a class="cmd-link">/help</a> to see all commands.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /help ──────────────────── -->
+    <div class="section" id="s2">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/help</span>
+        <span class="section-label">Command List</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/help</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🌱 <strong>TC CultivAIte</strong></span>
+          <span class="line"><em>Your Q2 reflection companion</em></span>
+          <span class="line-gap"></span>
+          <span class="line"><a class="cmd-link">/reflect</a> — 💧 Submit your weekly reflection</span>
+          <span class="line"><a class="cmd-link">/mystats</a> — 🌿 Check your plant, pts &amp; streak</span>
+          <span class="line"><a class="cmd-link">/setgoal</a> — 🎯 Set or update your Q2 goal</span>
+          <span class="line"><a class="cmd-link">/department</a> — 🌳 See your department garden</span>
+          <span class="line"><a class="cmd-link">/leaderboard</a> — 🏆 See all departments ranked by pts</span>
+          <span class="line"><a class="cmd-link">/tutorial</a> — 📖 How points and stages work</span>
+          <span class="line"><a class="cmd-link">/myreflections</a> — 📋 Browse your past reflections</span>
+          <span class="line"><a class="cmd-link">/editreflection</a> — ✏️ Update your most recent reflection</span>
+          <span class="line"><a class="cmd-link">/cancel</a> — ❌ Cancel a reflection in progress</span>
+          <span class="line"><a class="cmd-link">/skipweek</a> — 🗓 (Admin) Excuse a user for a week</span>
+          <span class="line"><a class="cmd-link">/help</a> — Show this message</span>
+          <span class="line-gap"></span>
+          <span class="line"><em>Reflect weekly. Grow together.</em></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /tutorial ──────────────────── -->
+    <div class="section" id="s3">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/tutorial</span>
+        <span class="section-label">How It Works</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/tutorial</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">📖 <strong>How TC CultivAIte Works</strong></span>
+          <span class="line-gap"></span>
+          <span class="line"><strong>⭐ Earning Points</strong></span>
+          <span class="line">• Reflect each week ▸ <strong>10 pts</strong></span>
+          <span class="line">• Streak bonus ▸ <strong>+1 pt</strong> for each consecutive week</span>
+          <span class="line">&nbsp;&nbsp;<em>(week 3 of a streak = 12 pts)</em></span>
+          <span class="line">• Share good news ▸ <strong>+5 pts</strong> <em>(admin-reviewed)</em></span>
+          <span class="line">• Get named in good news ▸ <strong>+3 pts</strong> <em>(admin-reviewed)</em></span>
+          <span class="line">• Max 1 good news nomination per person per week</span>
+          <span class="line-gap"></span>
+          <span class="line"><strong>🪴 Plant Stages</strong></span>
+          <span class="line">🌱 Seedling ▸ 0–20 pts</span>
+          <span class="line">🌿 Sprout ▸ 21–50 pts</span>
+          <span class="line">🌳 Sapling ▸ 51–85 pts</span>
+          <span class="line">🌼 Flowering ▸ 86–115 pts</span>
+          <span class="line">🍎 Apple ▸ 116–149 pts</span>
+          <span class="line">🍊 Orange ▸ 150–189 pts</span>
+          <span class="line">🍋 Lemon ▸ 190–234 pts</span>
+          <span class="line">🍉 Watermelon ▸ 235–284 pts</span>
+          <span class="line">🏵 Rosette ▸ 285+ pts</span>
+          <span class="line-gap"></span>
+          <span class="line"><strong>🍂 If You Miss a Week</strong></span>
+          <span class="line">• Miss 1 week ▸ plant goes 🍂 Dying</span>
+          <span class="line">• Miss 2+ weeks ▸ plant goes 🥀 Dead</span>
+          <span class="line">• <em>Your pts never decrease — reflect to revive your plant!</em></span>
+          <span class="line-gap"></span>
+          <span class="line"><strong>💧 Fertilizer</strong></span>
+          <span class="line">• Each consecutive week you reflect adds a 💧</span>
+          <span class="line">• More fertilizer = bigger pts bonus per week</span>
+          <span class="line-gap"></span>
+          <span class="line"><strong>🏆 Department Garden</strong></span>
+          <span class="line">• Dept score = average of all members' pts</span>
+          <span class="line">• Everyone submits for 4 weeks in a row → <strong>2× pts</strong> for everyone that week!</span>
+          <span class="line">• Can trigger twice this quarter (week 4 and week 8)</span>
+          <span class="line-gap"></span>
+          <span class="line"><em>Reflect weekly. Grow together. 🌱</em></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /setgoal new ──────────────────── -->
+    <div class="section" id="s4">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/setgoal</span>
+        <span class="section-label">New User — No Goal Yet</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/setgoal</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🎯 <strong>What's your goal for Q2?</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">This will show up as a reminder at the start of every reflection.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <div class="row user last">
+        <div class="bubble"><em>Sharpen my communication skills and contribute meaningfully to every project I touch.</em></div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">✅ Goal saved! 🌱</span>
+          <span class="line-gap"></span>
+          <span class="line">🎯 <em>Sharpen my communication skills and contribute meaningfully to every project I touch.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">You'll see this at the start of every <a class="cmd-link">/reflect</a>.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /setgoal update ──────────────────── -->
+    <div class="section" id="s5">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/setgoal</span>
+        <span class="section-label">Update Existing Goal</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/setgoal</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🎯 <strong>Your current Q2 goal:</strong></span>
+          <span class="line"><em>Sharpen my communication skills and contribute meaningfully to every project I touch.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">What would you like to change it to?</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <div class="row user last">
+        <div class="bubble"><em>Lead at least one cross-department initiative this quarter.</em></div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">✅ Goal saved! 🌱</span>
+          <span class="line-gap"></span>
+          <span class="line">🎯 <em>Lead at least one cross-department initiative this quarter.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">You'll see this at the start of every <a class="cmd-link">/reflect</a>.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /reflect full ──────────────────── -->
+    <div class="section" id="s6">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/reflect</span>
+        <span class="section-label">Full Normal Flow</span>
+        <div class="section-line"></div>
+      </div>
+
+      <!-- Step 1: Plant card -->
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/reflect</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <div class="plant-card">
+            <div class="week-line">Week 1</div>
+            <div class="greeting">Hey Wilson 👋</div>
+            <span class="line">🌿 Your Plant ▸ <strong>30 pts</strong></span>
+            <span class="line"><code class="progress-bar">●●●●●●●●●○</code> 21 pts to 🌳</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ 💧💧💧 <em>(3 weeks)</em></span>
+            <span class="line">❌ Not submitted yet</span>
+            <span class="line-gap"></span>
+            <span class="rank-line">🏅 You're #3 of 12</span>
+          </div>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Step 2: Goal reminder -->
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🎯 <strong>Your Q2 Goal</strong></span>
+          <span class="line"><em>Sharpen my communication skills and contribute meaningfully to every project I touch.</em></span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Step 3: Q1 -->
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line"><strong>Q1:</strong> What's one thing you've grown in personally this week?</span>
+          <span class="line-gap"></span>
+          <span class="line">Take your time — there are no wrong answers here.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row user last">
+        <div class="bubble"><em>I've been more intentional about listening before responding in team discussions.</em></div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Step 4: Q2 -->
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line"><strong>Q2:</strong> How have you improved professionally this week?</span>
+          <span class="line-gap"></span>
+          <span class="line">Even small steps count.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row user last">
+        <div class="bubble"><em>I completed the first draft of the campaign deck ahead of schedule.</em></div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Step 5: Q3 -->
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line"><strong>Q3 (Optional):</strong> Got any good news to share about someone this week?</span>
+          <span class="line-gap"></span>
+          <span class="line">Name them and what they did — both your dept and theirs earn bonus pts! Or type <strong>skip</strong> to finish.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row user last">
+        <div class="bubble">skip</div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Step 6: Confirmation (normal) -->
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">💧 <strong>Plant watered!</strong></span>
+          <span class="line-gap"></span>
+          <div class="plant-card">
+            <span class="line">🌿 Your Plant ▸ <strong>33 pts</strong></span>
+            <span class="line"><code class="progress-bar">●●●●●●●●●●</code> 18 pts to 🌳</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ 💧💧💧💧 <em>(4 weeks)</em></span>
+            <span class="line">✅ Submitted this week</span>
+            <span class="line-gap"></span>
+            <span class="rank-line">🏅 You're #3 of 12</span>
+          </div>
+          <span class="line-gap"></span>
+          <span class="line">Great work this week. See you next Monday! 🌿</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /reflect level-up ──────────────────── -->
+    <div class="section" id="s7">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/reflect</span>
+        <span class="section-label">Level-Up Variant</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="variant-label">→ Same Q1, Q2, Q3 flow as above. Different confirmation:</div>
+
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">💧 <strong>Plant watered!</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">🌳 Your plant just levelled up!</span>
+          <span class="line-gap"></span>
+          <span class="line">18 more pts to reach 🌼</span>
+          <span class="line-gap"></span>
+          <span class="line">⭐ <strong>51 pts</strong> total. You're growing — keep it up! 🌳</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /reflect already submitted ──────────────────── -->
+    <div class="section" id="s8">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/reflect</span>
+        <span class="section-label">Already Submitted This Week</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/reflect</div>
+      </div>
+      <div class="gap"></div>
+
+      <!-- Plant card with already-submitted note -->
+      <div class="row bot last">
+        <div class="bubble">
+          <div class="plant-card">
+            <div class="week-line">Week 1</div>
+            <div class="greeting">Hey Wilson 👋</div>
+            <span class="line">🌿 Your Plant ▸ <strong>33 pts</strong></span>
+            <span class="line"><code class="progress-bar">●●●●●●●●●●</code> 18 pts to 🌳</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ 💧💧💧💧 <em>(4 weeks)</em></span>
+            <span class="line">✅ Submitted this week</span>
+            <span class="line-gap"></span>
+            <span class="rank-line">🏅 You're #3 of 12</span>
+            <span class="already-note">You've already reflected this week — this one won't move your pts, but it's still stored. Keep going!</span>
+          </div>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <div class="variant-label">→ Q1, Q2, Q3 prompts still shown as normal. Then:</div>
+
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">📝 <strong>Reflection stored!</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">Your pts are already locked in for this week — this one's just for you. Keep that momentum going! 🌿</span>
+          <span class="line-gap"></span>
+          <span class="line">See you next week.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /reflect good news ──────────────────── -->
+    <div class="section" id="s9">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/reflect</span>
+        <span class="section-label">With Good News Nomination</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="variant-label">→ Same plant card + goal + Q1 + Q2 as normal flow. At Q3:</div>
+
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line"><strong>Q3 (Optional):</strong> Got any good news to share about someone this week?</span>
+          <span class="line-gap"></span>
+          <span class="line">Name them and what they did — both your dept and theirs earn bonus pts! Or type <strong>skip</strong> to finish.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row user last">
+        <div class="bubble"><em>Sarah from Operations stayed late to help us fix a last-minute deck issue. Real team player.</em></div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row bot last">
+        <div class="bubble">Who are you nominating? Type their full name as it appears in the system.</div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row user last">
+        <div class="bubble">Sarah Lim</div>
+      </div>
+      <div class="gap-lg"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">💧 <strong>Plant watered!</strong></span>
+          <span class="line-gap"></span>
+          <div class="plant-card">
+            <span class="line">🌿 Your Plant ▸ <strong>33 pts</strong></span>
+            <span class="line"><code class="progress-bar">●●●●●●●●●●</code> 18 pts to 🌳</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ 💧💧💧💧 <em>(4 weeks)</em></span>
+            <span class="line">✅ Submitted this week</span>
+          </div>
+          <span class="line-gap"></span>
+          <span class="line">Great work this week. See you next Monday! 🌿</span>
+          <span class="line-gap"></span>
+          <span class="line">🌟 Your good news about <strong>Sarah Lim</strong> has been noted — the team will review it!</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /reflect not in system ──────────────────── -->
+    <div class="section" id="s10">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/reflect</span>
+        <span class="section-label">User Not in System</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/reflect</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble error">
+          <span class="line">Hey! 👋 Looks like you're not in our system yet.</span>
+          <span class="line-gap"></span>
+          <span class="line">Text <span class="mention">@whalewhalewhalee</span> to get added, then come back here — your reflection journey is waiting! 🌱</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /mystats with stats ──────────────────── -->
+    <div class="section" id="s11">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/mystats</span>
+        <span class="section-label">With Stats</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/mystats</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <div class="plant-card">
+            <div class="week-line">Week 1</div>
+            <div class="greeting">Hey Wilson 👋</div>
+            <span class="line">🌿 Your Plant ▸ <strong>33 pts</strong></span>
+            <span class="line"><code class="progress-bar">●●●●●●●●●●</code> 18 pts to 🌳</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ 💧💧💧💧 <em>(4 weeks)</em></span>
+            <span class="line">✅ Submitted this week</span>
+            <span class="line-gap"></span>
+            <span class="rank-line">🏅 You're #3 of 12</span>
+          </div>
+          <span class="line-gap"></span>
+          <span class="line">Your plant is waiting. <a class="cmd-link">/reflect</a> to water it 💧</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /mystats first-time ──────────────────── -->
+    <div class="section" id="s12">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/mystats</span>
+        <span class="section-label">First-Time User — No Stats Yet</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/mystats</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <div class="plant-card">
+            <div class="week-line">Week 1</div>
+            <div class="greeting">Hey Wilson 👋</div>
+            <span class="line">🌱 Your Plant ▸ <strong>0 pts</strong></span>
+            <span class="line"><code class="progress-bar">○○○○○○○○○○</code> 21 pts to 🌿</span>
+            <span class="line-gap"></span>
+            <span class="line">💧 Fertilizer ▸ None <em>(0 weeks)</em></span>
+            <span class="line">❌ Not submitted yet this week</span>
+          </div>
+          <span class="line-gap"></span>
+          <span class="line">Ready to plant your first seed? <a class="cmd-link">/reflect</a> 💧</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /myreflections ──────────────────── -->
+    <div class="section" id="s13">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/myreflections</span>
+        <span class="section-label">Past Reflections</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/myreflections</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">📋 <strong>Your Reflections</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">📅 2026-04-14</span>
+          <span class="line">Q1: <em>I've been more intentional about listening before responding in team discussions.</em></span>
+          <span class="line">Q2: <em>I completed the first draft of the campaign deck ahead of schedule.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">📅 2026-04-07</span>
+          <span class="line">Q1: <em>Worked on staying calm under pressure during the event setup.</em></span>
+          <span class="line">Q2: <em>Coordinated with 3 departments on the Q1 wrap-up.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">📅 2026-03-31</span>
+          <span class="line">Q1: <em>Started being more proactive about asking for feedback.</em></span>
+          <span class="line">Q2: <em>Drafted the first version of the social media calendar for Q2.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">📅 2026-03-24</span>
+          <span class="line">Q1: <em>Pushed myself to speak up more in the weekly team sync.</em></span>
+          <span class="line">Q2: <em>Helped onboard a new team member and documented the process.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">📅 2026-03-17</span>
+          <span class="line">Q1: <em>Focused on not multitasking during meetings.</em></span>
+          <span class="line">Q2: <em>Completed the brand audit ahead of the deadline.</em></span>
+          <span class="line-gap"></span>
+          <span class="line"><em>Showing your last 5 entries.</em></span>
+          <span class="line">Want to make a change? <a class="cmd-link">/editreflection</a></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /editreflection ──────────────────── -->
+    <div class="section" id="s14">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/editreflection</span>
+        <span class="section-label">Edit Most Recent Reflection</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/editreflection</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">Your most recent reflection:</span>
+          <span class="line-gap"></span>
+          <span class="line">📅 <strong>2026-04-14</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">Q1: <em>I've been more intentional about listening before responding in team discussions.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">Q2: <em>I completed the first draft of the campaign deck ahead of schedule.</em></span>
+          <span class="line-gap"></span>
+          <span class="line">Which part would you like to update?</span>
+          <span class="line">Reply <strong>1</strong> for Q1, <strong>2</strong> for Q2, or <strong>3</strong> for both</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <div class="row user last">
+        <div class="bubble">2</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line"><strong>Q2:</strong> How have you improved professionally this week?</span>
+          <span class="line-gap"></span>
+          <span class="line">Even small steps count.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <div class="row user last">
+        <div class="bubble"><em>I refined the campaign deck based on feedback and presented it to the team.</em></div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          ✅ Reflection updated! Your words are saved. 🌱
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /department ──────────────────── -->
+    <div class="section" id="s15">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/department</span>
+        <span class="section-label">Garden Stats</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/department</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <div class="plant-card">
+            <span class="line">🌿 <strong>Business Development</strong></span>
+            <span class="line">Garden ▸ <code class="progress-bar">●●●●●●●●○○</code> 78%</span>
+            <span class="line">Stage ▸ <em>Sprout</em></span>
+            <span class="line-gap"></span>
+            <span class="line">⭐ Avg Points ▸ 42</span>
+            <span class="line">📅 Dept Streak ▸ 2 consecutive 100% week(s)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /leaderboard ──────────────────── -->
+    <div class="section" id="s16">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/leaderboard</span>
+        <span class="section-label">All Departments Ranked</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/leaderboard</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">🏆 <strong>TC Forest Leaderboard</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">🥇 🌳 <strong>Operations</strong></span>
+          <span class="line">⭐ 68 avg pts — <em>Sapling</em></span>
+          <span class="line-gap"></span>
+          <span class="line">🥈 🌿 <strong>Business Development</strong></span>
+          <span class="line">⭐ 42 avg pts — <em>Sprout</em></span>
+          <span class="line-gap"></span>
+          <span class="line">🥉 🌿 <strong>Marketing</strong></span>
+          <span class="line">⭐ 38 avg pts — <em>Sprout</em></span>
+          <span class="line-gap"></span>
+          <span class="line">4. 🌱 <strong>Finance</strong></span>
+          <span class="line">⭐ 18 avg pts — <em>Seedling</em></span>
+          <span class="line-gap"></span>
+          <span class="line">5. 🌱 <strong>HR &amp; Admin</strong></span>
+          <span class="line">⭐ 12 avg pts — <em>Seedling</em></span>
+          <span class="line-gap"></span>
+          <span class="line">Keep reflecting to climb the ranks! 🌿</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /cancel ──────────────────── -->
+    <div class="section" id="s17">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/cancel</span>
+        <span class="section-label">Exit Reflection in Progress</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/cancel</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">No worries! 🌱 Come back whenever you're ready.</span>
+          <span class="line">Your plant will be here waiting — <a class="cmd-link">/reflect</a> to continue.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── /skipweek ──────────────────── -->
+    <div class="section" id="s18">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">/skipweek</span>
+        <span class="section-label">Admin — Excuse a User</span>
+        <div class="section-line"></div>
+      </div>
+
+      <!-- Success -->
+      <div class="variant-label">✅ Admin — success</div>
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/skipweek Wilson 3</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <span class="line">✅ <strong>Week skipped!</strong></span>
+          <span class="line-gap"></span>
+          <span class="line">Wilson (Business Development) has been marked as excused for Week 3.</span>
+          <span class="line-gap"></span>
+          <span class="line">Their streak will be preserved once Apps Script recalculates.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Non-admin -->
+      <div class="variant-label">🚫 Non-admin attempt</div>
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/skipweek Wilson 3</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble error">
+          Sorry, this command is only available to admins.
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- Invalid syntax -->
+      <div class="variant-label">⚠️ Invalid syntax</div>
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/skipweek Wilson</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble error">
+          <span class="line">Usage: /skipweek [Name] [Week]</span>
+          <span class="line-gap"></span>
+          <span class="line">Example: /skipweek Wilson 3</span>
+          <span class="line-gap"></span>
+          <span class="line">Week must be a number between 1 and 13.</span>
+        </div>
+      </div>
+      <div class="gap-lg"></div>
+
+      <!-- User not found -->
+      <div class="variant-label">❓ User not found</div>
+      <div class="row user last">
+        <div class="bubble cmd-bubble">/skipweek Wilsun 3</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble error">
+          <span class="line">Wilsun not found in the Users tab.</span>
+          <span class="line-gap"></span>
+          <span class="line">Check the spelling matches column B exactly.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ──────────────────── Monday Nudge ──────────────────── -->
+    <div class="section" id="s19">
+      <div class="section-header">
+        <div class="section-line"></div>
+        <span class="section-badge">Auto</span>
+        <span class="section-label">Monday Nudge — Cron 10AM SGT</span>
+        <div class="section-line"></div>
+      </div>
+
+      <div class="row system">
+        <div class="bubble">Every Monday 10:00 AM SGT · Sent to users who haven't submitted this week</div>
+      </div>
+      <div class="gap"></div>
+      <div class="row bot last">
+        <div class="bubble">
+          <div style="margin-bottom:8px"><span class="auto-badge">⏰ Automated · Monday 10AM</span></div>
+          <span class="line">🌱 Hey <strong>Wilson</strong>! Just a gentle nudge from your reflection companion.</span>
+          <span class="line-gap"></span>
+          <span class="line">You haven't reflected this week yet — and your plant is waiting to be watered! 💧</span>
+          <span class="line-gap"></span>
+          <span class="line">Submit before <strong>6 PM today</strong> to keep your streak alive.</span>
+          <span class="line"><a class="cmd-link">/reflect</a> — it only takes a couple of minutes.</span>
+        </div>
+      </div>
+
+    </div>
+
+  </div><!-- /chat -->
+</div><!-- /main -->
+
+<script>
+  function setActive(el) {
+    document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+    el.classList.add('active');
+  }
+
+  // Highlight active nav item on scroll
+  const sections = document.querySelectorAll('.section[id]');
+  const navItems = document.querySelectorAll('.nav-item');
+  const chat = document.getElementById('chat');
+
+  chat.addEventListener('scroll', () => {
+    let current = '';
+    sections.forEach(sec => {
+      const top = sec.offsetTop - chat.scrollTop - 80;
+      if (top <= 0) current = sec.id;
+    });
+    navItems.forEach(item => {
+      const href = item.getAttribute('href').replace('#', '');
+      item.classList.toggle('active', href === current);
+    });
+  });
+
+  // Smooth scroll nav clicks to section within chat panel
+  navItems.forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      const id = item.getAttribute('href').replace('#', '');
+      const target = document.getElementById(id);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      setActive(item);
+    });
+  });
+</script>
+</body>
+</html>
