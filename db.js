@@ -658,12 +658,15 @@ export async function reapproveGoodNews(gnId, awards = [], ptsSharer) {
   }));
   const update = { status: 'Approved', notified_at: null };
   if (Number.isInteger(ptsSharer) && ptsSharer >= 0) update.pts_sharer = ptsSharer;
-  const [delResult, insResult, updResult] = await Promise.all([
-    supabase.from('good_news_awards').delete().eq('good_news_id', gnId),
+  // Delete old awards FIRST, then insert new ones — running them in parallel races,
+  // and if the DELETE arrives at Postgres after the INSERT it wipes the new rows too
+  // (both match good_news_id = gnId), leaving the row with zero awards.
+  const { error: delErr } = await supabase.from('good_news_awards').delete().eq('good_news_id', gnId);
+  if (delErr) throw delErr;
+  const [insResult, updResult] = await Promise.all([
     supabase.from('good_news_awards').insert(awardRows),
     supabase.from('good_news').update(update).eq('id', gnId),
   ]);
-  if (delResult.error) throw delResult.error;
   if (insResult.error) throw insResult.error;
   if (updResult.error) throw updResult.error;
   cacheInvalidate('stats');
