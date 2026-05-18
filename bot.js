@@ -927,6 +927,24 @@ bot.use(createConversation(editGoodNewsConversation));
 bot.use(createConversation(setGoalConversation));
 bot.use(createConversation(editReflectionConversation));
 
+// Auto-attach the persistent Reflect/Good News keyboard to every private-chat
+// sendMessage that doesn't already specify a reply_markup. This means existing
+// users see the keyboard the next time the bot replies to ANY message — they
+// don't have to /start again. Inline keyboards (approve/reject buttons, etc.)
+// already set reply_markup so they're skipped.
+bot.api.config.use(async (prev, method, payload, signal) => {
+  if (method === 'sendMessage' && payload && !payload.reply_markup) {
+    const chatId = payload.chat_id;
+    const isPrivate =
+      (typeof chatId === 'number' && chatId > 0) ||
+      (typeof chatId === 'string' && /^\d+$/.test(chatId));
+    if (isPrivate) {
+      payload = { ...payload, reply_markup: mainReplyKb() };
+    }
+  }
+  return prev(method, payload, signal);
+});
+
 // ---------------------------------------------------------------------------
 // /reflect
 // ---------------------------------------------------------------------------
@@ -2336,8 +2354,8 @@ bot.command('cancel', async (ctx) => {
 // ---------------------------------------------------------------------------
 
 // Persistent main keyboard — appears at the bottom of every chat and stays put.
-// Attached to /start, /help, /mystats, and the weekly Monday nudge so it shows
-// up for everyone (incl. users who already started) the next time the bot replies.
+// Auto-attached to every private-chat sendMessage via the API transformer above,
+// so it shows up for everyone the next time the bot replies to anything.
 const MAIN_KB_REFLECT_LABEL  = '📝 Reflect';
 const MAIN_KB_GOODNEWS_LABEL = '💌 Good News';
 function mainReplyKb() {
