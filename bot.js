@@ -3205,7 +3205,7 @@ http.createServer(async (req, res) => {
     if (req.method === 'POST' && approveM) {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
-      await sheets.approveGoodNews(parseInt(approveM[1]), body.awards ?? []);
+      await sheets.approveGoodNews(parseInt(approveM[1]), body.awards ?? [], body.ptsSharer);
       return jsonRes(res, { ok: true });
     }
 
@@ -3222,7 +3222,7 @@ http.createServer(async (req, res) => {
     if (req.method === 'POST' && reapproveM) {
       if (user.role === 'manager') return jsonRes(res, { error: 'Admin only' }, 403);
       const body = await parseBody(req);
-      await sheets.reapproveGoodNews(parseInt(reapproveM[1]), body.awards ?? []);
+      await sheets.reapproveGoodNews(parseInt(reapproveM[1]), body.awards ?? [], body.ptsSharer);
       return jsonRes(res, { ok: true });
     }
 

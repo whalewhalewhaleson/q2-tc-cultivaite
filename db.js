@@ -333,8 +333,23 @@ async function buildStatsCache() {
     if (!members.length) continue;
 
     const memberStats = members.map(n => statsMap[n]).filter(Boolean);
-    const avgPoints   = memberStats.length
-      ? Math.round(memberStats.reduce((s, m) => s + m.totalPoints, 0) / memberStats.length)
+
+    // Dept avg = per-member rate (pts per eligible week), averaged across active members,
+    // then scaled to full weeks. Excused weeks drop out of each member's denominator so
+    // excused absences (sick leave, pre-join weeks) don't drag dept avg down.
+    const fullWeeks = weekNow - launchWeek + 1;
+    let sumOfRates = 0;
+    let activeMembers = 0;
+    for (const m of memberStats) {
+      const lc = m.realName.toLowerCase().trim();
+      const excused = Object.values(userWeekMap[lc] ?? {}).filter(e => e.excused).length;
+      const eligibleWeeks = fullWeeks - excused;
+      if (eligibleWeeks <= 0) continue;
+      sumOfRates += m.totalPoints / eligibleWeeks;
+      activeMembers++;
+    }
+    const avgPoints = activeMembers > 0
+      ? Math.round((sumOfRates / activeMembers) * fullWeeks)
       : 0;
 
     // Total submissions this Q2 (non-excused only)
@@ -578,8 +593,9 @@ export async function getPendingGoodNews() {
 
 // Approve a Good News nomination and record who gets pts.
 // awards: [{ recipientName, recipientDept, pts }]  (1 or more)
-// The nominator's pts_sharer is fixed on the good_news row and applied in buildStatsCache.
-export async function approveGoodNews(gnId, awards = []) {
+// ptsSharer (optional): override the nominator's sharing pts on the good_news row.
+//   buildStatsCache reads from good_news.pts_sharer dynamically.
+export async function approveGoodNews(gnId, awards = [], ptsSharer) {
   if (!gnId || !awards.length) throw new Error('gnId and at least one award required');
 
   const awardRows = awards.map(a => ({
@@ -589,8 +605,11 @@ export async function approveGoodNews(gnId, awards = []) {
     pts:            a.pts ?? 3,
   }));
 
+  const update = { status: 'Approved' };
+  if (Number.isInteger(ptsSharer) && ptsSharer >= 0) update.pts_sharer = ptsSharer;
+
   const [updateResult, insertResult] = await Promise.all([
-    supabase.from('good_news').update({ status: 'Approved' }).eq('id', gnId),
+    supabase.from('good_news').update(update).eq('id', gnId),
     supabase.from('good_news_awards').insert(awardRows),
   ]);
 
@@ -628,7 +647,8 @@ export async function getReviewedGoodNews() {
 }
 
 // Re-approve: delete old award rows and insert new ones (updates who gets pts).
-export async function reapproveGoodNews(gnId, awards = []) {
+// ptsSharer (optional): override the nominator's sharing pts on the good_news row.
+export async function reapproveGoodNews(gnId, awards = [], ptsSharer) {
   if (!gnId || !awards.length) throw new Error('gnId and at least one award required');
   const awardRows = awards.map(a => ({
     good_news_id:   gnId,
@@ -636,10 +656,12 @@ export async function reapproveGoodNews(gnId, awards = []) {
     recipient_dept: a.recipientDept ?? null,
     pts:            a.pts ?? 3,
   }));
+  const update = { status: 'Approved', notified_at: null };
+  if (Number.isInteger(ptsSharer) && ptsSharer >= 0) update.pts_sharer = ptsSharer;
   const [delResult, insResult, updResult] = await Promise.all([
     supabase.from('good_news_awards').delete().eq('good_news_id', gnId),
     supabase.from('good_news_awards').insert(awardRows),
-    supabase.from('good_news').update({ status: 'Approved', notified_at: null }).eq('id', gnId),
+    supabase.from('good_news').update(update).eq('id', gnId),
   ]);
   if (delResult.error) throw delResult.error;
   if (insResult.error) throw insResult.error;
@@ -840,6 +862,9 @@ export async function setGoodNewsWeek(gnId, weekNum) {
 }
 
 export async function grantExtension(realName, weekNumber, type = 'extension') {
+  const { data: existing } = await supabase.from('extensions')
+    .select('id').eq('real_name', realName).eq('week_number', weekNumber).eq('type', type).maybeSingle();
+  if (existing) { cacheInvalidate('stats'); return; }
   const { error } = await supabase.from('extensions')
     .insert({ real_name: realName, week_number: weekNumber, type });
   if (error) throw error;

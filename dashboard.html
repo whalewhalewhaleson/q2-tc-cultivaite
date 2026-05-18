@@ -893,8 +893,20 @@ function renderRankings() {
     let avgPtsAtWk = d.avgPoints;
     let gardenAtWk = d.gardenStage;
     if (!isCurrent && members.length) {
-      const total = members.reduce((s, u) => s + computeUserAtWeek(u, wk).cumulPts, 0);
-      avgPtsAtWk = Math.round(total / members.length);
+      // Match Option B math in db.js: per-member rate (pts per eligible week) averaged, scaled to weeks.
+      const fullWksAtWk = wk - launchWk + 1;
+      let sumOfRates = 0, activeMembers = 0;
+      for (const u of members) {
+        const cumulPts = computeUserAtWeek(u, wk).cumulPts;
+        const excusedSoFar = (u.weeklyBreakdown ?? []).filter(e => e.week <= wk && e.status === 'excused').length;
+        const eligibleWks = fullWksAtWk - excusedSoFar;
+        if (eligibleWks <= 0) continue;
+        sumOfRates += cumulPts / eligibleWks;
+        activeMembers++;
+      }
+      avgPtsAtWk = activeMembers > 0
+        ? Math.round((sumOfRates / activeMembers) * fullWksAtWk)
+        : 0;
       gardenAtWk = pointsToStage(avgPtsAtWk);
     }
     return { ...d, wkRate: wkData.total ? Math.round(wkData.submitted / wkData.total * 100) : 0, wkStreak, avgPtsAtWk, gardenAtWk };
@@ -1339,19 +1351,25 @@ async function approveGN(gnId, btn) {
     awards = [{ recipientName: card.dataset.nominee, recipientDept: card.dataset.nomineeDept, pts: 3 }];
   }
 
+  const ptsSharer = parseInt(card.dataset.ptsSharer);
+  const ptsSharerOut = ptsSharer >= 0 ? ptsSharer : 5;
+
   btn.disabled = true;
   btn.textContent = 'Saving…';
   try {
     await fetch(`/api/good-news/${gnId}/approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ awards: awards.map(r => ({ recipientName: r.name ?? r.recipientName, recipientDept: r.dept ?? r.recipientDept ?? null, pts: parseInt(r.pts) >= 0 ? parseInt(r.pts) : 3 })) }),
+      body: JSON.stringify({
+        ptsSharer: ptsSharerOut,
+        awards: awards.map(r => ({ recipientName: r.name ?? r.recipientName, recipientDept: r.dept ?? r.recipientDept ?? null, pts: parseInt(r.pts) >= 0 ? parseInt(r.pts) : 3 })),
+      }),
     });
     // Move from pending to reviewed in local state
     const idx = _gnPending.findIndex(g => g.id === gnId);
     if (idx !== -1) {
       const parsePts = p => parseInt(p) >= 0 ? parseInt(p) : 3;
-      const row = { ..._gnPending[idx], status: 'Approved', awards: awards.map(r => ({ recipient_name: r.name ?? r.recipientName, recipient_dept: r.dept ?? r.recipientDept ?? null, pts: parsePts(r.pts) })) };
+      const row = { ..._gnPending[idx], status: 'Approved', pts_sharer: ptsSharerOut, awards: awards.map(r => ({ recipient_name: r.name ?? r.recipientName, recipient_dept: r.dept ?? r.recipientDept ?? null, pts: parsePts(r.pts) })) };
       _gnPending.splice(idx, 1);
       _gnReviewed.unshift(row);
     }
@@ -1531,8 +1549,11 @@ function editGN(gnId) {
   el.innerHTML = `
     <div class="gn-edit-label">✏️ Decide who gets the points</div>
     <div style="margin-bottom:10px">
-      <label style="font-size:11px;font-weight:600;color:#6b7c6b">Nominator — always gets +${ptsSharer} pts for sharing</label>
-      <div style="background:#e8f0fe;border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;color:#1a73e8;margin-top:4px">${esc(nominator)}${nominatorD?' ('+esc(nominatorD)+')':''}</div>
+      <label style="font-size:11px;font-weight:600;color:#6b7c6b">Nominator — gets pts for sharing</label>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+        <div style="flex:1;background:#e8f0fe;border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;color:#1a73e8">${esc(nominator)}${nominatorD?' ('+esc(nominatorD)+')':''}</div>
+        <input class="gn-edit-input gn-sharer-input" id="gn-sharer-${gnId}" placeholder="+pts" value="${ptsSharer}" style="width:52px;text-align:center;flex-shrink:0">
+      </div>
     </div>
     <div class="gn-edit-label" style="margin-bottom:6px">Award pts to (add anyone — can be more than one)</div>
     <div id="gnr-${gnId}"></div>
@@ -1668,6 +1689,13 @@ function saveGNEdit(gnId) {
   });
   if (!recipients.length) return;
 
+  // Nominator pts (editable)
+  const sharerInput = document.getElementById(`gn-sharer-${gnId}`);
+  if (sharerInput) {
+    const v = parseInt(sharerInput.value);
+    card.dataset.ptsSharer = (v >= 0 ? v : 5);
+  }
+
   card.dataset.recipients = JSON.stringify(recipients);
 
   // Update nominee display
@@ -1724,8 +1752,11 @@ function editGNReviewed(gnId, currentStatus) {
   el.innerHTML = `
     <div class="gn-edit-label">✏️ Edit award recipients</div>
     <div style="margin-bottom:10px">
-      <label style="font-size:11px;font-weight:600;color:#6b7c6b">Nominator — always gets +${ptsSharer} pts</label>
-      <div style="background:#e8f0fe;border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;color:#1a73e8;margin-top:4px">${esc(nominator)}${nominatorD?' ('+esc(nominatorD)+')':''}</div>
+      <label style="font-size:11px;font-weight:600;color:#6b7c6b">Nominator — gets pts for sharing</label>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+        <div style="flex:1;background:#e8f0fe;border-radius:6px;padding:7px 10px;font-size:13px;font-weight:600;color:#1a73e8">${esc(nominator)}${nominatorD?' ('+esc(nominatorD)+')':''}</div>
+        <input class="gn-edit-input gn-sharer-input" id="gnr-sharer-${gnId}" placeholder="+pts" value="${ptsSharer}" style="width:52px;text-align:center;flex-shrink:0">
+      </div>
     </div>
     <div class="gn-edit-label" style="margin-bottom:6px">Award pts to</div>
     <div id="gnrr-${gnId}"></div>
@@ -1872,11 +1903,15 @@ async function saveReviewedEdit(gnId) {
   });
   if (!awards.length) return;
 
+  const sharerInput = document.getElementById(`gnr-sharer-${gnId}`);
+  const sharerParsed = sharerInput ? parseInt(sharerInput.value) : NaN;
+  const ptsSharer = sharerParsed >= 0 ? sharerParsed : 5;
+
   try {
     await fetch(`/api/good-news/${gnId}/re-approve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ awards }),
+      body: JSON.stringify({ awards, ptsSharer }),
     });
     // Update local state
     const idx = _gnReviewed.findIndex(g => g.id === gnId);
@@ -1884,6 +1919,7 @@ async function saveReviewedEdit(gnId) {
       _gnReviewed[idx] = {
         ..._gnReviewed[idx],
         status: 'Approved',
+        pts_sharer: ptsSharer,
         awards: awards.map(a => ({ recipient_name: a.recipientName, recipient_dept: a.recipientDept, pts: a.pts })),
       };
     }
@@ -2062,9 +2098,10 @@ async function confirmMoveGNWeek(gnId) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
-async function removeExtensionPrompt(name) {
-  const wk = parseInt(prompt(`Remove extension/excuse for ${name}. Enter week number:`));
+async function removeExcusedWeek(name, weekNumber) {
+  const wk = parseInt(weekNumber);
   if (!wk) return;
+  if (!confirm(`Remove excuse for ${name} — Week ${toISOWeek(wk)}?`)) return;
   try {
     await fetch('/api/extensions', {
       method: 'DELETE',
@@ -2175,7 +2212,7 @@ async function openDrawer(name) {
           const fmt = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
           return `<div class="lb-refl-card" onclick="this.classList.toggle('expanded')">
             <div class="lb-refl-header">
-              <span style="font-size:12px;font-weight:700;color:#2d6a4f">Week ${wk}</span>
+              <span style="font-size:12px;font-weight:700;color:#2d6a4f">Week ${toISOWeek(wk)}</span>
               <span style="font-size:10px;color:#8a9a8a">${esc(fmt)}</span>
               <span class="lb-refl-hint"></span>
             </div>
@@ -2228,12 +2265,18 @@ async function openDrawer(name) {
       ${receivedHtml}`;
 
     // ── Section 4: Admin ───────────────────────────────────────────────────
+    const excusedWeeks = [...new Set(myExts.filter(e => e.type === 'excused').map(e => e.week_number))].sort((a,b) => b-a);
+    const excusedSet = new Set(excusedWeeks);
     const weekOpts = Array.from({ length: weekNow }, (_, i) => weekNow - i)
       .map(w => `<option value="${w}">Week ${toISOWeek(w)}</option>`).join('');
-    const excListHtml = myExts.filter(e => e.type === 'excused').length
-      ? `<div style="margin-top:10px;font-size:11px;color:#6b7c6b;background:#f5f7f5;border-radius:6px;padding:8px 10px">
-          Excused: ${myExts.filter(e => e.type === 'excused').map(e => `W${toISOWeek(e.week_number)}`).join(', ')}
-          <a href="#" onclick="removeExtensionPrompt(${jAttr(name)});return false" style="color:#c5221f;font-weight:700;margin-left:6px">Remove…</a>
+    const excuseWeekOpts = Array.from({ length: weekNow }, (_, i) => weekNow - i)
+      .map(w => excusedSet.has(w)
+        ? `<option value="${w}" disabled>Week ${toISOWeek(w)} · already excused</option>`
+        : `<option value="${w}">Week ${toISOWeek(w)}</option>`).join('');
+    const excListHtml = excusedWeeks.length
+      ? `<div style="margin-top:10px;font-size:11px;color:#6b7c6b;background:#f5f7f5;border-radius:6px;padding:8px 10px;display:flex;align-items:center;flex-wrap:wrap;gap:6px">
+          <span style="font-weight:600">Excused:</span>
+          ${excusedWeeks.map(w => `<span style="display:inline-flex;align-items:center;gap:2px;background:#fff3e0;color:#e65100;border:1px solid #ffcc80;border-radius:12px;padding:2px 4px 2px 8px;font-weight:700;font-size:11px">W${toISOWeek(w)}<button onclick="removeExcusedWeek(${jAttr(name)},${w})" title="Remove excuse" style="background:none;border:none;color:#c5221f;font-weight:900;cursor:pointer;padding:0 4px;font-size:14px;line-height:1">×</button></span>`).join('')}
         </div>`
       : '';
     const moveSubsHtml = subs.length
@@ -2242,7 +2285,7 @@ async function openDrawer(name) {
           const fmt = s.date ? new Date(s.date + 'T12:00:00+08:00').toLocaleDateString('en-SG', {day:'numeric',month:'short'}) : '';
           const sid = `mv-${s.rowIndex}`;
           return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:12px">
-            <span style="font-weight:700;color:#2d6a4f;min-width:52px">Week ${wk}</span>
+            <span style="font-weight:700;color:#2d6a4f;min-width:62px">Week ${toISOWeek(wk)}</span>
             <span style="color:#6b7c6b">${esc(fmt)} · ${esc(s.time)}</span>
             <button class="lb-admin-btn" style="margin:0;padding:3px 10px;font-size:11px" onclick="toggleAdminForm('${sid}',this)">Move ▾</button>
             <div id="${sid}" class="lb-admin-form" style="display:none;flex:1">
@@ -2262,7 +2305,7 @@ async function openDrawer(name) {
       <button class="lb-admin-btn" onclick="toggleAdminForm('exc-${safeId}',this)">🟠 Excuse Week</button>
       <div id="exc-${safeId}" class="lb-admin-form" style="display:none">
         <div style="font-size:11px;font-weight:700;color:#1a2e1a;margin-bottom:6px">Excuse absence — streak preserved, no points earned</div>
-        <select id="exc-wk-${safeId}" class="lb-admin-select">${weekOpts}</select>
+        <select id="exc-wk-${safeId}" class="lb-admin-select">${excuseWeekOpts}</select>
         <div style="display:flex;gap:6px;margin-top:8px">
           <button class="lb-admin-confirm" onclick="submitExtension(${jAttr(name)},'excused',document.getElementById('exc-wk-${safeId}').value)">Confirm</button>
           <button class="lb-admin-cancel" onclick="toggleAdminForm('exc-${safeId}',null)">Cancel</button>
