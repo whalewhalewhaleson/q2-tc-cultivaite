@@ -312,9 +312,17 @@ function isLeadershipOrAdmin(ctx) {
   return allIds.includes(String(ctx.from?.id ?? ''));
 }
 
+// Persistent reply-keyboard labels. Declared here (above waitForText) so the
+// interceptor can recognise them mid-conversation; the keyboard builder below
+// re-uses the same constants.
+const MAIN_KB_REFLECT_LABEL  = '📝 Reflect';
+const MAIN_KB_GOODNEWS_LABEL = '💌 Good News';
+
 // ---------------------------------------------------------------------------
 // Command interceptor — use inside conversations instead of waitFor directly
-// Returns the message context, or null if a command was typed (exits flow)
+// Returns the message context, or null if a command was typed (exits flow).
+// Also re-routes persistent-keyboard taps so tapping "💌 Good News" mid-reflect
+// (or vice-versa) switches flows instead of being stored as the answer.
 // ---------------------------------------------------------------------------
 
 async function waitForText(conversation, ctx, cancelMsg = null) {
@@ -327,6 +335,18 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
       { parse_mode: 'MarkdownV2' }
     );
     return null;
+  }
+
+  // Persistent-keyboard re-route. halt({ next: true }) ends this conversation
+  // and lets the update fall through to bot.hears below, which enters the
+  // correct conversation cleanly.
+  if (text === MAIN_KB_REFLECT_LABEL || text === MAIN_KB_GOODNEWS_LABEL) {
+    const switchingTo = text === MAIN_KB_REFLECT_LABEL ? '/reflect' : '/goodnews';
+    await ctx.reply(
+      `Got it — switching over to ${switchingTo}\\. Your previous answers weren't saved\\. 🌱`,
+      { parse_mode: 'MarkdownV2' }
+    );
+    await conversation.halt({ next: true });
   }
 
   return msgCtx;
@@ -570,6 +590,14 @@ async function reflectConversation(conversation, ctx) {
     if (text.startsWith('/')) {
       await ctx.reply(`No worries\\. Come back and /reflect whenever you're ready\\. 🌱`, { parse_mode: 'MarkdownV2' });
       return;
+    }
+    if (text === MAIN_KB_REFLECT_LABEL || text === MAIN_KB_GOODNEWS_LABEL) {
+      const switchingTo = text === MAIN_KB_REFLECT_LABEL ? '/reflect' : '/goodnews';
+      await ctx.reply(
+        `Got it — switching over to ${switchingTo}\\. Your reflection wasn't saved\\. 🌱`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      await conversation.halt({ next: true });
     }
     q3Input = text;
   }
@@ -2364,8 +2392,8 @@ bot.command('cancel', async (ctx) => {
 // Persistent main keyboard — appears at the bottom of every chat and stays put.
 // Auto-attached to every private-chat sendMessage via the API transformer above,
 // so it shows up for everyone the next time the bot replies to anything.
-const MAIN_KB_REFLECT_LABEL  = '📝 Reflect';
-const MAIN_KB_GOODNEWS_LABEL = '💌 Good News';
+// MAIN_KB_REFLECT_LABEL / MAIN_KB_GOODNEWS_LABEL are declared near waitForText
+// so the in-conversation interceptor can see them too.
 function mainReplyKb() {
   return new Keyboard()
     .text(MAIN_KB_REFLECT_LABEL)
