@@ -274,7 +274,8 @@ async function buildStatsCache() {
         } else if (!entry.excused) {
           currentStreak++;
           weekPts = 10 + (currentStreak - 1);
-          if ((deptConsec[dept]?.[wk] ?? 0) >= 4) { weekPts *= 2; dept2x = true; }
+          const deptRun = deptConsec[dept]?.[wk] ?? 0;
+          if (deptRun > 0 && deptRun % 4 === 0) { weekPts *= 2; dept2x = true; }
           status = entry.extended ? 'extended' : 'submitted';
         } else {
           status = 'excused';

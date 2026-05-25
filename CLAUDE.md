@@ -55,7 +55,7 @@ dashboard.html (~2000 lines)
 - On-time submission: 10 + (streak - 1) pts
 - Late submission: 5 pts (breaks streak)
 - Excused absence: 0 pts (preserves streak)
-- Dept 4-week bonus: 2x if department has 100% submission for 4+ consecutive weeks
+- Dept 4-week bonus: 2x **only** when the dept's consecutive-100% run hits a multiple of 4 (weeks 4, 8, 12 of the streak — not every week after week 4)
 - Good news: nominator gets pts_sharer (5), recipients get pts_nominee (3)
 
 ## Plant Stages (by cumulative points)
