@@ -84,6 +84,14 @@ let lastRecapWeek = 0;
 // Abort flags — set by /cancelnudge, checked by the corresponding cron before sending
 const cronAbortFlags = { deadline: false };
 
+// Chats currently inside a grammy conversation. The API transformer further
+// down skips auto-attaching mainReplyKb() for these chats so:
+//   - In-conversation prompts don't re-assert the persistent reply keyboard.
+//   - Outbound DMs from broadcasts, cron nudges, approval notifs, etc.
+//     don't replace the keyboard for users mid-flow (which Telegram renders
+//     as a UI flicker that effectively forces a refresh).
+const activeConvoChats = new Set();
+
 function getWeekNumber() {
   const start = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT boundary
   const ms = Date.now() - start.getTime();
@@ -332,7 +340,7 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
   if (text.startsWith('/')) {
     await ctx.reply(
       cancelMsg ?? `No worries\\. Come back and /reflect whenever you're ready\\. 🌱`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
     return null;
   }
@@ -344,7 +352,7 @@ async function waitForText(conversation, ctx, cancelMsg = null) {
     const switchingTo = text === MAIN_KB_REFLECT_LABEL ? '/reflect' : '/goodnews';
     await ctx.reply(
       `Got it — switching over to ${switchingTo}\\. Your previous answers weren't saved\\. 🌱`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
     await conversation.halt({ next: true });
   }
@@ -381,52 +389,61 @@ async function safeReply(ctx, text, options = {}) {
 async function setupConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
-  const user = await conversation.external(() => lookupUser(chatId, username));
+  try {
+    const user = await conversation.external(() => lookupUser(chatId, username));
 
-  if (!user?.realName) {
-    await ctx.reply(
-      `Looks like you're not in our system yet\\.\nText @whalewhalewhalee to get added, then come back here\\! 🌱`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
-  }
+    if (!user?.realName) {
+      await ctx.reply(
+        `Looks like you're not in our system yet\\.\nText @whalewhalewhalee to get added, then come back here\\! 🌱`,
+        { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
+      );
+      return;
+    }
 
-  const cancelMsg = `No worries\\! 🌱 You can always run /nick or /setgoal whenever you're ready\\.`;
+    const cancelMsg = `No worries\\! 🌱 You can always run /nick or /setgoal whenever you're ready\\.`;
 
-  // --- Nickname ---
-  const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
-  if (!existingNick) {
-    await ctx.reply(
-      `What should I call you? 🌱\n${italic("Type a nickname to get started — or /cancel if you're not ready yet.")}`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    const nickCtx = await waitForText(conversation, ctx, cancelMsg);
-    if (!nickCtx) return;
-    const nick = nickCtx.message.text.trim();
-    await conversation.external(() => sheets.setNickname(user.realName, nick));
-    await ctx.reply(`Nice to meet you, ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2' });
-  }
+    // --- Nickname ---
+    const existingNick = await conversation.external(() => sheets.getNickname(user.realName));
+    if (!existingNick) {
+      await ctx.reply(
+        `What should I call you? 🌱\n${italic("Type a nickname to get started — or /cancel if you're not ready yet.")}`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+      const nickCtx = await waitForText(conversation, ctx, cancelMsg);
+      if (!nickCtx) return;
+      const nick = nickCtx.message.text.trim();
+      await conversation.external(() => sheets.setNickname(user.realName, nick));
+      // mainReplyKb here in case the goal branch below doesn't fire (goal already set) —
+      // ensures the persistent kb is visible when the convo ends. If the goal prompt does
+      // fire next, its remove_keyboard re-hides the kb for that prompt.
+      await ctx.reply(`Nice to meet you, ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+    }
 
-  // --- Goal ---
-  const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
-  if (!existingGoal) {
-    await ctx.reply(
-      `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
-      `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    const goalCtx = await waitForText(conversation, ctx, cancelMsg);
-    if (!goalCtx) return;
-    const goal = goalCtx.message.text.trim();
-    await conversation.external(() => sheets.setGoal(user.realName, goal));
-    const goalConfirms = [
-      `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('Locked in!')} Ready to /reflect?`,
-      `✅ And you're set\\! /reflect whenever you're ready\\!`,
-    ];
-    const goalConfirm = goalConfirms[Math.floor(Math.random() * goalConfirms.length)];
-    await ctx.reply(goalConfirm, { parse_mode: 'MarkdownV2' });
+    // --- Goal ---
+    const existingGoal = await conversation.external(() => sheets.getGoal(user.realName));
+    if (!existingGoal) {
+      await ctx.reply(
+        `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
+        `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+      const goalCtx = await waitForText(conversation, ctx, cancelMsg);
+      if (!goalCtx) return;
+      const goal = goalCtx.message.text.trim();
+      await conversation.external(() => sheets.setGoal(user.realName, goal));
+      const goalConfirms = [
+        `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
+        `✅ ${bold('Locked in!')} Ready to /reflect?`,
+        `✅ And you're set\\! /reflect whenever you're ready\\!`,
+      ];
+      const goalConfirm = goalConfirms[Math.floor(Math.random() * goalConfirms.length)];
+      await ctx.reply(goalConfirm, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+    }
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
 }
 
@@ -437,37 +454,43 @@ async function setupConversation(conversation, ctx) {
 async function setNicknameConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
-  const user = await conversation.external(() => lookupUser(chatId, username));
+  try {
+    const user = await conversation.external(() => lookupUser(chatId, username));
 
-  if (!user?.realName) {
-    await ctx.reply(
-      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    return;
+    if (!user?.realName) {
+      await ctx.reply(
+        `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+        { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
+      );
+      return;
+    }
+
+    const existing = await conversation.external(() => sheets.getNickname(user.realName));
+
+    if (existing) {
+      await ctx.reply(
+        `Your current nickname is ${bold(existing)}\\.\n\nWhat would you like to change it to?`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+    } else {
+      await ctx.reply(
+        `What should I call you? 🌱`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+    }
+
+    const nickCtx = await waitForText(conversation, ctx);
+    if (!nickCtx) return;
+    const nick = nickCtx.message.text.trim();
+
+    await conversation.external(() => sheets.setNickname(user.realName, nick));
+    await ctx.reply(`✅ Nickname set to ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
-
-  const existing = await conversation.external(() => sheets.getNickname(user.realName));
-
-  if (existing) {
-    await ctx.reply(
-      `Your current nickname is ${bold(existing)}\\.\n\nWhat would you like to change it to?`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  } else {
-    await ctx.reply(
-      `What should I call you? 🌱`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  }
-
-  const nickCtx = await waitForText(conversation, ctx);
-  if (!nickCtx) return;
-  const nick = nickCtx.message.text.trim();
-
-  await conversation.external(() => sheets.setNickname(user.realName, nick));
-  await ctx.reply(`✅ Nickname set to ${bold(nick)}\\! 🌿`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -477,9 +500,12 @@ async function setNicknameConversation(conversation, ctx) {
 async function reflectConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
+  try {
   if (!chatId) {
-    await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2' });
+    await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
     return;
   }
 
@@ -490,7 +516,7 @@ async function reflectConversation(conversation, ctx) {
     await ctx.reply(
       `Hey\\! 👋 Looks like you're not in our system yet\\.\n\n` +
       `Text @whalewhalewhalee to get added, then come back here — your reflection journey is waiting\\! 🌱`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
     return;
   }
@@ -517,7 +543,7 @@ async function reflectConversation(conversation, ctx) {
       `Hey ${e(displayName)} 🐳 👋 One thing before we start —\n\n` +
       `${bold("Who do you want to be by the end of Q2?")} 🌱\n\n` +
       `${italic("Just type it out! I'll bring it up every time you reflect to keep you on track. (Change it anytime with /setgoal.)")}`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
     );
     const goalCtx = await waitForText(conversation, ctx);
     if (!goalCtx) return;
@@ -542,7 +568,7 @@ async function reflectConversation(conversation, ctx) {
       `${italic('(Your reflections will be visible to your managers/HODs!)')}`,
     ];
     const opener = reflectOpeners[Math.floor(Math.random() * reflectOpeners.length)];
-    await ctx.reply(opener, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(opener, { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } });
   }
 
   // --- Step 4: Q1 prompt (message 2) ---
@@ -588,14 +614,14 @@ async function reflectConversation(conversation, ctx) {
   } else {
     const text = q3Event.message.text?.trim() ?? '';
     if (text.startsWith('/')) {
-      await ctx.reply(`No worries\\. Come back and /reflect whenever you're ready\\. 🌱`, { parse_mode: 'MarkdownV2' });
+      await ctx.reply(`No worries\\. Come back and /reflect whenever you're ready\\. 🌱`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
       return;
     }
     if (text === MAIN_KB_REFLECT_LABEL || text === MAIN_KB_GOODNEWS_LABEL) {
       const switchingTo = text === MAIN_KB_REFLECT_LABEL ? '/reflect' : '/goodnews';
       await ctx.reply(
         `Got it — switching over to ${switchingTo}\\. Your reflection wasn't saved\\. 🌱`,
-        { parse_mode: 'MarkdownV2' }
+        { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
       );
       await conversation.halt({ next: true });
     }
@@ -685,7 +711,7 @@ async function reflectConversation(conversation, ctx) {
         : `Your good news about ${nomineeName} has been noted — the team will review it!`;
       msg += `\n\n🌟 ${italic(goodNewsLine)}`;
     }
-    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
   } else if (levelledUp) {
     const { nextEmoji, ptsNeeded } = getNextStageInfo(newStage, newPoints);
     let msg = `💧 ${bold('Plant watered!')}\n\n${newStage} ${bold('Your plant just levelled up!')}\n`;
@@ -701,7 +727,7 @@ async function reflectConversation(conversation, ctx) {
       msg += `\n\n🌟 ${italic(nomineeName === 'Unknown' ? `Good news noted — the team will review it!` : `Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     msg += celebrationLine;
-    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
   } else {
     let msg = `💧 ${bold('Plant watered!')}\n\n`;
     msg += buildPlantCard(newStage, newPct, newStreak, true, newPoints, newMisses, null, null);
@@ -713,11 +739,14 @@ async function reflectConversation(conversation, ctx) {
       msg += `\n\n🌟 ${italic(nomineeName === 'Unknown' ? `Good news noted — the team will review it!` : `Good news about ${nomineeName} noted — the team will review it!`)}`;
     }
     msg += celebrationLine;
-    await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(msg, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
   }
 
   if (completedDept && !alreadySubmitted) {
     conversation.external(() => broadcastDeptShoutout(completedDept));
+  }
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
 }
 
@@ -728,48 +757,54 @@ async function reflectConversation(conversation, ctx) {
 async function goodNewsConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
-  if (!chatId) {
-    await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2' });
-    return;
-  }
+  try {
+    if (!chatId) {
+      await ctx.reply("Hmm, I couldn't identify you 😅 Text @whalewhalewhalee if this keeps happening\\!", { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+      return;
+    }
 
-  const user = await conversation.external(() => lookupUser(chatId, username));
-  if (!user?.realName) {
-    await ctx.reply(
-      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
-      { parse_mode: 'MarkdownV2' }
+    const user = await conversation.external(() => lookupUser(chatId, username));
+    if (!user?.realName) {
+      await ctx.reply(
+        `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+        { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
+      );
+      return;
+    }
+
+    await safeReply(ctx,
+      `${bold('Got someone to shout out? ⭐️')}\n\n` +
+      `${italic('Did someone display our core values, go the extra mile, or show great character? Tell us who and what happened — the more specific, the better!')}\n\n` +
+      `${italic('You can shout out more than one person.')}\n\n` +
+      `📬 ${italic('FYI: the people you shout out will receive a notification once the team reviews it.')}`,
+      { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
     );
-    return;
+
+    const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back anytime to share good news\\! ⭐️`);
+    if (!inputCtx) return;
+
+    const input = inputCtx.message.text.trim();
+    let nomineeName, message;
+    nomineeName = 'Unknown';
+    message = input.trim();
+
+    if (!message) {
+      await ctx.reply(`Hmm, didn't catch a message there\\. Try again with /goodnews\\! ⭐️`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+      return;
+    }
+
+    await conversation.external(async () => {
+      await sheets.logGoodNews(user.realName, user.department, nomineeName, 'Unknown', message, getWeekNumber());
+      sheets.invalidateStatsCache();
+    });
+
+    await ctx.reply(`Logged\\! ⭐️ The team will review it on Monday\\! 😊`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
-
-  await safeReply(ctx,
-    `${bold('Got someone to shout out? ⭐️')}\n\n` +
-    `${italic('Did someone display our core values, go the extra mile, or show great character? Tell us who and what happened — the more specific, the better!')}\n\n` +
-    `${italic('You can shout out more than one person.')}\n\n` +
-    `📬 ${italic('FYI: the people you shout out will receive a notification once the team reviews it.')}`,
-    { parse_mode: 'MarkdownV2' }
-  );
-
-  const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back anytime to share good news\\! ⭐️`);
-  if (!inputCtx) return;
-
-  const input = inputCtx.message.text.trim();
-  let nomineeName, message;
-  nomineeName = 'Unknown';
-  message = input.trim();
-
-  if (!message) {
-    await ctx.reply(`Hmm, didn't catch a message there\\. Try again with /goodnews\\! ⭐️`, { parse_mode: 'MarkdownV2' });
-    return;
-  }
-
-  await conversation.external(async () => {
-    await sheets.logGoodNews(user.realName, user.department, nomineeName, 'Unknown', message, getWeekNumber());
-    sheets.invalidateStatsCache();
-  });
-
-  await ctx.reply(`Logged\\! ⭐️ The team will review it on Monday\\! 😊`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -779,48 +814,55 @@ async function goodNewsConversation(conversation, ctx) {
 async function setGoalConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
-  const user = await conversation.external(() => lookupUser(chatId, username));
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
-  if (!user?.realName) {
+  try {
+    const user = await conversation.external(() => lookupUser(chatId, username));
+
+    if (!user?.realName) {
+      await ctx.reply(
+        `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
+        { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
+      );
+      return;
+    }
+
+    const existing = await conversation.external(() => sheets.getGoal(user.realName));
+
+    if (existing) {
+      await ctx.reply(
+        `🎯 ${bold('Your current goal:')}\n${italic(existing)}\n\n` +
+        `What do you want to change it to?`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+    } else {
+      await ctx.reply(
+        `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
+        `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
+        { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
+      );
+    }
+
+    const goalCtx = await waitForText(conversation, ctx);
+    if (!goalCtx) return;
+    const newGoal = goalCtx.message.text.trim();
+
+    await conversation.external(() => sheets.setGoal(user.realName, newGoal));
     await ctx.reply(
-      `Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`,
-      { parse_mode: 'MarkdownV2' }
+      (() => {
+      const confirms = [
+        `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
+        `✅ ${bold('Locked in!')} Ready to /reflect?`,
+        `✅ And you're set\\! /reflect whenever you're ready\\!`,
+      ];
+      return confirms[Math.floor(Math.random() * confirms.length)];
+    })(),
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
-    return;
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
-
-  const existing = await conversation.external(() => sheets.getGoal(user.realName));
-
-  if (existing) {
-    await ctx.reply(
-      `🎯 ${bold('Your current goal:')}\n${italic(existing)}\n\n` +
-      `What do you want to change it to?`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  } else {
-    await ctx.reply(
-      `What kind of person do you want to be by the end of Q2? ❤️🎯🥊\n\n` +
-      `${italic("This will show up every time you reflect — so make it personal. You can always change it with /setgoal.")}`,
-      { parse_mode: 'MarkdownV2' }
-    );
-  }
-
-  const goalCtx = await waitForText(conversation, ctx);
-  if (!goalCtx) return;
-  const newGoal = goalCtx.message.text.trim();
-
-  await conversation.external(() => sheets.setGoal(user.realName, newGoal));
-  await ctx.reply(
-    (() => {
-    const confirms = [
-      `✅ ${bold('Set.')} Let's lock it in\\! Ready to /reflect?`,
-      `✅ ${bold('Locked in!')} Ready to /reflect?`,
-      `✅ And you're set\\! /reflect whenever you're ready\\!`,
-    ];
-    return confirms[Math.floor(Math.random() * confirms.length)];
-  })(),
-    { parse_mode: 'MarkdownV2' }
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -832,13 +874,13 @@ async function setGoalConversation(conversation, ctx) {
 async function doEditGoodNews(conversation, ctx, user) {
   const latest = await conversation.external(() => sheets.getLatestGoodNewsForNominator(user.realName));
   if (!latest) {
-    await ctx.reply(`No good news submissions found\\. Share one with /goodnews anytime\\! ⭐️`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`No good news submissions found\\. Share one with /goodnews anytime\\! ⭐️`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
     return;
   }
   if (latest.status !== 'Pending') {
     await ctx.reply(
       `Your most recent good news has already been ${e(latest.status.toLowerCase())} by the team \\(W${e(String(latest.week_number))}\\)\\.\n\nOnly Pending submissions can be edited\\.`,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() }
     );
     return;
   }
@@ -846,82 +888,89 @@ async function doEditGoodNews(conversation, ctx, user) {
     `${bold('Your most recent good news')} ${italic(`(W${latest.week_number}, Pending)`)}\n\n` +
     `${e(latest.message)}\n\n` +
     `What would you like to change it to?`,
-    { parse_mode: 'MarkdownV2' }
+    { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } }
   );
   const inputCtx = await waitForText(conversation, ctx, `No worries\\. Come back whenever you're ready\\.`);
   if (!inputCtx) return;
   const message = inputCtx.message.text.trim();
   if (!message) {
-    await ctx.reply(`Hmm, nothing there\\. Try again\\.`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`Hmm, nothing there\\. Try again\\.`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
     return;
   }
   await conversation.external(() => sheets.updatePendingGoodNews(latest.id, latest.nominee_name, message));
-  await ctx.reply(`✅ Good news updated\\! The team will still review it on Monday\\. 😊`, { parse_mode: 'MarkdownV2' });
+  await ctx.reply(`✅ Good news updated\\! The team will still review it on Monday\\. 😊`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
 }
 
 async function editReflectionConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
 
-  const user = await conversation.external(() => lookupUser(chatId, username));
-  if (!user?.realName) {
-    await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
-    return;
+  try {
+    const user = await conversation.external(() => lookupUser(chatId, username));
+    if (!user?.realName) {
+      await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+      return;
+    }
+
+    const submissions = await conversation.external(() => sheets.getSubmissionsForUser(user.realName, 1));
+    if (!submissions.length) {
+      await ctx.reply(`No reflections stored yet\\. Your first one is just a /reflect away\\! 🌱`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+      return;
+    }
+
+    const latest = submissions[0];
+
+    // 3 separate messages — one per question. First one hides the persistent kb
+    // so it doesn't sit under the inline picker that comes next.
+    await ctx.reply(`${bold('Your most recent reflection')} · 📅 ${e(latest.date)}`, { parse_mode: 'MarkdownV2', reply_markup: { remove_keyboard: true } });
+    await ctx.reply(`${bold('Q1')}\n${e(latest.q1 || '—')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold('Q2')}\n${e(latest.q2 || '—')}`, { parse_mode: 'MarkdownV2' });
+    await ctx.reply(`${bold('Q3 ⭐️')}\n${e(cleanQ3(latest.q3) || 'None shared this week')}`, { parse_mode: 'MarkdownV2' });
+
+    // Inline keyboard for choice
+    const keyboard = new InlineKeyboard()
+      .text('Q1', 'edit_q1').text('Q2', 'edit_q2').row()
+      .text('Q1 + Q2', 'edit_both').text('Q3 Good News ⭐️', 'edit_q3');
+
+    await ctx.reply('Which part would you like to update?', { reply_markup: keyboard });
+
+    const event = await conversation.waitFor('callback_query:data');
+    await event.answerCallbackQuery();
+    const choice = event.callbackQuery.data;
+
+    if (choice === 'edit_q3') {
+      await doEditGoodNews(conversation, ctx, user);
+      return;
+    }
+
+    let newQ1 = latest.q1;
+    let newQ2 = latest.q2;
+
+    if (choice === 'edit_q1' || choice === 'edit_both') {
+      await ctx.reply(
+        `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
+        `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
+        { parse_mode: 'MarkdownV2' }
+      );
+      const q1Ctx = await waitForText(conversation, ctx);
+      if (!q1Ctx) return;
+      newQ1 = q1Ctx.message.text;
+    }
+
+    if (choice === 'edit_q2' || choice === 'edit_both') {
+      await ctx.reply(`${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`, { parse_mode: 'MarkdownV2' });
+      const q2Ctx = await waitForText(conversation, ctx);
+      if (!q2Ctx) return;
+      newQ2 = q2Ctx.message.text;
+    }
+
+    await conversation.external(() => sheets.updateSubmission(latest.rowIndex, newQ1, newQ2));
+    await ctx.reply(`✅ ${bold('Reflection updated!')} Your words are saved\\. 🌱`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
-
-  const submissions = await conversation.external(() => sheets.getSubmissionsForUser(user.realName, 1));
-  if (!submissions.length) {
-    await ctx.reply(`No reflections stored yet\\. Your first one is just a /reflect away\\! 🌱`, { parse_mode: 'MarkdownV2' });
-    return;
-  }
-
-  const latest = submissions[0];
-
-  // 3 separate messages — one per question
-  await ctx.reply(`${bold('Your most recent reflection')} · 📅 ${e(latest.date)}`, { parse_mode: 'MarkdownV2' });
-  await ctx.reply(`${bold('Q1')}\n${e(latest.q1 || '—')}`, { parse_mode: 'MarkdownV2' });
-  await ctx.reply(`${bold('Q2')}\n${e(latest.q2 || '—')}`, { parse_mode: 'MarkdownV2' });
-  await ctx.reply(`${bold('Q3 ⭐️')}\n${e(cleanQ3(latest.q3) || 'None shared this week')}`, { parse_mode: 'MarkdownV2' });
-
-  // Inline keyboard for choice
-  const keyboard = new InlineKeyboard()
-    .text('Q1', 'edit_q1').text('Q2', 'edit_q2').row()
-    .text('Q1 + Q2', 'edit_both').text('Q3 Good News ⭐️', 'edit_q3');
-
-  await ctx.reply('Which part would you like to update?', { reply_markup: keyboard });
-
-  const event = await conversation.waitFor('callback_query:data');
-  await event.answerCallbackQuery();
-  const choice = event.callbackQuery.data;
-
-  if (choice === 'edit_q3') {
-    await doEditGoodNews(conversation, ctx, user);
-    return;
-  }
-
-  let newQ1 = latest.q1;
-  let newQ2 = latest.q2;
-
-  if (choice === 'edit_q1' || choice === 'edit_both') {
-    await ctx.reply(
-      `${bold("Q1: What is one TC value you've lived out and how? 🤔")}\n\n` +
-      `${italic('And in the coming week, how can you live out our values even more? 🌱☁️')}`,
-      { parse_mode: 'MarkdownV2' }
-    );
-    const q1Ctx = await waitForText(conversation, ctx);
-    if (!q1Ctx) return;
-    newQ1 = q1Ctx.message.text;
-  }
-
-  if (choice === 'edit_q2' || choice === 'edit_both') {
-    await ctx.reply(`${bold('Q2: How did you do in your role? What would a coach tell you? 💭💪🏻')}`, { parse_mode: 'MarkdownV2' });
-    const q2Ctx = await waitForText(conversation, ctx);
-    if (!q2Ctx) return;
-    newQ2 = q2Ctx.message.text;
-  }
-
-  await conversation.external(() => sheets.updateSubmission(latest.rowIndex, newQ1, newQ2));
-  await ctx.reply(`✅ ${bold('Reflection updated!')} Your words are saved\\. 🌱`, { parse_mode: 'MarkdownV2' });
 }
 
 // ---------------------------------------------------------------------------
@@ -931,12 +980,19 @@ async function editReflectionConversation(conversation, ctx) {
 async function editGoodNewsConversation(conversation, ctx) {
   const chatId = ctx.from?.id;
   const username = ctx.from?.username?.toLowerCase();
-  const user = await conversation.external(() => lookupUser(chatId, username));
-  if (!user?.realName) {
-    await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2' });
-    return;
+  const chatIdKey = String(ctx.chat?.id ?? chatId ?? '');
+  activeConvoChats.add(chatIdKey);
+
+  try {
+    const user = await conversation.external(() => lookupUser(chatId, username));
+    if (!user?.realName) {
+      await ctx.reply(`Hey\\! 👋 You're not in our system yet\\.\nText @whalewhalewhalee to get added\\! 🌱`, { parse_mode: 'MarkdownV2', reply_markup: mainReplyKb() });
+      return;
+    }
+    await doEditGoodNews(conversation, ctx, user);
+  } finally {
+    activeConvoChats.delete(chatIdKey);
   }
-  await doEditGoodNews(conversation, ctx, user);
 }
 
 // ---------------------------------------------------------------------------
@@ -970,7 +1026,10 @@ bot.api.config.use(async (prev, method, payload, signal) => {
     const isPrivate =
       (typeof chatId === 'number' && chatId > 0) ||
       (typeof chatId === 'string' && /^\d+$/.test(chatId));
-    if (isPrivate) {
+    // Skip auto-attach when the recipient is mid-conversation, so the
+    // persistent keyboard doesn't get re-asserted on every prompt and
+    // outbound DMs don't flicker the keyboard while they're typing.
+    if (isPrivate && !activeConvoChats.has(String(chatId))) {
       payload = { ...payload, reply_markup: mainReplyKb() };
     }
   }
