@@ -30,15 +30,48 @@ const Q2_START    = new Date('2026-03-30T16:00:00+08:00'); // Mon 4pm SGT bounda
 const LAUNCH_DATE = '2026-04-21'; // Points count from Week 4 (Apr 20 4pm); Apr 20 noon-proxy lands in wk3, so use Apr 21
 const WEEK_MS     = 7 * 24 * 60 * 60 * 1000;
 
+// ---------------------------------------------------------------------------
+// TEMP — Public-holiday deadline extension (auto-expiring, safe to leave in)
+// Mon 1 Jun 2026 is a public holiday, so Q2 Week 9's deadline is pushed from
+// Mon 1 Jun 16:00 to Tue 2 Jun 16:00 SGT. Any submission timestamped inside
+// that 24h window counts for Week 9 (on-time) instead of rolling into Week 10,
+// so streaks aren't broken by the day off. Inert outside the window.
+// Mirrored by holidayRun() in bot.js, which shifts that week's reminder crons
+// Mon→Tue / Tue→Wed. Remove this block + holidayRun() after Q2 if desired.
+const PH_OLD_BOUNDARY = Date.parse('2026-06-01T16:00:00+08:00'); // normal Wk9→10 flip
+const PH_NEW_BOUNDARY = Date.parse('2026-06-02T16:00:00+08:00'); // extended deadline
+export function holidayAdjust(timeMs, week) {
+  return (week === 10 && timeMs >= PH_OLD_BOUNDARY && timeMs < PH_NEW_BOUNDARY) ? 9 : week;
+}
+
+// Cron-day shift for the same public-holiday week (Mon 1 Jun → Sun 7 Jun 2026
+// SGT). The reminder/notification crons in bot.js are registered on BOTH their
+// normal and shifted day (e.g. '* * 1,2') and gated by this guard, so:
+//   • that week → Monday jobs fire Tue, Tuesday jobs fire Wed (team's day off)
+//   • every other week → fire on their normal day, exactly as before
+// No second deploy needed to revert. `now` is injectable for unit tests.
+export function holidayRun(normalDow, now = new Date()) {
+  const sgt = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Singapore' }));
+  const dow = sgt.getDay(); // 0=Sun … 6=Sat
+  const inHolidayWeek =
+    sgt.getFullYear() === 2026 && sgt.getMonth() === 5 && // June (0-indexed)
+    sgt.getDate() >= 1 && sgt.getDate() <= 7;
+  if (!inHolidayWeek) return dow === normalDow; // normal weeks: unchanged
+  if (normalDow === 1) return dow === 2; // Mon → Tue
+  if (normalDow === 2) return dow === 3; // Tue → Wed
+  return dow === normalDow;               // other days (e.g. Fri) unaffected
+}
+
 function dateToWeekNumber(dateStr) {
   // Noon SGT proxy: Mon dates land in the closing week (safely before 4pm cutoff)
   const d = new Date(dateStr + 'T12:00:00+08:00');
   const ms = d.getTime() - Q2_START.getTime();
   if (ms < 0) return 1;
-  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  const week = Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  return holidayAdjust(d.getTime(), week);
 }
 
-function dateTimeToWeekNumber(dateStr, timeStr) {
+export function dateTimeToWeekNumber(dateStr, timeStr) {
   // Parse "H:MM AM/PM" from the stored time field for exact week placement
   const match = (timeStr ?? '').match(/(\d+):(\d+)\s*(AM|PM)/i);
   let h = 12, m = 0;
@@ -50,13 +83,16 @@ function dateTimeToWeekNumber(dateStr, timeStr) {
   const d = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+08:00`);
   const ms = d.getTime() - Q2_START.getTime();
   if (ms < 0) return 1;
-  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  const week = Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  return holidayAdjust(d.getTime(), week);
 }
 
 function currentWeekNumber() {
-  const ms = Date.now() - Q2_START.getTime();
+  const nowMs = Date.now();
+  const ms = nowMs - Q2_START.getTime();
   if (ms < 0) return 1;
-  return Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  const week = Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
+  return holidayAdjust(nowMs, week);
 }
 
 // ---------------------------------------------------------------------------
