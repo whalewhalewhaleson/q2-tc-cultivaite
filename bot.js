@@ -3523,6 +3523,31 @@ http.createServer(async (req, res) => {
 // Start polling (must be last)
 // ---------------------------------------------------------------------------
 
+// Restore the first-dept-100% shoutout guard from existing data before polling,
+// so a Railway redeploy mid-week can't re-announce it. The guard lives only in
+// memory (shoutedDepts + firstShoutoutFiredThisWeek), so a restart would reset
+// it and let a later dept be wrongly crowned "first to hit 100%". If any dept is
+// already at 100% this week, that shoutout has logically already fired —
+// repopulate the flags. Reads only; never triggers a broadcast.
+async function restoreShoutoutState() {
+  try {
+    const { deptWeekRate, weekNow } = await sheets.getRawStatsCache();
+    for (const [dept, byWeek] of Object.entries(deptWeekRate)) {
+      const rate = byWeek?.[weekNow];
+      if (rate && rate.total > 0 && rate.submitted === rate.total) {
+        shoutedDepts.add(dept);
+        firstShoutoutFiredThisWeek = true;
+      }
+    }
+    if (firstShoutoutFiredThisWeek) {
+      console.log(`[Shoutout] Restored guard on boot — already fired this week for: ${[...shoutedDepts].join(', ')}`);
+    }
+  } catch (err) {
+    console.error('[Shoutout] Failed to restore guard on boot:', err.message);
+  }
+}
+await restoreShoutoutState();
+
 console.log('🌱 TC CultivAIte bot starting...');
 bot.start({
   onStart: () => console.log('✅ Bot is running! Press Ctrl+C to stop.'),
