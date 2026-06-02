@@ -33,12 +33,13 @@ eq('only touches week 10 (week 9 passthrough)', holidayAdjust(OLD, 9), 9);
 
 console.log('\n── Cron-day guard: holidayRun(normalDow, now) ──');
 const sgt = (iso) => new Date(iso + '+08:00'); // build an instant at SGT wall-clock
-// HOLIDAY WEEK (Mon 1 Jun → Sun 7 Jun): Mon jobs → Tue, Tue jobs → Wed
+// HOLIDAY WEEK (Mon 1 Jun → Sun 7 Jun): Mon jobs → Tue, Tue Good News notifs → Thu
 eq('PH wk, Mon job, on MON → skip',  holidayRun(1, sgt('2026-06-01T10:00:00')), false);
 eq('PH wk, Mon job, on TUE → run',   holidayRun(1, sgt('2026-06-02T10:00:00')), true);
 eq('PH wk, Mon job, on WED → skip',  holidayRun(1, sgt('2026-06-03T10:00:00')), false);
 eq('PH wk, Tue job, on TUE → skip',  holidayRun(2, sgt('2026-06-02T10:00:00')), false);
-eq('PH wk, Tue job, on WED → run',   holidayRun(2, sgt('2026-06-03T10:00:00')), true);
+eq('PH wk, Tue job, on WED → skip',  holidayRun(2, sgt('2026-06-03T10:00:00')), false);
+eq('PH wk, Tue job, on THU → run',   holidayRun(2, sgt('2026-06-04T10:00:00')), true);
 eq('PH wk, Fri recap, on FRI → run', holidayRun(5, sgt('2026-06-05T15:30:00')), true);
 // NORMAL WEEK (e.g. week of Mon 8 Jun): everything fires on its normal day
 eq('Normal wk, Mon job, on MON → run',  holidayRun(1, sgt('2026-06-08T10:00:00')), true);

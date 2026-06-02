@@ -2878,8 +2878,8 @@ cron.schedule('0 2 * * 5', async () => {
 // Tuesday 9:30 AM SGT (01:30 UTC) — admin heads-up preview before good news notifications
 // ---------------------------------------------------------------------------
 
-cron.schedule('30 1 * * 2,3', async () => {
-  if (!holidayRun(2)) return; // TEMP: Jun-1 PH week → fire Wed not Tue
+cron.schedule('30 1 * * 2,4', async () => {
+  if (!holidayRun(2)) return; // TEMP: Jun-1 PH week → fire Thu not Tue
   const week = currentQ2Week();
   if (week < 1 || week > 13) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
@@ -2921,8 +2921,8 @@ cron.schedule('30 1 * * 2,3', async () => {
 // Tuesday 10:15 AM SGT (02:15 UTC) — send good news notifications
 // ---------------------------------------------------------------------------
 
-cron.schedule('15 2 * * 2,3', async () => {
-  if (!holidayRun(2)) return; // TEMP: Jun-1 PH week → fire Wed not Tue
+cron.schedule('15 2 * * 2,4', async () => {
+  if (!holidayRun(2)) return; // TEMP: Jun-1 PH week → fire Thu not Tue
   const week = currentQ2Week();
   if (week < 1 || week > 13) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
