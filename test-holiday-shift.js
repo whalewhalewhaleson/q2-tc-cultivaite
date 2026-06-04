@@ -39,7 +39,8 @@ eq('PH wk, Mon job, on TUE → run',   holidayRun(1, sgt('2026-06-02T10:00:00'))
 eq('PH wk, Mon job, on WED → skip',  holidayRun(1, sgt('2026-06-03T10:00:00')), false);
 eq('PH wk, Tue job, on TUE → skip',  holidayRun(2, sgt('2026-06-02T10:00:00')), false);
 eq('PH wk, Tue job, on WED → skip',  holidayRun(2, sgt('2026-06-03T10:00:00')), false);
-eq('PH wk, Tue job, on THU → run',   holidayRun(2, sgt('2026-06-04T10:00:00')), true);
+eq('PH wk, Tue job, on THU → skip',  holidayRun(2, sgt('2026-06-04T10:00:00')), false);
+eq('PH wk, Tue job, on FRI → run',   holidayRun(2, sgt('2026-06-05T10:00:00')), true);
 eq('PH wk, Fri recap, on FRI → run', holidayRun(5, sgt('2026-06-05T15:30:00')), true);
 // NORMAL WEEK (e.g. week of Mon 8 Jun): everything fires on its normal day
 eq('Normal wk, Mon job, on MON → run',  holidayRun(1, sgt('2026-06-08T10:00:00')), true);

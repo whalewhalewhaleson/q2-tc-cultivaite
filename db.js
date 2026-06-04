@@ -47,7 +47,7 @@ export function holidayAdjust(timeMs, week) {
 // Cron-day shift for the same public-holiday week (Mon 1 Jun → Sun 7 Jun 2026
 // SGT). The reminder/notification crons in bot.js are registered on BOTH their
 // normal and shifted day (e.g. '* * 1,2') and gated by this guard, so:
-//   • that week → Monday reminders fire Tue; Tuesday Good News notifs fire Thu
+//   • that week → Monday reminders fire Tue; Tuesday Good News notifs fire Fri
 //   • every other week → fire on their normal day, exactly as before
 // No second deploy needed to revert. `now` is injectable for unit tests.
 export function holidayRun(normalDow, now = new Date()) {
@@ -58,8 +58,8 @@ export function holidayRun(normalDow, now = new Date()) {
     sgt.getDate() >= 1 && sgt.getDate() <= 7;
   if (!inHolidayWeek) return dow === normalDow; // normal weeks: unchanged
   if (normalDow === 1) return dow === 2; // Mon → Tue
-  if (normalDow === 2) return dow === 4; // Tue → Thu (Good News notifs, this week only)
-  return dow === normalDow;               // other days (e.g. Fri) unaffected
+  if (normalDow === 2) return dow === 5; // Tue → Fri (Good News notifs, this week only — delayed one extra day)
+  return dow === normalDow;               // other days unaffected
 }
 
 function dateToWeekNumber(dateStr) {
