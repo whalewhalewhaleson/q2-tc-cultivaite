@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { groupForUser, offsetMinutesForUser, GROUPS } from './deadlines.js';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -71,7 +72,10 @@ function dateToWeekNumber(dateStr) {
   return holidayAdjust(d.getTime(), week);
 }
 
-export function dateTimeToWeekNumber(dateStr, timeStr) {
+// offsetMin shifts this user's weekly boundary later by that many minutes (0 =
+// the default Mon 4PM SGT). A Thailand user (+60) treats Mon 5PM as the cutoff;
+// a Monday-off user (+1590) treats Tue 6:30PM. See deadlines.js.
+export function dateTimeToWeekNumber(dateStr, timeStr, offsetMin = 0) {
   // Parse "H:MM AM/PM" from the stored time field for exact week placement
   const match = (timeStr ?? '').match(/(\d+):(\d+)\s*(AM|PM)/i);
   let h = 12, m = 0;
@@ -81,15 +85,15 @@ export function dateTimeToWeekNumber(dateStr, timeStr) {
     if (match[3].toUpperCase() === 'AM' && h === 12) h = 0;
   }
   const d = new Date(`${dateStr}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00+08:00`);
-  const ms = d.getTime() - Q2_START.getTime();
+  const ms = d.getTime() - (Q2_START.getTime() + offsetMin * 60000);
   if (ms < 0) return 1;
   const week = Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
   return holidayAdjust(d.getTime(), week);
 }
 
-function currentWeekNumber() {
+export function currentWeekNumber(offsetMin = 0) {
   const nowMs = Date.now();
-  const ms = nowMs - Q2_START.getTime();
+  const ms = nowMs - (Q2_START.getTime() + offsetMin * 60000);
   if (ms < 0) return 1;
   const week = Math.min(Math.max(Math.floor(ms / WEEK_MS) + 1, 1), 13);
   return holidayAdjust(nowMs, week);
@@ -174,6 +178,16 @@ async function buildStatsCache() {
   const weekNow    = currentWeekNumber();
   const launchWeek = dateToWeekNumber(LAUNCH_DATE);
 
+  // Per-user deadline offset + group (Thailand / Monday-off / default).
+  // The offset shifts this user's week boundary; the group drives nudges.
+  const userOffset = {}; // lc_name → minutes past Mon 4PM SGT
+  const userGroup  = {}; // lc_name → 'default' | 'thailand' | 'monday_off'
+  for (const u of users) {
+    const lc = u.real_name.toLowerCase().trim();
+    userGroup[lc]  = groupForUser(u.real_name, u.department, u.secondary_department);
+    userOffset[lc] = GROUPS[userGroup[lc]].offsetMin;
+  }
+
   // Build dept → member list (supports dual-dept membership)
   const deptMembers = {}; // dept → Set of real_name
   for (const u of users) {
@@ -188,7 +202,7 @@ async function buildStatsCache() {
   const userWeekMap = {}; // lc_name → Map<weekNum, { submitted, excused }>
   for (const sub of subs) {
     const name = String(sub.real_name ?? '').toLowerCase().trim();
-    const wk   = dateTimeToWeekNumber(sub.date, sub.time);
+    const wk   = dateTimeToWeekNumber(sub.date, sub.time, userOffset[name] ?? 0);
     if (!userWeekMap[name]) userWeekMap[name] = {};
     const excused = sub.q1 === '[Excused absence]';
     userWeekMap[name][wk] = { submitted: true, excused };
@@ -289,13 +303,18 @@ async function buildStatsCache() {
     const dept = (u.department ?? '').trim();
     const weekMap = userWeekMap[name] ?? {};
 
+    // This user's "current week" — for Thailand/Monday-off it stays on the
+    // closing week until THEIR later deadline, so the grace window shows
+    // 'pending' instead of wrongly recording a streak-breaking miss.
+    const userWeekNow = currentWeekNumber(userOffset[name] ?? 0);
+
     let totalPoints        = 0;
     let streak             = 0;
     let consecutiveMisses  = 0;
     let currentStreak      = 0;
     const weeklyBreakdown  = [];
 
-    for (let wk = launchWeek; wk <= weekNow; wk++) {
+    for (let wk = launchWeek; wk <= userWeekNow; wk++) {
       const entry = weekMap[wk];
       let weekPts = 0;
       let status = 'missed';
@@ -318,7 +337,7 @@ async function buildStatsCache() {
         }
         totalPoints += weekPts;
         streak = currentStreak;
-      } else if (wk < weekNow) {
+      } else if (wk < userWeekNow) {
         currentStreak = 0;
         streak        = 0;
         consecutiveMisses++;
@@ -331,7 +350,7 @@ async function buildStatsCache() {
 
     totalPoints += goodNewsBonus[name] ?? 0;
 
-    const submittedThisWeek = (weekMap[weekNow]?.submitted && !weekMap[weekNow]?.late) ?? false;
+    const submittedThisWeek = (weekMap[userWeekNow]?.submitted && !weekMap[userWeekNow]?.late) ?? false;
     const plantStage        = pointsToStage(totalPoints);
     const progressPct       = stageProgressPct(totalPoints);
 
@@ -339,6 +358,7 @@ async function buildStatsCache() {
       realName: u.real_name,
       department: dept,
       secondaryDepartment: (u.secondary_department ?? '').trim() || null,
+      deadlineGroup: userGroup[name] ?? 'default',
       goal: (u.goal ?? '').trim() || null,
       plantStage,
       progressPct,
@@ -434,6 +454,21 @@ async function getUsersRows() {
   return rows;
 }
 
+// lc real_name → deadline offset (minutes past Mon 4PM SGT). Group membership is
+// a property of the PERSON (incl. secondary_department), not of a submission row
+// — which only snapshots one `department` and so can't resolve a Thailand/RTH
+// secondary dept. Submission/reflection week placement must resolve offset here,
+// keeping it consistent with the authoritative scoring path in buildStatsCache.
+// Backed by the 5-min users cache, so repeat calls are free.
+async function getUserOffsetMap() {
+  const rows = await getUsersRows();
+  const map = {};
+  for (const r of rows) {
+    map[(r.real_name ?? '').toLowerCase().trim()] = offsetMinutesForUser(r.real_name, r.department, r.secondary_department);
+  }
+  return map;
+}
+
 export async function getUserByChatId(chatId) {
   if (!chatId) return null;
   const rows = await getUsersRows();
@@ -486,6 +521,7 @@ export async function getAllUsersWithChatId() {
       chatId:     String(r.chat_id),
       nickname:   r.nickname ?? null,
       department: r.department ?? null,
+      secondaryDepartment: r.secondary_department ?? null,
     }));
 }
 
@@ -570,11 +606,12 @@ export async function getSubmissionsForUser(realName, limit = 5) {
     .order('date', { ascending: true })
     .order('id', { ascending: true });
 
+  const offsetMap = await getUserOffsetMap();
   const rows = (data ?? []).map(r => ({
     rowIndex: r.id,
     date:     r.date ?? '',
     time:     r.time ?? '',
-    weekNum:  dateTimeToWeekNumber(r.date ?? '', r.time ?? ''),
+    weekNum:  dateTimeToWeekNumber(r.date ?? '', r.time ?? '', offsetMap[(r.real_name ?? realName).toLowerCase().trim()] ?? 0),
     q1:       r.q1  ?? '',
     q2:       r.q2  ?? '',
     q3:       r.q3  ?? '',
@@ -856,9 +893,11 @@ export async function getReflectionsForWeek(weekNum) {
   ]);
   if (error) throw error;
   const lateSet = new Set((lateData ?? []).map(r => r.real_name.toLowerCase().trim()));
-  // Post-filter: boundary Monday dates appear in two weeks' date ranges — use time to assign exactly one week
+  const offsetMap = await getUserOffsetMap();
+  // Post-filter: boundary Monday dates appear in two weeks' date ranges — use time
+  // (and the user's deadline offset) to assign exactly one week
   return (data ?? [])
-    .filter(s => dateTimeToWeekNumber(s.date, s.time ?? '') === weekNum)
+    .filter(s => dateTimeToWeekNumber(s.date, s.time ?? '', offsetMap[(s.real_name ?? '').toLowerCase().trim()] ?? 0) === weekNum)
     .map(s => ({ ...s, late: lateSet.has(s.real_name.toLowerCase().trim()) }));
 }
 
