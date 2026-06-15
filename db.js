@@ -166,7 +166,7 @@ async function buildStatsCache() {
     supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
     supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee, week_number').eq('status', 'Approved'),
     supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
-    supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active'),
+    supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active, scoring'),
     supabase.from('late_submissions').select('real_name, week_number'),
   ]);
 
@@ -174,6 +174,16 @@ async function buildStatsCache() {
   const news     = approvedNews ?? [];
   const awards   = gnAwards     ?? [];
   const users    = (allUsers ?? []).filter(u => u.active !== false);
+
+  // Non-scoring members: full features (reflect, good news, nudges, own /mystats)
+  // but excluded from every aggregate. They stay in `users` (and therefore in
+  // statsMap, so their personal view still computes points) but are filtered out
+  // of `deptMembers`, `deptWeekRate`, and `sorted` below — which is what feeds
+  // company total, rankings, dept points/avg, the Q2 goal, submission-rate
+  // denominators, and the dept 4-week bonus. Same spirit as EXCLUDED_DEPARTMENTS.
+  const nonScoring = new Set(
+    users.filter(u => u.scoring === false).map(u => u.real_name.toLowerCase().trim())
+  );
 
   const weekNow    = currentWeekNumber();
   const launchWeek = dateToWeekNumber(LAUNCH_DATE);
@@ -191,6 +201,7 @@ async function buildStatsCache() {
   // Build dept → member list (supports dual-dept membership)
   const deptMembers = {}; // dept → Set of real_name
   for (const u of users) {
+    if (nonScoring.has(u.real_name.toLowerCase().trim())) continue;
     const depts = [u.department, u.secondary_department].map(d => (d ?? '').trim()).filter(Boolean);
     for (const dept of depts) {
       if (!deptMembers[dept]) deptMembers[dept] = new Set();
@@ -240,6 +251,7 @@ async function buildStatsCache() {
   const deptWeekRate = {};
   for (const u of users) {
     const name = u.real_name.toLowerCase().trim();
+    if (nonScoring.has(name)) continue;
     const depts = [u.department, u.secondary_department].map(d => (d ?? '').trim()).filter(Boolean);
     for (const dept of depts) {
       if (!deptWeekRate[dept]) deptWeekRate[dept] = {};
@@ -375,6 +387,7 @@ async function buildStatsCache() {
   // Assign ranks (dense, by totalPoints desc)
   const sorted = Object.values(statsMap)
     .filter(s => !EXCLUDED_DEPARTMENTS.includes(s.department))
+    .filter(s => !nonScoring.has(s.realName.toLowerCase().trim()))
     .sort((a, b) => b.totalPoints - a.totalPoints);
 
   let denseRank = 0;
@@ -829,9 +842,9 @@ export async function getFullDashboardStats() {
   const goalsSet           = sorted.filter(u => u.goal).length;
   const allUsersRows       = await getUsersRows();
   const usersRows          = allUsersRows.filter(r => r.active !== false);
-  const onboarded          = usersRows.filter(r => r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
+  const onboarded          = usersRows.filter(r => r.chat_id && r.scoring !== false && !EXCLUDED_DEPARTMENTS.includes(r.department ?? '')).length;
   const notRegistered      = usersRows
-    .filter(r => !r.chat_id && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
+    .filter(r => !r.chat_id && r.scoring !== false && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
     .map(r => ({ realName: r.real_name, department: r.department ?? 'Unknown' }));
   const inactiveUsers      = allUsersRows
     .filter(r => r.active === false && !EXCLUDED_DEPARTMENTS.includes(r.department ?? ''))
