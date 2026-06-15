@@ -449,7 +449,7 @@ async function buildStatsCache() {
     };
   }
 
-  const result = { statsMap, deptStatsMap, sorted, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek };
+  const result = { statsMap, deptStatsMap, sorted, nonScoring, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek };
   cacheSet('stats', result, TTL.STATS);
   return result;
 }
@@ -834,7 +834,7 @@ export async function unapproveGoodNews(gnId) {
 
 // Returns all data the leadership dashboard needs in one call.
 export async function getFullDashboardStats() {
-  const { sorted, deptStatsMap, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek } = await buildStatsCache();
+  const { sorted, statsMap, nonScoring, deptStatsMap, userWeekMap, deptWeekRate, deptConsec, weekNow, launchWeek } = await buildStatsCache();
 
   const totalUsers         = sorted.length;
   const submittedThisWeek  = sorted.filter(u => u.submittedThisWeek).length;
@@ -867,6 +867,31 @@ export async function getFullDashboardStats() {
     goodNewsEvents:      u.goodNewsEvents,
   }));
 
+  // Non-scoring members — excluded from `sorted` (and thus all aggregates above),
+  // but surfaced here as a separate roster so the dashboard can still select them
+  // as Good News recipients, notify them, and find them in search. Same object
+  // shape as `users` (so drawer/search/picker render them) + a scoring:false marker.
+  const nonScoringUsers = [...nonScoring]
+    .map(lc => statsMap[lc])
+    .filter(Boolean)
+    .map(u => ({
+      realName:            u.realName,
+      department:          u.department,
+      secondaryDepartment: u.secondaryDepartment,
+      goal:                u.goal,
+      plantStage:          u.plantStage,
+      progressPct:         u.progressPct,
+      streak:              u.streak,
+      submittedThisWeek:   u.submittedThisWeek,
+      totalPoints:         u.totalPoints,
+      consecutiveMisses:   u.consecutiveMisses,
+      rank:                null,
+      scoring:             false,
+      weekHistory:         userWeekMap[u.realName.toLowerCase().trim()] ?? {},
+      weeklyBreakdown:     u.weeklyBreakdown,
+      goodNewsEvents:      u.goodNewsEvents,
+    }));
+
   const depts = Object.values(deptStatsMap).map(d => {
     const tw = deptWeekRate[d.department]?.[weekNow] ?? { submitted: 0, total: d.count };
     return {
@@ -878,7 +903,7 @@ export async function getFullDashboardStats() {
     };
   }).sort((a, b) => b.thisWeekRate - a.thisWeekRate || b.avgPoints - a.avgPoints);
 
-  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, depts, notRegistered, inactiveUsers };
+  return { weekNow, launchWeek, totalWeeks: 13, totalUsers, onboarded, submittedThisWeek, totalPoints, goalsSet, users, nonScoringUsers, depts, notRegistered, inactiveUsers };
 }
 
 export async function getRawStatsCache() {

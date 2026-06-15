@@ -1505,7 +1505,7 @@ function addRejectedNotifyRow(gnId, name = '', dept = '') {
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase().trim();
     if (!q || !_stats) { dd.style.display = 'none'; return; }
-    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    const matches = gnPeople().filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
     if (!matches.length) { dd.style.display = 'none'; return; }
     dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1518,7 +1518,7 @@ function addRejectedNotifyRow(gnId, name = '', dept = '') {
   input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
   input.addEventListener('focus', () => {
     if (!_stats) return;
-    const all = _stats.users;
+    const all = gnPeople();
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
     dd.querySelectorAll('.gn-dd-item').forEach(item => {
@@ -1619,7 +1619,7 @@ function addRecipient(gnId, name = '', dept = '', pts = 5) {
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase().trim();
     if (!q || !_stats) { dd.style.display = 'none'; return; }
-    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    const matches = gnPeople().filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
     if (!matches.length) { dd.style.display = 'none'; return; }
     dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1637,7 +1637,7 @@ function addRecipient(gnId, name = '', dept = '', pts = 5) {
   input.addEventListener('focus', () => {
     if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
     if (!_stats) return;
-    const all = _stats.users;
+    const all = gnPeople();
     if (!all.length) return;
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1676,7 +1676,7 @@ function addNotifyOnly(gnId) {
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase().trim();
     if (!q || !_stats) { dd.style.display = 'none'; return; }
-    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    const matches = gnPeople().filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
     if (!matches.length) { dd.style.display = 'none'; return; }
     dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1828,7 +1828,7 @@ function addReviewedRecipient(gnId, name = '', dept = '', pts = 5) {
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase().trim();
     if (!q || !_stats) { dd.style.display = 'none'; return; }
-    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    const matches = gnPeople().filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
     if (!matches.length) { dd.style.display = 'none'; return; }
     dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1846,7 +1846,7 @@ function addReviewedRecipient(gnId, name = '', dept = '', pts = 5) {
   input.addEventListener('focus', () => {
     if (input.value.trim()) { input.dispatchEvent(new Event('input')); return; }
     if (!_stats) return;
-    const all = _stats.users;
+    const all = gnPeople();
     if (!all.length) return;
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0;transition:background 0.1s" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1885,7 +1885,7 @@ function addReviewedNotifyRecipient(gnId, name = '', dept = '') {
   input.addEventListener('input', () => {
     const q = input.value.toLowerCase().trim();
     if (!q || !_stats) { dd.style.display = 'none'; return; }
-    const matches = _stats.users.filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
+    const matches = gnPeople().filter(u => u.realName.toLowerCase().includes(q)).slice(0, 8);
     if (!matches.length) { dd.style.display = 'none'; return; }
     dd.innerHTML = matches.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
@@ -1898,7 +1898,7 @@ function addReviewedNotifyRecipient(gnId, name = '', dept = '') {
   input.addEventListener('blur', () => setTimeout(() => dd.style.display = 'none', 200));
   input.addEventListener('focus', () => {
     if (!_stats) return;
-    const all = _stats.users;
+    const all = gnPeople();
     dd.innerHTML = all.map(u => `<div class="gn-dd-item" style="padding:8px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f0f2f0" data-name="${esc(u.realName)}" data-dept="${esc(u.department)}">${esc(u.realName)} <span style="color:#8a9a8a;font-size:11px">${esc(u.department)}</span></div>`).join('');
     dd.style.display = 'block';
     dd.querySelectorAll('.gn-dd-item').forEach(item => {
@@ -2138,8 +2138,13 @@ async function removeExcusedWeek(name, weekNumber) {
   } catch (e) { alert('Error: ' + e.message); }
 }
 
+// People selectable in the Good News pickers: scoring members + non-scoring members.
+// Non-scoring members are excluded from leaderboards/totals but must still be
+// awardable / notifiable, so they belong in the picker even though they're not in _stats.users.
+function gnPeople() { return [...(_stats?.users ?? []), ...(_stats?.nonScoringUsers ?? [])]; }
+
 async function openDrawer(name) {
-  const active   = (_stats?.users ?? []).find(u => u.realName === name);
+  const active   = [...(_stats?.users ?? []), ...(_stats?.nonScoringUsers ?? [])].find(u => u.realName === name);
   const inactive = (_stats?.inactiveUsers ?? []).find(u => u.realName === name);
   const u = active || inactive;
   if (!u) return;
@@ -2360,12 +2365,17 @@ function onSearch(q) {
     .slice(0, 8)
     .map(u => ({ name: u.realName, dept: u.department, active: true, pts: u.totalPoints, stage: displayStage(u.plantStage, u.consecutiveMisses) }));
 
+  const nonScoringMatches = (_stats.nonScoringUsers ?? [])
+    .filter(u => u.realName.toLowerCase().includes(needle) || (u.department ?? '').toLowerCase().includes(needle))
+    .slice(0, 4)
+    .map(u => ({ name: u.realName, dept: u.department, active: true, nonScoring: true, pts: u.totalPoints, stage: displayStage(u.plantStage, u.consecutiveMisses) }));
+
   const inactiveMatches = (_stats.inactiveUsers ?? [])
     .filter(u => u.realName.toLowerCase().includes(needle) || (u.department ?? '').toLowerCase().includes(needle))
     .slice(0, 4)
     .map(u => ({ name: u.realName, dept: u.department, active: false, pts: null, stage: null }));
 
-  const results = [...activeMatches, ...inactiveMatches];
+  const results = [...activeMatches, ...nonScoringMatches, ...inactiveMatches];
   if (!results.length) {
     el.innerHTML = '<div class="search-empty">No members found</div>';
     el.classList.add('open');
@@ -2373,7 +2383,9 @@ function onSearch(q) {
   }
 
   el.innerHTML = results.map(r => {
-    const badge = r.active
+    const badge = r.nonScoring
+      ? `<span class="search-item-badge" style="background:#ede7f6;color:#5e35b1">Non-scoring · ${r.stage}</span>`
+      : r.active
       ? `<span class="search-item-badge" style="background:#d9f0e0;color:#1b5e3b">${r.stage} ${r.pts} pts</span>`
       : `<span class="search-item-badge" style="background:#f0f2f0;color:#8a9a8a">Inactive</span>`;
     return `<div class="search-item" onclick="openDrawer(${jAttr(r.name)});closeSearch()">
