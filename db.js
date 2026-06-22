@@ -129,6 +129,24 @@ export function invalidateStatsCache() {
   cacheInvalidate('stats');
 }
 
+// PostgREST caps an unbounded .select() at 1000 rows. Growing tables crossed
+// that (good_news_awards hit 1209 at W25) so unbounded reads silently dropped
+// the newest rows. Page through in 1000-row chunks instead. `makeQuery` MUST
+// return a fresh builder each call AND set a stable .order() — range paging
+// without a deterministic sort can drop or duplicate rows across page bounds.
+async function selectAll(makeQuery) {
+  const PAGE = 1000;
+  const all = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw error;
+    if (!data?.length) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+  }
+  return all;
+}
+
 // ---------------------------------------------------------------------------
 // Stats engine — replaces Apps Script
 // Calculates all user stats live from submissions + good_news tables.
@@ -162,12 +180,12 @@ async function buildStatsCache() {
   if (cached) return cached;
 
   // Fetch all data in parallel
-  const [{ data: allSubs }, { data: approvedNews }, { data: gnAwards }, { data: allUsers }, { data: lateRows }] = await Promise.all([
-    supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true }),
-    supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee, week_number').eq('status', 'Approved'),
-    supabase.from('good_news_awards').select('good_news_id, recipient_name, pts'),
+  const [allSubs, approvedNews, gnAwards, { data: allUsers }, lateRows] = await Promise.all([
+    selectAll(() => supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true })),
+    selectAll(() => supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee, week_number').eq('status', 'Approved').order('id', { ascending: true })),
+    selectAll(() => supabase.from('good_news_awards').select('good_news_id, recipient_name, pts').order('id', { ascending: true })),
     supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active, scoring'),
-    supabase.from('late_submissions').select('real_name, week_number'),
+    selectAll(() => supabase.from('late_submissions').select('real_name, week_number').order('id', { ascending: true })),
   ]);
 
   const subs     = allSubs      ?? [];
@@ -714,23 +732,22 @@ export async function rejectGoodNews(gnId) {
 
 // Returns approved + rejected nominations (for the "already reviewed" section).
 export async function getReviewedGoodNews() {
-  const [{ data: rows, error: e1 }, { data: awards, error: e2 }] = await Promise.all([
-    supabase
+  const [rows, awards] = await Promise.all([
+    selectAll(() => supabase
       .from('good_news')
       .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status, notified_at')
       .in('status', ['Approved', 'Rejected'])
-      .order('timestamp', { ascending: false }),
-    supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
+      .order('timestamp', { ascending: false })
+      .order('id', { ascending: false })),
+    selectAll(() => supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts').order('id', { ascending: true })),
   ]);
-  if (e1) throw e1;
-  if (e2) throw e2;
 
   const awardsByGnId = {};
-  for (const a of (awards ?? [])) {
+  for (const a of awards) {
     if (!awardsByGnId[a.good_news_id]) awardsByGnId[a.good_news_id] = [];
     awardsByGnId[a.good_news_id].push(a);
   }
-  return (rows ?? []).map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] }));
+  return rows.map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] }));
 }
 
 // Re-approve: delete old award rows and insert new ones (updates who gets pts).
@@ -1160,35 +1177,30 @@ export async function listManagers() {
 }
 
 export async function getGoodNewsByDept(dept) {
-  const [
-    { data: pending, error: e1 },
-    { data: reviewed, error: e2 },
-    { data: awards, error: e3 },
-  ] = await Promise.all([
-    supabase.from('good_news')
+  const [pending, reviewed, awards] = await Promise.all([
+    selectAll(() => supabase.from('good_news')
       .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer')
       .eq('status', 'Pending')
       .or(`nominator_dept.eq."${dept}",nominee_dept.eq."${dept}"`)
-      .order('timestamp', { ascending: true }),
-    supabase.from('good_news')
+      .order('timestamp', { ascending: true })
+      .order('id', { ascending: true })),
+    selectAll(() => supabase.from('good_news')
       .select('id, timestamp, nominator_name, nominator_dept, nominee_name, nominee_dept, message, week_number, pts_sharer, status')
       .in('status', ['Approved', 'Rejected'])
       .or(`nominator_dept.eq."${dept}",nominee_dept.eq."${dept}"`)
-      .order('timestamp', { ascending: false }),
-    supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts'),
+      .order('timestamp', { ascending: false })
+      .order('id', { ascending: false })),
+    selectAll(() => supabase.from('good_news_awards').select('good_news_id, recipient_name, recipient_dept, pts').order('id', { ascending: true })),
   ]);
-  if (e1) throw e1;
-  if (e2) throw e2;
-  if (e3) throw e3;
 
   const awardsByGnId = {};
-  for (const a of (awards ?? [])) {
+  for (const a of awards) {
     if (!awardsByGnId[a.good_news_id]) awardsByGnId[a.good_news_id] = [];
     awardsByGnId[a.good_news_id].push(a);
   }
   return {
-    pending:  pending ?? [],
-    reviewed: (reviewed ?? []).map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] })),
+    pending,
+    reviewed: reviewed.map(r => ({ ...r, awards: awardsByGnId[r.id] ?? [] })),
   };
 }
 
