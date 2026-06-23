@@ -180,12 +180,13 @@ async function buildStatsCache() {
   if (cached) return cached;
 
   // Fetch all data in parallel
-  const [allSubs, approvedNews, gnAwards, { data: allUsers }, lateRows] = await Promise.all([
+  const [allSubs, approvedNews, gnAwards, { data: allUsers }, lateRows, adjustRows] = await Promise.all([
     selectAll(() => supabase.from('submissions').select('*').order('date', { ascending: true }).order('id', { ascending: true })),
     selectAll(() => supabase.from('good_news').select('id, nominator_name, nominee_name, pts_sharer, pts_nominee, week_number').eq('status', 'Approved').order('id', { ascending: true })),
     selectAll(() => supabase.from('good_news_awards').select('good_news_id, recipient_name, pts').order('id', { ascending: true })),
     supabase.from('users').select('real_name, department, secondary_department, goal, nickname, active, scoring'),
     selectAll(() => supabase.from('late_submissions').select('real_name, week_number').order('id', { ascending: true })),
+    selectAll(() => supabase.from('point_adjustments').select('real_name, pts').order('id', { ascending: true })),
   ]);
 
   const subs     = allSubs      ?? [];
@@ -326,6 +327,14 @@ async function buildStatsCache() {
     goodNewsBreakdown[recipient].push({ week: gnIdToWeek[award.good_news_id] ?? null, kind: 'received', pts: award.pts ?? 3 });
   }
 
+  // Manual point adjustments (one-off bonuses, e.g. survey-completion credit).
+  // Added straight onto totalPoints; not surfaced in any breakdown by design.
+  const adjustBonus = {}; // lc_name → extra pts
+  for (const adj of (adjustRows ?? [])) {
+    const who = (adj.real_name ?? '').toLowerCase().trim();
+    adjustBonus[who] = (adjustBonus[who] ?? 0) + (adj.pts ?? 0);
+  }
+
   // Calculate per-user stats
   const statsMap = {}; // lc_name → stats object
   for (const u of users) {
@@ -379,6 +388,7 @@ async function buildStatsCache() {
     }
 
     totalPoints += goodNewsBonus[name] ?? 0;
+    totalPoints += adjustBonus[name] ?? 0;
 
     const submittedThisWeek = (weekMap[userWeekNow]?.submitted && !weekMap[userWeekNow]?.late) ?? false;
     const plantStage        = pointsToStage(totalPoints);
