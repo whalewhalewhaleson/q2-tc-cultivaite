@@ -57,7 +57,7 @@ dashboard.html (~2000 lines)
 - Excused absence: 0 pts (preserves streak)
 - Dept 4-week bonus: 2x **only** when the dept's consecutive-100% run hits a multiple of 4 (weeks 4, 8, 12 of the streak — not every week after week 4)
 - Good news: nominator gets pts_sharer (5), recipients get pts_nominee (3)
-- Manual adjustments: `point_adjustments(real_name, pts, reason)` rows summed straight onto totalPoints (one-off bonuses, e.g. survey credit). Silent — not shown in any breakdown. Reversible by deleting rows.
+- Manual adjustments: `point_adjustments(real_name, pts, reason)` rows summed straight onto totalPoints (one-off bonuses, e.g. survey credit). Surfaced as a "✨ Bonus Points" block in `/mystats` (and `/testmystats`) with pts + reason; still excluded from the weekly breakdown rows (no week). Reversible by deleting rows.
 
 ## Plant Stages (by cumulative points)
 

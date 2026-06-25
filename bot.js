@@ -248,6 +248,20 @@ function buildWeeklyBreakdown(stats) {
   return out;
 }
 
+// Manual point adjustments (one-off bonuses, e.g. survey credit). Shown after the
+// weekly breakdown so a user can reconcile a total the weekly + good-news lines
+// don't add up to. Returns '' when the user has no adjustments.
+function buildAdjustmentsBlock(stats) {
+  if (!stats.adjustmentEvents?.length) return '';
+  let out = `\n\n✨ ${bold('Bonus Points')}`;
+  for (const adj of stats.adjustmentEvents) {
+    const sign = adj.pts >= 0 ? '\\+' : '\\-';
+    const ptsStr = `${sign}${e(String(Math.abs(adj.pts)))} pts`;
+    out += `\n${ptsStr}${adj.reason ? ` · ${e(adj.reason)}` : ''}`;
+  }
+  return out;
+}
+
 // Returns nickname if set, otherwise falls back to realName
 async function getDisplayName(realName) {
   const nick = await sheets.getNickname(realName);
@@ -2076,6 +2090,7 @@ bot.command('testmystats', async (ctx) => {
       if (stats.weeklyBreakdown?.length) {
         msg += buildWeeklyBreakdown(stats);
       }
+      msg += buildAdjustmentsBlock(stats);
     }
 
     await ctx.reply(msg, { parse_mode: 'MarkdownV2' });
@@ -2192,6 +2207,7 @@ bot.command('mystats', async (ctx) => {
       if (stats.weeklyBreakdown?.length) {
         msg += buildWeeklyBreakdown(stats);
       }
+      msg += buildAdjustmentsBlock(stats);
       if (!stats.submittedThisWeek) {
         msg += `\n\nYour plant is thirsty\\! 💧 /reflect to water it\\.`;
       }
