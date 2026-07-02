@@ -14,7 +14,7 @@ import { grantDashboardAccess, revokeDashboardAccess, listDashboardAccess, getDa
          getApprovedUnnotifiedGoodNews, markGoodNewsNotified,
          getGoodNewsById, queueRejectedNotify,
          getLastRecapWeek, setLastRecapWeek, holidayAdjust, holidayRun,
-         currentWeekNumber } from './db.js';
+         currentWeekNumber, campaignEnded } from './db.js';
 import { GROUPS, groupForUser } from './deadlines.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -2589,6 +2589,7 @@ bot.catch((err) => {
 // current week (these fire before the group's boundary flips, so
 // stats.submittedThisWeek still refers to the week that's about to close).
 async function runMorningNudge(group) {
+  if (campaignEnded(GROUPS[group].offsetMin)) return;
   if (currentWeekNumber(GROUPS[group].offsetMin) === 1) {
     console.log(`[Cron] Skipping ${group} morning nudge — Week 1 launch week.`);
     return;
@@ -2628,6 +2629,7 @@ async function runMorningNudge(group) {
 }
 
 async function runWarningNudge(group) {
+  if (campaignEnded(GROUPS[group].offsetMin)) return;
   if (currentWeekNumber(GROUPS[group].offsetMin) === 1) return;
   console.log(`[Cron] Running ${group} 1-hour warning...`);
   try {
@@ -2654,6 +2656,7 @@ async function runWarningNudge(group) {
 // week = the group's new currentWeekNumber - 1. We read that week's breakdown
 // status (NOT submittedThisWeek, which has already advanced to the new week).
 async function runDeadlineNudge(group) {
+  if (campaignEnded(GROUPS[group].offsetMin)) return;
   const closedWeek = currentWeekNumber(GROUPS[group].offsetMin) - 1;
   if (closedWeek < 1) return; // pre-launch
   if (cronAbortFlags[group]) {
@@ -2697,6 +2700,7 @@ const GROUP_PREVIEW_TAG = {
 // abort. Resets the group's abort flag so last week's /cancelnudge never carries
 // over. Fires before the boundary flips, so submittedThisWeek = the closing week.
 async function runDeadlinePreview(group) {
+  if (campaignEnded(GROUPS[group].offsetMin)) return;
   if (currentWeekNumber(GROUPS[group].offsetMin) === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
   if (!adminIds.length) return;
@@ -2755,6 +2759,7 @@ cron.schedule('0 7 * * 1,2', async () => {
 
 // 9:30 AM SGT (01:30 UTC) — light count before 10 AM nudge
 cron.schedule('30 1 * * 1,2', async () => {
+  if (campaignEnded(GROUPS.default.offsetMin)) return;
   if (!holidayRun(1)) return; // TEMP: Jun-1 PH week → fire Tue not Mon
   if (currentQ2Week() === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
@@ -2777,6 +2782,7 @@ cron.schedule('30 1 * * 1,2', async () => {
 
 // 2:30 PM SGT (06:30 UTC) — light count before 3 PM warning
 cron.schedule('30 6 * * 1,2', async () => {
+  if (campaignEnded(GROUPS.default.offsetMin)) return;
   if (!holidayRun(1)) return; // TEMP: Jun-1 PH week → fire Tue not Mon
   if (currentQ2Week() === 1) return;
   const adminIds = (process.env.ADMIN_CHAT_IDS ?? '').split(',').map(id => id.trim()).filter(Boolean);
