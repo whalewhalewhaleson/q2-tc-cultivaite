@@ -99,6 +99,20 @@ export function currentWeekNumber(offsetMin = 0) {
   return holidayAdjust(nowMs, week);
 }
 
+// currentWeekNumber() clamps at 13 forever once Q2 ends, so it can't be used
+// to detect "campaign over" — this checks the real (unclamped) elapsed time
+// against week 13's deadline instead, so the Mon/Tue deadline-nudge crons in
+// bot.js can stop firing once the season is actually done. The +1 day pad
+// keeps week 13's own admin-preview + deadline-nudge pair (30 min apart, same
+// day) both on the same side of the cutoff — without it, the guard could flip
+// true in between them and leave the preview's "nudge fires in 30 min" promise
+// broken by a silently-skipped nudge. The very next cycle (a full week later)
+// stays cleanly suppressed either way.
+const DAY_MS = 24 * 60 * 60 * 1000;
+export function campaignEnded(offsetMin = 0, now = Date.now()) {
+  return now >= Q2_START.getTime() + offsetMin * 60000 + 13 * WEEK_MS + DAY_MS;
+}
+
 // ---------------------------------------------------------------------------
 // In-memory cache
 // ---------------------------------------------------------------------------
