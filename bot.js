@@ -2733,6 +2733,17 @@ async function runDeadlinePreview(group) {
 }
 
 // ---------------------------------------------------------------------------
+// Q2 2026 campaign ended — all outbound notification crons (nudges below,
+// plus the recap/Good-News block further down) are disabled. Flip
+// NOTIFICATIONS_ENABLED back to true to resume for a future campaign. The
+// shared sendGoodNewsNotifications()/runRecapBroadcast() functions stay at
+// module scope (unwrapped) so the manual /firerecap and /firenotifications
+// admin commands keep working.
+// ---------------------------------------------------------------------------
+const NOTIFICATIONS_ENABLED = false;
+if (NOTIFICATIONS_ENABLED) {
+
+// ---------------------------------------------------------------------------
 // DEFAULT group crons — Mon 10AM/3PM/4PM SGT. Holiday gating (holidayRun + the
 // '1,2' day spec) is preserved from the Jun-1 PH shift; it is inert now that the
 // PH week has passed. The Thailand / Monday-off crons below post-date it and so
@@ -2832,6 +2843,8 @@ cron.schedule(GROUPS.monday_off.nudges.morning,  () => runMorningNudge('monday_o
 cron.schedule(GROUPS.monday_off.nudges.warning,  () => runWarningNudge('monday_off'),   { timezone: 'UTC' });
 cron.schedule(GROUPS.monday_off.nudges.preview,  () => runDeadlinePreview('monday_off'),{ timezone: 'UTC' });
 cron.schedule(GROUPS.monday_off.nudges.deadline, () => runDeadlineNudge('monday_off'),  { timezone: 'UTC' });
+
+} // NOTIFICATIONS_ENABLED (nudge crons)
 
 // ---------------------------------------------------------------------------
 // Good news notifications — shared by cron and /firenotifications
@@ -2954,6 +2967,7 @@ async function runRecapBroadcast() {
 // ---------------------------------------------------------------------------
 // Friday recap cron — 3:30 PM SGT = 07:30 UTC, every Friday
 // ---------------------------------------------------------------------------
+if (NOTIFICATIONS_ENABLED) {
 
 cron.schedule('30 7 * * 5', async () => {
   const week = currentQ2Week();
@@ -3070,6 +3084,8 @@ cron.schedule('15 2 * * 2,5', async () => {
     }
   }
 }, { timezone: 'UTC' });
+
+} // NOTIFICATIONS_ENABLED (recap/Good-News crons)
 
 // ---------------------------------------------------------------------------
 // HTTP server — serves the leadership dashboard + JSON API
