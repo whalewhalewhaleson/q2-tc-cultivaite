@@ -4,6 +4,7 @@ import { groupForUser, offsetMinutesForUser, GROUPS } from './deadlines.js';
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { db: { schema: 'cultivaite' } },
 );
 
 const EXCLUDED_DEPARTMENTS = [];
